@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config';
 
 function IntervenantPortal() {
   const [email, setEmail] = useState('');
@@ -26,7 +27,7 @@ function IntervenantPortal() {
     setLoading(true);
     setError(null);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiUrl = API_URL;
       const response = await fetch(`${apiUrl}/api/intervenant/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,7 +49,7 @@ function IntervenantPortal() {
     setLoading(true);
     setError(null);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiUrl = API_URL;
       const response = await fetch(`${apiUrl}/api/intervenant/${intervenant.id}/missions`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Erreur lors de la récupération des missions');

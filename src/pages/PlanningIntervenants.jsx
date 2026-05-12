@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../config';
 import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
 import format from 'date-fns/format';
 import parse from 'date-fns/parse';
@@ -36,7 +37,7 @@ function PlanningIntervenants() {
   const fetchPlanning = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/equipe/planning');
+      const res = await fetch(`${API_URL}/api/equipe/planning`);
       if (!res.ok) throw new Error('Erreur lors du chargement du planning');
       const data = await res.json();
       

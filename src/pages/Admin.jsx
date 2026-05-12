@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
 const Admin = () => {
@@ -84,7 +85,7 @@ const Admin = () => {
 
   const fetchIntervenants = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/intervenants', {
+      const res = await fetch(`${API_URL}/api/admin/intervenants`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -101,8 +102,8 @@ const Admin = () => {
     setIsSavingIntervenant(true);
     try {
       const url = currentIntervenant 
-        ? `http://localhost:5000/api/admin/intervenants/${currentIntervenant.id}` 
-        : 'http://localhost:5000/api/admin/intervenants';
+        ? `${API_URL}/api/admin/intervenants/${currentIntervenant.id}` 
+        : `${API_URL}/api/admin/intervenants';
       const method = currentIntervenant ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
@@ -128,7 +129,7 @@ const Admin = () => {
   const deleteIntervenant = async (id) => {
     if(!window.confirm("Supprimer cet intervenant ?")) return;
     try {
-      await fetch(`http://localhost:5000/api/admin/intervenants/${id}`, {
+      await fetch(`${API_URL}/api/admin/intervenants/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -174,7 +175,7 @@ const Admin = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:5000/api/admin/auth', {
+      const res = await fetch(`${API_URL}/api/admin/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password })
@@ -194,7 +195,7 @@ const Admin = () => {
   // Codes Promo
   const fetchPromoCodes = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/promo-codes', {
+      const res = await fetch(`${API_URL}/api/admin/promo-codes`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -209,7 +210,7 @@ const Admin = () => {
   const createPromoCode = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:5000/api/admin/promo-codes', {
+      const res = await fetch(`${API_URL}/api/admin/promo-codes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(promoForm)
@@ -231,7 +232,7 @@ const Admin = () => {
   const deletePromoCode = async (id) => {
     if (!window.confirm('Supprimer ce code promo ?')) return;
     try {
-      await fetch(`http://localhost:5000/api/admin/promo-codes/${id}`, {
+      await fetch(`${API_URL}/api/admin/promo-codes/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -243,7 +244,7 @@ const Admin = () => {
 
   const togglePromoCode = async (id, actif) => {
     try {
-      await fetch(`http://localhost:5000/api/admin/promo-codes/${id}`, {
+      await fetch(`${API_URL}/api/admin/promo-codes/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ actif: !actif })
@@ -258,7 +259,7 @@ const Admin = () => {
   const captureCaution = async () => {
     if (!captureReservationId || !captureMontant) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/reservations/${captureReservationId}/capture-caution`, {
+      const res = await fetch(`${API_URL}/api/reservations/${captureReservationId}/capture-caution`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ montant: parseFloat(captureMontant) })
@@ -287,7 +288,7 @@ const Admin = () => {
   const fetchReservations = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/admin/reservations', {
+      const res = await fetch(`${API_URL}/api/admin/reservations`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -304,7 +305,7 @@ const Admin = () => {
 
   const fetchFinances = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/finances', {
+      const res = await fetch(`${API_URL}/api/admin/finances`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -331,7 +332,7 @@ const Admin = () => {
 
     setIsAssigningMissions(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/reservations/${currentReservationForMission.id}/missions`, {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${currentReservationForMission.id}/missions`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -368,7 +369,7 @@ const Admin = () => {
 
   const notifyIntervenant = async (reservationId, intervenantId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/reservations/${reservationId}/notify-intervenant`, {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${reservationId}/notify-intervenant`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -387,7 +388,7 @@ const Admin = () => {
   const deleteMission = async (missionId) => {
     if (!window.confirm("Supprimer cette mission ?")) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/missions/${missionId}`, {
+      const res = await fetch(`${API_URL}/api/admin/missions/${missionId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -404,7 +405,7 @@ const Admin = () => {
 
   const updateStatut = async (id, newStatut) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/reservations/${id}`, {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -424,7 +425,7 @@ const Admin = () => {
 
   const updateIntervenant = async (reservationId, intervenantId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/reservations/${reservationId}`, {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${reservationId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -444,7 +445,7 @@ const Admin = () => {
 
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/reservations/${id}`, {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -461,7 +462,7 @@ const Admin = () => {
 
   const triggerPaymentAction = async (id, actionType) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/reservations/${id}/${actionType}`, {
+      const res = await fetch(`${API_URL}/api/reservations/${id}/${actionType}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -490,7 +491,7 @@ const Admin = () => {
   const handleAction = async (action, id) => {
     // Action 'accept' or 'reject' triggers the backend email logic
     try {
-      const res = await fetch(`http://localhost:5000/api/reservations/${id}/${action}`);
+      const res = await fetch(`${API_URL}/api/reservations/${id}/${action}`);
       if (res.ok) {
         alert(action === 'accept' ? 'Réservation acceptée et e-mail envoyé.' : 'Réservation refusée et e-mail envoyé.');
         fetchReservations();

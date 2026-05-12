@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { API_URL } from '../config';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -46,7 +47,7 @@ const Planning = () => {
   };
 
   const fetchReservations = () => {
-    fetch('http://localhost:5000/api/reservations')
+    fetch(`${API_URL}/api/reservations`)
       .then(res => res.json())
       .then(data => {
         if(Array.isArray(data)) {

@@ -126,7 +126,7 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
     setValidatingPromo(true);
     setPromoError('');
     try {
-      const res = await fetch('http://localhost:5000/api/promo-codes/validate', {
+      const res = await fetch(`${API_URL}/api/promo-codes/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -275,8 +275,8 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
       };
       
       const url = isAdmin 
-        ? 'http://localhost:5000/api/admin/reservations'
-        : 'http://localhost:5000/api/reservations';
+        ? `${API_URL}/api/admin/reservations`
+        : `${API_URL}/api/reservations`;
 
       const headers = { 'Content-Type': 'application/json' };
       if (isAdmin) {
