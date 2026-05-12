@@ -11,6 +11,9 @@ const stripe = require('stripe')(stripeSecretKey);
 const prisma = new PrismaClient();
 const app = express();
 
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 app.use(cors());
 
 // Stripe Webhook doit être avant express.json()
@@ -315,8 +318,8 @@ app.post('/api/reservations', async (req, res) => {
     }
 
     // Envoyer mail d'alerte aux administrateurs
-    const acceptLink = `http://localhost:5000/api/reservations/${reservation.id}/accept`;
-    const rejectLink = `http://localhost:5000/api/reservations/${reservation.id}/reject`;
+    const acceptLink = `${BACKEND_URL}/api/reservations/${reservation.id}/accept`;
+    const rejectLink = `${BACKEND_URL}/api/reservations/${reservation.id}/reject`;
 
     let detailsChambresHTML = '';
     if (chambresDetails) {
@@ -433,8 +436,8 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `http://localhost:5173/payment-cancel`,
+        success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${FRONTEND_URL}/payment-cancel`,
         metadata: {
           reservationId: existingReservation.id.toString(),
           paymentType: 'acompte'
@@ -546,8 +549,8 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:5173/payment-cancel`,
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: { reservationId: reser.id.toString(), paymentType: 'solde' }
     };
 
@@ -595,8 +598,8 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
       }],
       mode: 'payment',
       payment_intent_data: { capture_method: 'manual' },
-      success_url: `http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:5173/payment-cancel`,
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: { reservationId: reser.id.toString(), paymentType: 'caution' }
     };
 
@@ -738,8 +741,8 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:5173/payment-cancel`,
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: {
         reservationId: reservation.id.toString(),
         paymentType: 'solde'
