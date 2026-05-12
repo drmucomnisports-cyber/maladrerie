@@ -1,0 +1,103 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Client {
+  id             Int           @id @default(autoincrement())
+  nom            String
+  email          String
+  telephone      String
+  adressePostale String?
+  reservations   Reservation[]
+  createdAt      DateTime      @default(now())
+}
+
+model Reservation {
+  id              Int          @id @default(autoincrement())
+  client          Client       @relation(fields: [clientId], references: [id])
+  clientId        Int
+  chambres        Int[]        // Gardé pour la compatibilité avec le calendrier
+  chambresDetails Json?        // Array of objects { id, adultes, enfants, prix }
+  options         Json?        // Objets { litsFaits, lingeFourni, menage }
+  prixTotal       Float?
+  montantAcompte  Float?
+  montantSolde    Float?
+  statutPaiement  String       @default("EN_ATTENTE") // EN_ATTENTE, ACOMPTE_PAYE, PAYE
+  statutCaution   String       @default("NON_DEMANDEE") // NON_DEMANDEE, EN_ATTENTE, DEPOSEE, UTILISEE, RESTITUEE
+  stripeSessionId String?      // Legacy or generic
+  stripeAcompteId String?
+  stripeSoldeId   String?
+  stripeCautionId String?
+  dateDebut       DateTime
+  dateFin         DateTime
+  statut          String       @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE, RESERVE
+  isGroupe        Boolean      @default(false)
+  lienPaiementEnvoye Boolean   @default(false)
+  montantCautionRetenu Float?  // Montant effectivement retenu sur la caution (ex: 50€ pour ménage)
+  codePromo       String?      // Code promo utilisé
+  intervenant     Intervenant? @relation(fields: [intervenantId], references: [id])
+  intervenantId   Int?
+  missions        Mission[]
+  occupants       Occupant[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Occupant {
+  id            Int         @id @default(autoincrement())
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  reservationId Int
+  nom           String
+  prenom        String
+  estAdulte     Boolean     @default(true)
+  age           Int?
+}
+
+model Intervenant {
+  id             Int             @id @default(autoincrement())
+  nom            String
+  prenom         String
+  telephone      String
+  email          String
+  disponibilites Disponibilite[]
+  reservations   Reservation[]
+  missions       Mission[]
+}
+
+model Mission {
+  id            Int         @id @default(autoincrement())
+  intervenant   Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+  intervenantId Int
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  reservationId Int
+  typeMission   String
+  montant       Float
+  date          DateTime?
+  statut        String      @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE
+}
+
+model Disponibilite {
+  id            Int         @id @default(autoincrement())
+  intervenant   Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+  intervenantId Int
+  dateDebut     DateTime
+  dateFin       DateTime
+}
+
+model PromoCode {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  description   String?
+  type          String    @default("pourcentage") // "pourcentage" ou "fixe"
+  valeur        Float     // ex: 10 pour 10% ou 10€
+  actif         Boolean   @default(true)
+  dateExpiration DateTime?
+  usageMax      Int?      // nombre max d'utilisations (null = illimité)
+  usageActuel   Int       @default(0)
+  createdAt     DateTime  @default(now())
+}
