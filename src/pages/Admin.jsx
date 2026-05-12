@@ -103,7 +103,7 @@ const Admin = () => {
     try {
       const url = currentIntervenant 
         ? `${API_URL}/api/admin/intervenants/${currentIntervenant.id}` 
-        : `${API_URL}/api/admin/intervenants';
+        : `${API_URL}/api/admin/intervenants`;
       const method = currentIntervenant ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,

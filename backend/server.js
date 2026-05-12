@@ -519,6 +519,8 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     console.error(error);
     res.status(500).send("Erreur lors de l'acceptation");
   }
+});
+
 // Demander le solde manuellement
 app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
   const { id } = req.params;
