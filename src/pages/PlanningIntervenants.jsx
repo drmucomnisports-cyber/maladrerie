@@ -7,7 +7,7 @@ import startOfWeek from 'date-fns/startOfWeek';
 import getDay from 'date-fns/getDay';
 import { fr } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const locales = {
   'fr': fr,
@@ -25,19 +25,38 @@ function PlanningIntervenants() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const token = localStorage.getItem('staffToken');
 
   // States controlled for calendar navigation
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState(Views.MONTH);
 
   useEffect(() => {
-    fetchPlanning();
-  }, []);
+    if (!token) {
+      navigate('/login');
+    } else {
+      fetchPlanning();
+    }
+  }, [token, navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('staffToken');
+    navigate('/login');
+  };
 
   const fetchPlanning = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/equipe/planning`);
+      const res = await fetch(`${API_URL}/api/equipe/planning`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        return;
+      }
       if (!res.ok) throw new Error('Erreur lors du chargement du planning');
       const data = await res.json();
       
@@ -95,9 +114,14 @@ function PlanningIntervenants() {
             <h1 className="text-2xl font-black uppercase tracking-tight">Planning Équipe</h1>
             <p className="text-blue-200 text-sm mt-1">Disponibilités et Réservations du Gîte de la Maladrerie</p>
           </div>
-          <Link to="/" className="text-white hover:text-blue-200 transition-colors font-bold uppercase text-sm">
-            Retour à l'accueil
-          </Link>
+          <div className="flex gap-4">
+            <Link to="/" className="text-white hover:text-blue-200 transition-colors font-bold uppercase text-sm">
+              Accueil
+            </Link>
+            <button onClick={handleLogout} className="text-white hover:text-red-300 transition-colors font-bold uppercase text-sm">
+              Déconnexion
+            </button>
+          </div>
         </div>
       </header>
 

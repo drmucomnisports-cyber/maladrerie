@@ -6,12 +6,14 @@ import Admin from './pages/Admin';
 import PlanningIntervenants from './pages/PlanningIntervenants';
 
 import IntervenantPortal from './pages/IntervenantPortal';
+import Login from './pages/Login';
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/planning" element={<Planning />} />
         <Route path="/planning-equipe" element={<PlanningIntervenants />} />
         <Route path="/admin" element={<Admin />} />

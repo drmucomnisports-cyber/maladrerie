@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
 const Admin = () => {
+  const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [token, setToken] = useState(localStorage.getItem('adminToken') || null);
   const [reservations, setReservations] = useState([]);
@@ -45,7 +47,7 @@ const Admin = () => {
 
   const [showIntervenantModal, setShowIntervenantModal] = useState(false);
   const [currentIntervenant, setCurrentIntervenant] = useState(null);
-  const [intervenantForm, setIntervenantForm] = useState({ nom: '', prenom: '', email: '', telephone: '', disponibilites: [] });
+  const [intervenantForm, setIntervenantForm] = useState({ nom: '', prenom: '', email: '', telephone: '', password: '', disponibilites: [] });
   const [isSavingIntervenant, setIsSavingIntervenant] = useState(false);
 
   // Codes Promo
@@ -56,6 +58,11 @@ const Admin = () => {
   // Captation partielle caution
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureReservationId, setCaptureReservationId] = useState(null);
+
+  // Comptes Admin
+  const [adminAccounts, setAdminAccounts] = useState([]);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminForm, setAdminForm] = useState({ email: '', password: '', nom: '' });
   const [captureMontant, setCaptureMontant] = useState('');
 
   useEffect(() => {
@@ -64,6 +71,7 @@ const Admin = () => {
       fetchIntervenants();
       fetchFinances();
       fetchPromoCodes();
+      fetchAdminAccounts();
     }
   }, [token]);
 
@@ -146,6 +154,7 @@ const Admin = () => {
       prenom: interv.prenom,
       email: interv.email,
       telephone: interv.telephone,
+      password: '', // On ne pré-remplit pas le mot de passe
       disponibilites: interv.disponibilites || []
     });
     setShowIntervenantModal(true);
@@ -242,6 +251,48 @@ const Admin = () => {
     }
   };
 
+  const fetchAdminAccounts = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/accounts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) setAdminAccounts(await res.json());
+    } catch (err) { console.error(err); }
+  };
+
+  const saveAdminAccount = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_URL}/api/admin/accounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(adminForm)
+      });
+      if (res.ok) {
+        setShowAdminModal(false);
+        setAdminForm({ email: '', password: '', nom: '' });
+        fetchAdminAccounts();
+        showFeedback("Compte administrateur créé.");
+      } else {
+        showFeedback("Erreur lors de la création de l'admin.", "error");
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const deleteAdminAccount = async (id) => {
+    if (!window.confirm("Supprimer cet administrateur ?")) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/accounts/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchAdminAccounts();
+        showFeedback("Compte supprimé.");
+      }
+    } catch (err) { console.error(err); }
+  };
+
   const togglePromoCode = async (id, actif) => {
     try {
       await fetch(`${API_URL}/api/admin/promo-codes/${id}`, {
@@ -283,6 +334,7 @@ const Admin = () => {
     setToken(null);
     localStorage.removeItem('adminToken');
     setReservations([]);
+    navigate('/login');
   };
 
   const fetchReservations = async () => {
@@ -503,38 +555,13 @@ const Admin = () => {
     }
   };
 
-  if (!token) {
-    return (
-      <div className="min-h-screen bg-[#F8F8F8] flex flex-col justify-center items-center font-sans">
-        <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md border-t-8 border-muc-blue">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-black text-muc-blue tracking-tight uppercase">Administration</h1>
-            <p className="text-sm font-medium text-slate-500 mt-2">Gîte de La Maladrerie</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Mot de passe</label>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-5 py-3 rounded-xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium mt-1"
-                placeholder="••••••••"
-              />
-            </div>
-            {error && <p className="text-red-500 text-sm font-bold text-center">{error}</p>}
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-muc-blue text-white py-3 rounded-xl font-black uppercase tracking-widest hover:bg-muc-blue/90 transition-all shadow-md"
-            >
-              {loading ? 'Connexion...' : 'Se connecter'}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!token) {
+      navigate('/login');
+    }
+  }, [token, navigate]);
+
+  if (!token) return null;
 
   return (
     <div className="min-h-screen bg-[#F8F8F8] font-sans p-8">
@@ -579,6 +606,7 @@ const Admin = () => {
             <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
             <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
             <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'promos' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Promos</button>
+            <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'accounts' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Comptes</button>
           </div>
           </div>
         </div>
@@ -894,6 +922,10 @@ const Admin = () => {
                 <label className="block text-sm font-bold text-slate-700 mb-1">Téléphone</label>
                 <input required type="text" value={intervenantForm.telephone} onChange={e => setIntervenantForm({...intervenantForm, telephone: e.target.value})} className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-muc-blue" />
               </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Mot de passe (Laisser vide pour ne pas changer)</label>
+                <input type="password" value={intervenantForm.password} onChange={e => setIntervenantForm({...intervenantForm, password: e.target.value})} className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-muc-blue" placeholder="••••••••" />
+              </div>
               
               <div className="pt-2 border-t border-slate-100">
                 <div className="flex justify-between items-center mb-2 mt-2">
@@ -1038,6 +1070,48 @@ const Admin = () => {
         </div>
       )}
 
+      {activeTab === 'accounts' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">Gestion des Comptes Administrateurs</h2>
+            <button onClick={() => setShowAdminModal(true)} className="bg-muc-blue text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-800 transition-all shadow-md">+ Nouvel Admin</button>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-black uppercase text-slate-500 tracking-widest">Nom</th>
+                  <th className="px-6 py-4 text-xs font-black uppercase text-slate-500 tracking-widest">Email</th>
+                  <th className="px-6 py-4 text-xs font-black uppercase text-slate-500 tracking-widest">Créé le</th>
+                  <th className="px-6 py-4 text-xs font-black uppercase text-slate-500 tracking-widest text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {adminAccounts.map(acc => (
+                  <tr key={acc.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-700">{acc.nom || 'Sans nom'}</td>
+                    <td className="px-6 py-4 text-slate-600">{acc.email}</td>
+                    <td className="px-6 py-4 text-slate-500">{new Date(acc.createdAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-right">
+                      <button onClick={() => deleteAdminAccount(acc.id)} className="text-red-500 hover:text-red-700 font-bold uppercase text-xs tracking-widest">Supprimer</button>
+                    </td>
+                  </tr>
+                ))}
+                {adminAccounts.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-12 text-center text-slate-500 italic">Aucun compte admin supplémentaire.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <p className="text-sm text-slate-600"><strong>Note :</strong> Le compte principal configuré sur Railway (SuperAdmin) n'apparaît pas ici mais reste toujours actif.</p>
+          </div>
+        </div>
+      )}
+
       {showPromoModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 p-6">
@@ -1077,6 +1151,32 @@ const Admin = () => {
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setShowPromoModal(false)} className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Annuler</button>
                 <button type="submit" className="flex-1 py-3 font-bold text-white bg-muc-blue hover:bg-blue-800 rounded-xl transition-all shadow-md">Créer le code</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 p-6">
+            <h3 className="text-lg font-black text-muc-blue uppercase tracking-tight mb-6">Nouvel Administrateur</h3>
+            <form onSubmit={saveAdminAccount} className="space-y-4">
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1 ml-1">Nom (Affichage)</label>
+                <input required type="text" value={adminForm.nom} onChange={e => setAdminForm({...adminForm, nom: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-transparent focus:border-muc-blue rounded-xl outline-none font-bold" placeholder="Ex: Jean Dupont" />
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1 ml-1">Email (Identifiant)</label>
+                <input required type="email" value={adminForm.email} onChange={e => setAdminForm({...adminForm, email: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-transparent focus:border-muc-blue rounded-xl outline-none font-bold" placeholder="admin@exemple.com" />
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1 ml-1">Mot de passe</label>
+                <input required type="password" value={adminForm.password} onChange={e => setAdminForm({...adminForm, password: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-transparent focus:border-muc-blue rounded-xl outline-none font-bold" placeholder="••••••••" />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setShowAdminModal(false)} className="flex-1 px-6 py-3 border-2 border-slate-100 text-slate-500 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-slate-50 transition-all">Annuler</button>
+                <button type="submit" className="flex-1 px-6 py-3 bg-muc-blue text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 transition-all shadow-lg shadow-blue-200">Créer le compte</button>
               </div>
             </form>
           </div>

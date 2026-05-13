@@ -4,6 +4,8 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_dummy';
 const stripe = require('stripe')(stripeSecretKey);
@@ -84,13 +86,38 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
 
 app.use(express.json());
 
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'david.roujet@mucomnisports.fr';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'muc2024';
+
 const checkAuth = (req, res, next) => {
-  const token = req.headers.authorization;
-  console.log(`[checkAuth] Path: ${req.path}, Token: ${token}`);
-  if (token === 'Bearer fake-jwt-token-muc') {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Non autorisé' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  
+  // Compatibilité avec l'ancien token pour l'instant si besoin, mais on privilégie JWT
+  if (token === 'fake-jwt-token-muc') {
+    req.user = { email: ADMIN_EMAIL, role: 'admin' };
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Session expirée ou invalide' });
+  }
+};
+
+const checkAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
     next();
   } else {
-    res.status(401).json({ error: 'Non autorisé' });
+    res.status(403).json({ error: 'Accès réservé aux administrateurs' });
   }
 };
 
@@ -870,11 +897,60 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
 // ===== ROUTES ADMINISTRATEUR =====
 
 // Authentification simple
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // 1. Check SuperAdmin (Env Var) - Toujours prioritaire pour le dépannage
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      const token = jwt.sign({ email, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+      return res.json({ success: true, token, role: 'admin' });
+    }
+
+    // 2. Check Database Admin
+    const dbAdmin = await prisma.adminAccount.findUnique({ where: { email } });
+    if (dbAdmin) {
+      const isMatch = await bcrypt.compare(password, dbAdmin.password);
+      if (isMatch) {
+        const token = jwt.sign({ id: dbAdmin.id, email: dbAdmin.email, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+        return res.json({ success: true, token, role: 'admin' });
+      }
+    }
+
+    // 3. Check Intervenant
+    const intervenant = await prisma.intervenant.findUnique({
+      where: { email }
+    });
+
+    if (intervenant) {
+      // Pour l'instant, on accepte un mot de passe par défaut si non défini
+      // Ou on compare avec le mot de passe haché
+      let isMatch = false;
+      if (!intervenant.password) {
+        // Premier login ou password non défini
+        if (password === 'equipe2024') isMatch = true;
+      } else {
+        isMatch = await bcrypt.compare(password, intervenant.password);
+      }
+
+      if (isMatch) {
+        const token = jwt.sign({ id: intervenant.id, email: intervenant.email, role: 'intervenant' }, JWT_SECRET, { expiresIn: '24h' });
+        return res.json({ success: true, token, role: 'intervenant' });
+      }
+    }
+
+    res.status(401).json({ success: false, error: 'Identifiants incorrects' });
+  } catch (error) {
+    console.error("Erreur login:", error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 app.post('/api/admin/auth', (req, res) => {
   const { password } = req.body;
-  const adminPassword = process.env.ADMIN_PASSWORD || 'muc2024';
-  if (password === adminPassword) {
-    res.json({ success: true, token: 'fake-jwt-token-muc' });
+  if (password === ADMIN_PASSWORD) {
+    const token = jwt.sign({ email: ADMIN_EMAIL, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ success: true, token });
   } else {
     res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
   }
@@ -1473,46 +1549,53 @@ app.get('/api/admin/intervenants', checkAuth, async (req, res) => {
 });
 
 app.post('/api/admin/intervenants', checkAuth, async (req, res) => {
-  const { nom, prenom, telephone, email, disponibilites } = req.body;
+  const { nom, prenom, email, telephone, password, disponibilites } = req.body;
   try {
+    const data = { nom, prenom, email, telephone };
+    if (password) {
+      data.password = await bcrypt.hash(password, 10);
+    }
     const intervenant = await prisma.intervenant.create({
       data: {
-        nom, prenom, telephone, email,
-        disponibilites: disponibilites && disponibilites.length > 0 ? {
-          create: disponibilites.map(d => ({
+        ...data,
+        disponibilites: {
+          create: (disponibilites || []).map(d => ({
             dateDebut: new Date(d.dateDebut),
             dateFin: new Date(d.dateFin)
           }))
-        } : undefined
-      },
-      include: { disponibilites: true }
+        }
+      }
     });
     res.json(intervenant);
   } catch (error) {
+    console.error("Erreur création intervenant:", error);
     res.status(500).json({ error: 'Erreur lors de la création de l\'intervenant' });
   }
 });
 
 app.put('/api/admin/intervenants/:id', checkAuth, async (req, res) => {
   const { id } = req.params;
-  const { nom, prenom, telephone, email, disponibilites } = req.body;
+  const { nom, prenom, email, telephone, password, disponibilites } = req.body;
   try {
-    // Recreate disponibilites simply for this example
-    if (disponibilites) {
-      await prisma.disponibilite.deleteMany({ where: { intervenantId: parseInt(id) } });
+    const data = { nom, prenom, email, telephone };
+    if (password) {
+      data.password = await bcrypt.hash(password, 10);
     }
+
+    // Supprimer les anciennes dispos et recréer les nouvelles
+    await prisma.disponibilite.deleteMany({ where: { intervenantId: parseInt(id) } });
+
     const intervenant = await prisma.intervenant.update({
       where: { id: parseInt(id) },
       data: {
-        nom, prenom, telephone, email,
-        disponibilites: disponibilites && disponibilites.length > 0 ? {
-          create: disponibilites.map(d => ({
+        ...data,
+        disponibilites: {
+          create: (disponibilites || []).map(d => ({
             dateDebut: new Date(d.dateDebut),
             dateFin: new Date(d.dateFin)
           }))
-        } : undefined
-      },
-      include: { disponibilites: true }
+        }
+      }
     });
     res.json(intervenant);
   } catch (error) {
@@ -1527,6 +1610,42 @@ app.delete('/api/admin/intervenants/:id', checkAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la suppression de l\'intervenant' });
+  }
+});
+
+// CRUD AdminAccounts
+app.get('/api/admin/accounts', checkAuth, checkAdmin, async (req, res) => {
+  try {
+    const admins = await prisma.adminAccount.findMany({
+      select: { id: true, email: true, nom: true, createdAt: true }
+    });
+    res.json(admins);
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur lors de la récupération des admins' });
+  }
+});
+
+app.post('/api/admin/accounts', checkAuth, checkAdmin, async (req, res) => {
+  const { email, password, nom } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const admin = await prisma.adminAccount.create({
+      data: { email, password: hashedPassword, nom }
+    });
+    const { password: _, ...adminWithoutPassword } = admin;
+    res.json(adminWithoutPassword);
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur lors de la création de l\'admin' });
+  }
+});
+
+app.delete('/api/admin/accounts/:id', checkAuth, checkAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.adminAccount.delete({ where: { id: parseInt(id) } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur lors de la suppression de l\'admin' });
   }
 });
 
@@ -1554,7 +1673,7 @@ app.get('/api/admin/clients/:id', checkAuth, async (req, res) => {
 // PLANING EQUIPE
 // ===================================
 
-app.get('/api/equipe/planning', async (req, res) => {
+app.get('/api/equipe/planning', checkAuth, async (req, res) => {
   try {
     const disponibilites = await prisma.disponibilite.findMany({
       include: { intervenant: true }

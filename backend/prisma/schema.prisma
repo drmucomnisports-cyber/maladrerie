@@ -63,7 +63,8 @@ model Intervenant {
   nom            String
   prenom         String
   telephone      String
-  email          String
+  email          String          @unique
+  password       String?
   disponibilites Disponibilite[]
   reservations   Reservation[]
   missions       Mission[]
@@ -100,4 +101,11 @@ model PromoCode {
   usageMax      Int?      // nombre max d'utilisations (null = illimité)
   usageActuel   Int       @default(0)
   createdAt     DateTime  @default(now())
+}
+model AdminAccount {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  nom       String?
+  createdAt DateTime @default(now())
 }
