@@ -277,7 +277,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     
     setFormData(prev => ({ ...prev, occupants: newOccupants }));
     setStep(2);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
   };
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -573,21 +575,21 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
       {/* Modal de Confirmation / Alerte */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300">
-            <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-green-50'}`}>
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-32 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300 border-t-8 border-muc-blue">
+            <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-muc-blue/5'}`}>
               <div className="flex justify-center mb-4">
                 {modalConfig.type === 'warning' ? (
                   <div className="bg-amber-100 p-4 rounded-full text-amber-600">
                     <AlertTriangle size={40} />
                   </div>
                 ) : (
-                  <div className="bg-green-100 p-4 rounded-full text-green-600">
+                  <div className="bg-muc-blue/10 p-4 rounded-full text-muc-blue">
                     <CheckCircle size={40} />
                   </div>
                 )}
               </div>
-              <h3 className="text-2xl font-black text-slate-800 mb-2">{modalConfig.title}</h3>
+              <h3 className="text-2xl font-black text-slate-800 mb-2 uppercase tracking-tight">{modalConfig.title}</h3>
               <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">
                 {modalConfig.message}
               </div>
@@ -601,11 +603,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             </div>
             <div className="p-4 bg-slate-50 border-t border-slate-100">
               <button 
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
                   modalConfig.type === 'warning' 
                   ? 'bg-muc-blue text-white hover:bg-blue-800' 
-                  : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400'
+                  : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400 shadow-lg'
                 }`}
               >
                 {modalConfig.type === 'warning' ? 'J\'appelle de suite' : 'Fermer'}
