@@ -4,9 +4,11 @@ import Home from './pages/Home';
 import Planning from './pages/Planning';
 import Admin from './pages/Admin';
 import PlanningIntervenants from './pages/PlanningIntervenants';
-
 import IntervenantPortal from './pages/IntervenantPortal';
 import Login from './pages/Login';
+import MentionsLegales from './pages/MentionsLegales';
+import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
+import CGVPage from './pages/CGVPage';
 
 function App() {
   return (
@@ -18,6 +20,9 @@ function App() {
         <Route path="/planning-equipe" element={<PlanningIntervenants />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/portail-intervenant" element={<IntervenantPortal />} />
+        <Route path="/mentions-legales" element={<MentionsLegales />} />
+        <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
+        <Route path="/cgv" element={<CGVPage />} />
       </Routes>
     </Router>
   );

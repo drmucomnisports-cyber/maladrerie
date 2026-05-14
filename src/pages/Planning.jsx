@@ -227,7 +227,16 @@ const Planning = () => {
                © {new Date().getFullYear()} MUCOmnisports - Gîte de La Maladrerie
              </p>
           </div>
-          <div className="pt-8 border-t border-white/5">
+          <div className="pt-8 border-t border-white/5 flex flex-wrap justify-center gap-x-8 gap-y-4">
+             <Link to="/mentions-legales" className="text-[10px] text-white/40 hover:text-muc-yellow transition-colors font-bold uppercase tracking-[0.2em]">
+                Mentions Légales
+             </Link>
+             <Link to="/politique-confidentialite" className="text-[10px] text-white/40 hover:text-muc-yellow transition-colors font-bold uppercase tracking-[0.2em]">
+                Confidentialité
+             </Link>
+             <Link to="/cgv" className="text-[10px] text-white/40 hover:text-muc-yellow transition-colors font-bold uppercase tracking-[0.2em]">
+                CGV
+             </Link>
              <Link to="/login" className="text-[10px] text-white/40 hover:text-muc-yellow transition-colors font-bold uppercase tracking-[0.2em]">
                 Espace Pro
              </Link>
