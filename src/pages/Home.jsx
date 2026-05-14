@@ -106,7 +106,6 @@ const Home = () => {
         <div className="hidden lg:flex gap-8 text-[13px] font-bold uppercase tracking-wider text-slate-700 flex-1 items-center">
           <a href="#activites" onClick={(e) => handleScroll(e, 'activites')} className="hover:text-muc-blue transition-colors">Activités</a>
           <a href="#infos" onClick={(e) => handleScroll(e, 'infos')} className="hover:text-muc-blue transition-colors">Infos</a>
-          <Link to="/login" className="hover:text-muc-blue transition-colors">Espace Pro</Link>
           <Link to="/planning" className="bg-muc-yellow text-muc-blue px-6 py-2 rounded-lg text-sm font-black hover:bg-[#E5A600] transition-all ml-4 shadow-sm">
             RÉSERVER
           </Link>
@@ -458,7 +457,7 @@ const Home = () => {
             </a>
           </div>
 
-          <div className="pt-12 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-8 opacity-60">
+          <div className="pt-12 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-8 opacity-60 pb-8">
              <div className="flex flex-col items-start">
                <span className="font-black text-white tracking-tighter text-2xl">MUC</span>
                <span className="text-[10px] font-black text-muc-yellow tracking-[0.2em] uppercase">La Maladrerie</span>
@@ -466,6 +465,11 @@ const Home = () => {
              <p className="text-xs text-white uppercase tracking-[0.3em] font-medium">
                © {new Date().getFullYear()} MUCOmnisports - Gîte de La Maladrerie
              </p>
+          </div>
+          <div className="pt-8 border-t border-white/5">
+             <Link to="/login" className="text-[10px] text-white/40 hover:text-muc-yellow transition-colors font-bold uppercase tracking-[0.2em]">
+                Espace Pro
+             </Link>
           </div>
         </div>
       </footer>

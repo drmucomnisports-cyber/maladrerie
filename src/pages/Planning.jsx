@@ -54,7 +54,9 @@ const Planning = () => {
           const formattedEvents = data.map(r => ({
             title: r.statut === 'RESERVE' 
               ? `Réservé (Ch. ${r.chambres.join(', ')})` 
-              : `Attente (Ch. ${r.chambres.join(', ')})`,
+              : r.statut === 'DEVIS_EN_ATTENTE'
+                ? `Devis en cours (Ch. ${r.chambres.join(', ')})`
+                : `Attente (Ch. ${r.chambres.join(', ')})`,
             start: new Date(r.dateDebut),
             end: new Date(r.dateFin),
             allDay: true,
@@ -107,9 +109,10 @@ const Planning = () => {
 
   const eventStyleGetter = (event) => {
     const isReserved = event.statut === 'RESERVE';
+    const isDevis = event.statut === 'DEVIS_EN_ATTENTE';
     return {
       style: {
-        backgroundColor: isReserved ? '#0068B3' : '#F9B233',
+        backgroundColor: isReserved ? '#0068B3' : isDevis ? '#F59E0B' : '#F9B233',
         borderRadius: '10px',
         opacity: 0.9,
         color: 'white',
@@ -200,11 +203,37 @@ const Planning = () => {
 
           {/* Formulaire */}
           <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl h-fit sticky top-32 border-t-8 border-muc-yellow" data-reveal="right">
-            <h2 className="text-3xl font-black text-muc-blue mb-8 uppercase tracking-tight">Formulaire</h2>
-            <ReservationForm events={events} isAdmin={false} onCreated={fetchReservations} />
+            <h2 className="text-3xl font-black text-muc-blue mb-8 uppercase tracking-tight">
+              {new URLSearchParams(window.location.search).get('mode') === 'devis' ? 'Générer un Devis' : 'Réservation'}
+            </h2>
+            <ReservationForm 
+              events={events} 
+              isAdmin={!!localStorage.getItem('adminToken')} 
+              isDevis={new URLSearchParams(window.location.search).get('mode') === 'devis'}
+              onCreated={fetchReservations} 
+            />
           </div>
         </div>
       </div>
+
+      <footer className="bg-muc-blue py-20 px-6 text-center slanted-top relative overflow-hidden mt-12">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8 opacity-80 border-t border-white/10 pt-12 pb-8">
+             <div className="flex flex-col items-start">
+               <span className="font-black text-white tracking-tighter text-2xl">MUC</span>
+               <span className="text-[10px] font-black text-muc-yellow tracking-[0.2em] uppercase">La Maladrerie</span>
+             </div>
+             <p className="text-xs text-white uppercase tracking-[0.3em] font-medium">
+               © {new Date().getFullYear()} MUCOmnisports - Gîte de La Maladrerie
+             </p>
+          </div>
+          <div className="pt-8 border-t border-white/5">
+             <Link to="/login" className="text-[10px] text-white/40 hover:text-muc-yellow transition-colors font-bold uppercase tracking-[0.2em]">
+                Espace Pro
+             </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

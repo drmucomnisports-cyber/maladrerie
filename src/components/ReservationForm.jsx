@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Send } from 'lucide-react';
+import { Send, X, CheckCircle, AlertTriangle, Phone } from 'lucide-react';
+import { API_URL } from '../config';
 
 const CHAMBRES_INFO = {
   1: { num: 1, name: 'Chambre PMR', lits: 5, etage: 'RDC' },
@@ -10,7 +11,7 @@ const CHAMBRES_INFO = {
   6: { num: 6, name: 'Chambre standard', lits: 5, etage: '2e étage' }
 };
 
-const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} }) => {
+const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCreated = () => {} }) => {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -30,10 +31,36 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
     occupants: []
   });
 
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
+
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(null);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoError, setPromoError] = useState('');
+  const [devisWarningRooms, setDevisWarningRooms] = useState([]);
+
+  useEffect(() => {
+    if (formData.dateDebut && formData.dateFin && events.length > 0) {
+      const start = new Date(formData.dateDebut);
+      const end = new Date(formData.dateFin);
+      
+      const overlappingDevis = events.filter(e => {
+        // Assume events mapped from backend include 'statut'
+        if (e.statut !== 'DEVIS_EN_ATTENTE') return false;
+        const eStart = new Date(e.start);
+        const eEnd = new Date(e.end);
+        return (start < eEnd && end > eStart);
+      });
+
+      const rooms = [...new Set(overlappingDevis.flatMap(e => e.chambres || []))];
+      // Filter only rooms currently selected
+      const selectedOverlappingRooms = rooms.filter(r => formData.chambres.includes(r));
+      setDevisWarningRooms(selectedOverlappingRooms);
+    } else {
+      setDevisWarningRooms([]);
+    }
+  }, [formData.dateDebut, formData.dateFin, events, formData.chambres]);
 
   const [unavailableRooms, setUnavailableRooms] = useState([]);
 
@@ -87,29 +114,33 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
 
     let total = 0;
     let totalAdultes = 0;
-    let totalEnfants = 0;
+    let totalMineurs = 0;
 
     formData.chambres.forEach(chId => {
-      const details = formData.chambresDetails[chId] || { adultes: 0, enfants: 0 };
+      const details = formData.chambresDetails[chId] || { adultes: 0, mineurs: 0 };
       const info = CHAMBRES_INFO[chId];
       const nbAdultes = parseInt(details.adultes || 0);
-      const nbEnfants = parseInt(details.enfants || 0);
-      const occupants = nbAdultes + nbEnfants;
+      const nbMineurs = parseInt(details.mineurs || 0);
+      const occupants = nbAdultes + nbMineurs;
       
       totalAdultes += nbAdultes;
-      totalEnfants += nbEnfants;
+      totalMineurs += nbMineurs;
 
       const tarifPers = occupants >= info.lits ? 22 : 25;
       total += occupants * tarifPers * nuits;
+      
+      // Taxe de séjour : 4% du prix de la nuitée par adulte (+18 ans)
+      // Note: Adultes dans chambresDetails sont ≥13 ans pour le tarif, 
+      // mais ici on applique 4% sur le prix de la nuitée par adulte.
+      total += nbAdultes * tarifPers * nuits * 0.04;
     });
 
-    total += totalAdultes * 0.88 * nuits;
-
-    const totalPersonnes = totalAdultes + totalEnfants;
+    const totalPersonnes = totalAdultes + totalMineurs;
     if (formData.options.litsFaits) total += totalPersonnes * 5;
     if (formData.options.lingeFourni) total += totalPersonnes * 5;
     if (formData.options.menage) total += formData.chambres.length * 50;
 
+    // Appliquer Promo
     if (promoApplied) {
       if (promoApplied.type === 'pourcentage') {
         total = total * (1 - promoApplied.valeur / 100);
@@ -157,7 +188,7 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
         
         const newDetails = { ...prev.chambresDetails };
         if (!checked) delete newDetails[chambreId];
-        else newDetails[chambreId] = { adultes: 0, enfants: 0 };
+        else newDetails[chambreId] = { adultes: 0, mineurs: 0 };
 
         return { ...prev, chambres: newChambres, chambresDetails: newDetails };
       });
@@ -214,7 +245,7 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
     let totalExpectedOccupants = 0;
     for (let chId of formData.chambres) {
       const details = formData.chambresDetails[chId];
-      const occupantsCount = (details?.adultes || 0) + (details?.enfants || 0);
+      const occupantsCount = (details?.adultes || 0) + (details?.mineurs || 0);
       const capacite = CHAMBRES_INFO[chId].lits;
       if (occupantsCount === 0) {
         alert(`Veuillez indiquer le nombre d'occupants pour la chambre ${chId}.`);
@@ -232,20 +263,21 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
     for (const chId of formData.chambres) {
       const details = formData.chambresDetails[chId];
       const nbAdultes = parseInt(details?.adultes || 0);
-      const nbEnfants = parseInt(details?.enfants || 0);
+      const nbMineurs = parseInt(details?.mineurs || 0);
       
       // Ajouter les adultes
       for (let i = 0; i < nbAdultes; i++) {
         newOccupants.push({ nom: '', prenom: '', estAdulte: true, age: '' });
       }
-      // Ajouter les enfants
-      for (let i = 0; i < nbEnfants; i++) {
+      // Ajouter les mineurs
+      for (let i = 0; i < nbMineurs; i++) {
         newOccupants.push({ nom: '', prenom: '', estAdulte: false, age: '' });
       }
     }
     
     setFormData(prev => ({ ...prev, occupants: newOccupants }));
     setStep(2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -274,9 +306,11 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
         promoCode: promoApplied?.code
       };
       
-      const url = isAdmin 
-        ? `${API_URL}/api/admin/reservations`
-        : `${API_URL}/api/reservations`;
+      const url = (isAdmin && isDevis)
+        ? `${API_URL}/api/admin/devis`
+        : isAdmin 
+          ? `${API_URL}/api/admin/reservations`
+          : `${API_URL}/api/reservations`;
 
       const headers = { 'Content-Type': 'application/json' };
       if (isAdmin) {
@@ -292,20 +326,23 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
       
       if (res.ok) {
         const data = await res.json();
-        let message = isAdmin 
-          ? 'Réservation ajoutée manuellement avec succès.' 
-          : 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
+        let message = isDevis
+          ? 'Le devis a été généré et envoyé au prospect. Il est valable pendant 48 heures.'
+          : isAdmin 
+            ? 'Réservation ajoutée manuellement avec succès.' 
+            : 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
         
-        // Afficher l'alerte de dernière minute si applicable
-        if (data.isLastMinute && data.lastMinuteWarning) {
-          message = data.lastMinuteWarning;
-        }
-        
-        setSuccessMsg(message);
+        setModalConfig({
+          type: data.isLastMinute ? 'warning' : 'success',
+          title: data.isLastMinute ? 'Action Requise !' : (isDevis ? 'Devis Envoyé' : 'Demande Envoyée'),
+          message: data.isLastMinute ? data.lastMinuteWarning : message
+        });
+        setShowModal(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
         setFormData({ nom: '', email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [] });
         setStep(1);
         onCreated();
-        setTimeout(() => setSuccessMsg(''), 5000);
       } else {
         const errData = await res.json();
         setErrorMsg(errData.error || "Une erreur est survenue lors de l'envoi.");
@@ -332,7 +369,7 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
       {step === 1 && (
         <>
           <div className="space-y-1">
-            <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Responsable'}</label>
+            <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Client'}</label>
             <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: Jean Dupont" />
           </div>
           
@@ -387,8 +424,8 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
                       <input type="number" min="0" max={info.lits} value={formData.chambresDetails[num]?.adultes || 0} onChange={(e) => handleRoomDetailsChange(num, 'adultes', e.target.value)} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Enfants (&lt;13 ans)</label>
-                      <input type="number" min="0" max={info.lits} value={formData.chambresDetails[num]?.enfants || 0} onChange={(e) => handleRoomDetailsChange(num, 'enfants', e.target.value)} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm" />
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Mineurs</label>
+                      <input type="number" min="0" max={info.lits} value={formData.chambresDetails[num]?.mineurs || 0} onChange={(e) => handleRoomDetailsChange(num, 'mineurs', e.target.value)} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm" />
                     </div>
                   </div>
                 )}
@@ -425,8 +462,8 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
                 type="text" 
                 value={promoCode} 
                 onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                placeholder="Entrez votre code"
-                className="flex-1 px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-muc-blue font-bold text-sm uppercase"
+                placeholder="VOTRE CODE"
+                className="w-full sm:flex-1 px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-muc-blue font-bold text-sm uppercase min-w-0"
                 disabled={promoApplied}
               />
               {!promoApplied ? (
@@ -434,7 +471,7 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
                   type="button" 
                   onClick={handleApplyPromo}
                   disabled={validatingPromo || !promoCode}
-                  className="px-4 py-2 bg-muc-blue text-white rounded-xl font-bold text-sm hover:bg-blue-800 disabled:opacity-50 transition-all"
+                  className="whitespace-nowrap px-6 py-2 bg-muc-blue text-white rounded-xl font-bold text-sm hover:bg-blue-800 disabled:opacity-50 transition-all shadow-md"
                 >
                   {validatingPromo ? '...' : 'Appliquer'}
                 </button>
@@ -461,13 +498,13 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
                 <span>{calculerPrix().toFixed(2)} €</span>
               </div>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">* Inclut la taxe de séjour (0.88€/adulte/nuit)</p>
+            <p className="text-[10px] text-slate-500 mt-2">* Inclut la taxe de séjour (4% du prix de la nuitée / adulte)</p>
           </div>
         </div>
       )}
 
           <button type="submit" className="w-full bg-muc-blue text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-muc-blue/90 hover:scale-[1.02] transition-all shadow-xl mt-8">
-            <Send size={20} /> Étape suivante : Détails des occupants
+            <Send size={20} /> Valider
           </button>
         </>
       )}
@@ -479,7 +516,6 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
           </button>
 
           <div className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm">
-            <h3 className="text-lg font-black text-slate-800 mb-4">Coordonnées du Responsable</h3>
             <div className="space-y-1">
               <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Adresse Postale Complète</label>
               <textarea required name="adressePostale" value={formData.adressePostale} onChange={handleChange} rows="3" className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: 123 rue de la Paix, 75000 Paris" />
@@ -487,13 +523,13 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
           </div>
 
           <div className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm">
-            <h3 className="text-lg font-black text-slate-800 mb-4">Détails des {formData.occupants.length} Occupants</h3>
+            <h3 className="text-lg font-black text-slate-800 mb-4 uppercase tracking-tight">Détails des occupants</h3>
             <div className="space-y-6">
               {(() => {
                 let adultCount = 0;
                 let childCount = 0;
                 return formData.occupants.map((occ, idx) => {
-                  const label = occ.estAdulte ? `Adulte ${++adultCount}` : `Enfant ${++childCount}`;
+                  const label = occ.estAdulte ? `Adulte ${++adultCount}` : `Mineur ${++childCount}`;
                   return (
                     <div key={idx} className={`p-4 rounded-xl border ${occ.estAdulte ? 'bg-slate-50 border-slate-200' : 'bg-amber-50 border-amber-200'}`}>
                       <h4 className="text-sm font-bold text-slate-700 mb-3">{label}</h4>
@@ -507,8 +543,8 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
                       </div>
                       {!occ.estAdulte && (
                         <div className="mt-3">
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">Âge de l'enfant</label>
-                          <input required type="number" min="0" max="12" placeholder="Âge" value={occ.age} onChange={(e) => handleOccupantChange(idx, 'age', parseInt(e.target.value))} className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-muc-yellow outline-none" />
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">Âge du mineur</label>
+                          <input required type="number" min="0" max="18" placeholder="Âge" value={occ.age} onChange={(e) => handleOccupantChange(idx, 'age', parseInt(e.target.value))} className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-muc-yellow outline-none" />
                         </div>
                       )}
                     </div>
@@ -532,6 +568,50 @@ const ReservationForm = ({ events = [], isAdmin = false, onCreated = () => {} })
               <><Send size={20} /> {isAdmin ? 'Valider et Créer' : 'Confirmer la demande'}</>
             )}
           </button>
+        </div>
+      )}
+
+      {/* Modal de Confirmation / Alerte */}
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300">
+            <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-green-50'}`}>
+              <div className="flex justify-center mb-4">
+                {modalConfig.type === 'warning' ? (
+                  <div className="bg-amber-100 p-4 rounded-full text-amber-600">
+                    <AlertTriangle size={40} />
+                  </div>
+                ) : (
+                  <div className="bg-green-100 p-4 rounded-full text-green-600">
+                    <CheckCircle size={40} />
+                  </div>
+                )}
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 mb-2">{modalConfig.title}</h3>
+              <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">
+                {modalConfig.message}
+              </div>
+              
+              {modalConfig.type === 'warning' && (
+                <div className="mt-6 flex items-center justify-center gap-2 text-muc-blue font-bold bg-white/50 p-3 rounded-xl border border-amber-200">
+                  <Phone size={18} />
+                  <a href="tel:0667993681">06 67 99 36 81</a>
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100">
+              <button 
+                onClick={() => setShowModal(false)}
+                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
+                  modalConfig.type === 'warning' 
+                  ? 'bg-muc-blue text-white hover:bg-blue-800' 
+                  : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400'
+                }`}
+              >
+                {modalConfig.type === 'warning' ? 'J\'appelle de suite' : 'Fermer'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </form>

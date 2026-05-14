@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
@@ -602,6 +603,7 @@ const Admin = () => {
 
           <div className="flex gap-4">
             <button onClick={() => setActiveTab('reservations')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'reservations' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Réservations</button>
+            <button onClick={() => setActiveTab('devis')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'devis' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Devis</button>
             <button onClick={() => setActiveTab('clients')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'clients' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Clients</button>
             <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
             <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
@@ -622,6 +624,7 @@ const Admin = () => {
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                  <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
@@ -701,6 +704,9 @@ const Admin = () => {
                         </button>
                       </div>
                     </td>
+                    <td className="p-4">
+                      <div className="text-xs font-bold text-slate-600">{res.validePar || '-'}</div>
+                    </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2 flex-wrap max-w-[200px] ml-auto">
                         {res.statut === 'EN_ATTENTE' && (
@@ -747,6 +753,147 @@ const Admin = () => {
             </table>
           </div>
         </div>
+        )}
+
+        {activeTab === 'devis' && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
+              <div className="w-full md:w-1/2 relative">
+                <input 
+                  type="text" 
+                  placeholder="Rechercher un devis (Nom, Email)..." 
+                  className="w-full pl-12 pr-6 py-4 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-muc-blue focus:ring-0 transition-all font-medium text-slate-600"
+                  value={clientSearch}
+                  onChange={(e) => setClientSearch(e.target.value)}
+                />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+              </div>
+              <button 
+                onClick={() => navigate('/planning?mode=devis')}
+                className="w-full md:w-auto bg-muc-blue text-white px-8 py-4 rounded-xl font-black uppercase tracking-wider hover:bg-muc-blue/90 hover:scale-105 transition-all shadow-xl flex items-center justify-center gap-3"
+              >
+                <PlusCircle size={24} />
+                Nouveau Devis
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prospect</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Expire le</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reservations.filter(res => 
+                      res.statut.includes('DEVIS') && 
+                      (res.client.nom.toLowerCase().includes(clientSearch.toLowerCase()) || 
+                       res.client.email.toLowerCase().includes(clientSearch.toLowerCase()))
+                    ).map((res) => (
+                      <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                        <td className="p-4">
+                          <div className="font-bold text-slate-800">{res.client.nom}</div>
+                          <div className="text-xs text-slate-500">{res.client.email}</div>
+                          <div className="text-xs text-slate-500">{res.client.telephone}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                            <Calendar size={14} className="text-muc-blue" />
+                            Du {new Date(res.dateDebut).toLocaleDateString()}
+                          </div>
+                          <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                            <Calendar size={14} className="text-muc-blue" />
+                            Au {new Date(res.dateFin).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-wrap gap-1">
+                            {res.chambres.map(c => (
+                              <span key={c.id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase">{c.nom}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-black text-muc-blue">{res.total}€</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1">
+                            <div className="text-xs font-bold text-slate-600 flex items-center gap-2">
+                              <Clock size={14} className="text-slate-400" />
+                              {res.expireLe ? new Date(res.expireLe).toLocaleDateString() : 'N/A'}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              {res.expireLe ? new Date(res.expireLe).toLocaleTimeString() : ''}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                            res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {res.statut === 'DEVIS_EN_ATTENTE' ? 'En attente' : 'Expiré'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {res.statut === 'DEVIS_EN_ATTENTE' && (
+                              <button 
+                                onClick={async () => {
+                                  if (window.confirm('Confirmer la transformation du devis en réservation ?')) {
+                                    try {
+                                      const response = await fetch(`${API_URL}/api/admin/reservations/${res.id}/convert-devis`, {
+                                        method: 'POST',
+                                        headers: { 
+                                          'Content-Type': 'application/json',
+                                          'Authorization': `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({ adminEmail: localStorage.getItem('adminEmail') })
+                                      });
+                                      if (response.ok) {
+                                        showFeedback('Devis converti avec succès !');
+                                        fetchReservations();
+                                      } else {
+                                        const data = await response.json();
+                                        alert(`Erreur: ${data.error}`);
+                                      }
+                                    } catch (error) {
+                                      console.error('Erreur conversion devis:', error);
+                                    }
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-muc-blue text-white text-xs font-bold rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+                              >
+                                <CheckCircle size={14} />
+                                Valider
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => setDeleteModalId(res.id)} 
+                              className="p-1.5 bg-red-50 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"
+                            >
+                              <Trash size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {reservations.filter(res => res.statut.includes('DEVIS')).length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-slate-500 font-medium">Aucun devis trouvé</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === 'clients' && (() => {
@@ -1020,7 +1167,17 @@ const Admin = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">Gestion des Codes Promotionnels</h2>
-            <button onClick={() => setShowPromoModal(true)} className="bg-muc-blue text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-800 transition-all shadow-md">+ Créer un code</button>
+            <div className="flex gap-3">
+              <a 
+                href="https://dashboard.stripe.com/coupons" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold hover:bg-black transition-all shadow-md flex items-center gap-2 text-sm"
+              >
+                <span>💳 Gérer sur Stripe</span>
+              </a>
+              <button onClick={() => setShowPromoModal(true)} className="bg-muc-blue text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-800 transition-all shadow-md text-sm">+ Créer un code interne</button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">

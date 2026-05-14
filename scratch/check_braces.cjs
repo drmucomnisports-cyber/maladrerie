@@ -1,13 +1,8 @@
 const fs = require('fs');
-const content = fs.readFileSync('backend/server.js', 'utf8');
-let braces = 0;
-let line = 1;
+const content = fs.readFileSync('server.js', 'utf8');
+let open = 0;
 for (let i = 0; i < content.length; i++) {
-  if (content[i] === '\n') {
-    if (braces === 0) console.log(`Balance zero at line ${line}`);
-    line++;
-  }
-  if (content[i] === '{') braces++;
-  if (content[i] === '}') braces--;
+    if (content[i] === '{') open++;
+    if (content[i] === '}') open--;
 }
-console.log(`Final balance: ${braces}`);
+console.log('Open braces count:', open);

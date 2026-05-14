@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
-const nodemailer = require('nodemailer');
+const { BrevoClient } = require('@getbrevo/brevo');
+const { generateDevisPDF } = require('./utils/generateDevisPDF');
 const cron = require('node-cron');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -180,17 +181,18 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
   chambres.forEach(chId => {
     const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
     const nbAdultes = parseInt(details.adultes || 0);
-    const nbEnfants = parseInt(details.enfants || 0);
-    const occupants = nbAdultes + nbEnfants;
+    const nbMineurs = parseInt(details.enfants || 0);
+    const occupants = nbAdultes + nbMineurs;
     const capacite = CHAMBRES_CAPACITE[chId] || 5;
     
     totalAdultes += nbAdultes;
     const tarifPers = occupants >= capacite ? 22 : 25;
     total += occupants * tarifPers * nuits;
+    // Taxe de séjour : 4% du prix de la nuitée par adulte
+    total += nbAdultes * (tarifPers * 0.04) * nuits;
   });
 
-  // Taxe de séjour
-  total += totalAdultes * 0.88 * nuits;
+  // Suppression de l'ancienne ligne de taxe hardcodée
 
   // Options
   const totalPersonnes = Object.values(chambresDetails || {}).reduce((acc, curr) => acc + parseInt(curr.adultes || 0) + parseInt(curr.enfants || 0), 0);
@@ -213,25 +215,32 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
   return Math.round(total * 100) / 100;
 };
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT),
-  secure: false, // true pour le port 465, false pour les autres
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
+// Configuration Brevo API (v5) - La méthode la plus fiable en production
+const brevo = new BrevoClient({ 
+  apiKey: process.env.BREVO_API_KEY || process.env.SMTP_PASS 
 });
 
 const sendMail = async (options) => {
   try {
-    await transporter.sendMail({
-      ...options,
-      from: `"Gîte de La Maladrerie" <${process.env.SMTP_SENDER}>`
+    const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
+    
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: options.subject,
+      htmlContent: options.html,
+      sender: { 
+        name: "Gite de la Maladrerie - MUC", 
+        email: "dr.mucomnisports@gmail.com" 
+      },
+      to: toEmails,
+      attachment: options.attachments ? options.attachments.map(att => ({
+        content: att.content,
+        name: att.name
+      })) : undefined
     });
-    console.log(`Email envoyé avec succès à: ${options.to}`);
+    
+    console.log(`Email envoyé via API Brevo avec succès à: ${options.to}`);
   } catch (error) {
-    console.error("Erreur lors de l'envoi de l'email:", error);
+    console.error("Erreur lors de l'envoi de l'email via API:", error.message || error);
   }
 };
 
@@ -276,6 +285,8 @@ app.post('/api/reservations', async (req, res) => {
 
   // Recalculer le prix côté serveur pour sécurité
   const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, req.body.promoCode);
+  const prixTotal = backendPrixTotal; // Alias de sécurité pour éviter les ReferenceError
+
 
   try {
     const reservation = await prisma.reservation.create({
@@ -344,6 +355,14 @@ app.post('/api/reservations', async (req, res) => {
       `;
     }
 
+    // Vérification dernière minute (moins de 3 jours)
+    const isLastMinute = Math.round((new Date(dateDebut) - new Date()) / (1000 * 60 * 60 * 24)) < 3;
+
+    const responseData = { ...reservation, isLastMinute };
+    if (isLastMinute) {
+      responseData.lastMinuteWarning = "Votre réservation a bien été enregistrée. Celle-ci étant effectuée moins de 3 jours avant la date d'arrivée, nous vous invitons à contacter directement Philippe Morereau (07 52 62 79 62) ou David Roujet (06 67 99 36 81) afin de confirmer la bonne prise en compte de votre demande.";
+    }
+
     // Envoyer mail d'alerte aux administrateurs
     const acceptLink = `${BACKEND_URL}/api/reservations/${reservation.id}/accept`;
     const rejectLink = `${BACKEND_URL}/api/reservations/${reservation.id}/reject`;
@@ -351,7 +370,7 @@ app.post('/api/reservations', async (req, res) => {
     let detailsChambresHTML = '';
     if (chambresDetails) {
       detailsChambresHTML = Object.entries(chambresDetails).map(([chId, details]) => 
-        `<li>Chambre ${chId} : ${details.adultes} adulte(s), ${details.enfants} enfant(s)</li>`
+        `<li>Chambre ${chId} : ${details.adultes} adulte(s), ${details.enfants} mineur(s)</li>`
       ).join('');
     }
 
@@ -401,7 +420,7 @@ app.post('/api/reservations', async (req, res) => {
             ${occupantsHTML}
             ${optionsHTML}
             ${intervenantsHTML}
-            ${prixTotal ? `<p style="font-size: 18px; margin-top: 20px;"><strong>Tarif Total Estimé :</strong> ${prixTotal.toFixed(2)} €</p>` : ''}
+            <p style="font-size: 18px; margin-top: 20px;"><strong>Tarif Total Estimé :</strong> ${backendPrixTotal.toFixed(2)} €</p>
             
             <div style="margin-top: 30px; text-align: center;">
               <a href="${acceptLink}" style="display: inline-block; padding: 12px 25px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-right: 10px;">ACCEPTER ET DEMANDER PAIEMENT</a>
@@ -415,15 +434,12 @@ app.post('/api/reservations', async (req, res) => {
       `
     });
 
-    const responseData = { ...reservation, isLastMinute };
-    if (isLastMinute) {
-      responseData.lastMinuteWarning = "Votre réservation a bien été enregistrée. Celle-ci étant effectuée moins de 3 jours avant la date d'arrivée, nous vous invitons à contacter directement Philippe Morereau (06 07 08 09 10) ou David Roujet (06 01 02 03 04) afin de confirmer la bonne prise en compte de votre demande.";
-    }
     res.status(201).json(responseData);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Erreur lors de la création de la réservation' });
   }
+
 });
 
 // Accepter une réservation
@@ -451,6 +467,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
       const stripeCustomerId = await getOrCreateStripeCustomer(existingReservation.client.email, existingReservation.client.nom);
       const sessionParams = {
         payment_method_types: ['card'],
+        allow_promotion_codes: true,
         line_items: [{
           price_data: {
             currency: 'eur',
@@ -486,7 +503,8 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
         statut: 'RESERVE',
         montantAcompte: montantAcompte,
         montantSolde: montantSolde,
-        stripeAcompteId: stripeSessionId
+        stripeAcompteId: stripeSessionId,
+        validePar: req.user?.email || 'Admin'
       },
       include: { client: true }
     });
@@ -519,7 +537,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
             ${existingReservation.occupants && existingReservation.occupants.length > 0 ? `
               <p><strong>Occupants inscrits (${nbPersonnesAccept} personnes) :</strong></p>
               <ul>
-                ${existingReservation.occupants.map(occ => `<li>${occ.nom} ${occ.prenom} - ${occ.estAdulte ? 'Adulte' : `Enfant (${occ.age} ans)`}</li>`).join('')}
+                ${existingReservation.occupants.map(occ => `<li>${occ.nom} ${occ.prenom} - ${occ.estAdulte ? 'Adulte' : `Mineur (${occ.age} ans)`}</li>`).join('')}
               </ul>
             ` : ''}
             ${paymentLink ? `
@@ -531,7 +549,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
             ` : '<p>Votre réservation est confirmée. Le règlement se fera selon les modalités convenues.</p>'}
             <p>Nous restons à votre disposition pour toute question complémentaire.</p>
             <p>À très bientôt !</p>
-            <p style="margin-top: 20px;">L'équipe du MUC Omnisports</p>
+            <p style="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
           </div>
           <div style="background-color: #FDB913; height: 5px;"></div>
         </div>
@@ -551,6 +569,295 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
   }
 });
 
+// Refuser une réservation
+app.get('/api/reservations/:id/reject', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const reservation = await prisma.reservation.update({
+      where: { id: parseInt(id) },
+      data: { 
+        statut: 'REFUSEE',
+        validePar: req.user?.email || 'Admin'
+      },
+      include: { client: true }
+    });
+
+    // Optionnel : Envoyer un mail de refus au client
+    await sendMail({
+      to: reservation.client.email,
+      subject: "Information concernant votre demande de réservation - Gîte de La Maladrerie",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+          <div style="background-color: #004B93; padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
+          </div>
+          <div style="padding: 30px; color: #333; line-height: 1.6;">
+            <h2 style="color: #004B93;">Bonjour ${reservation.client.nom},</h2>
+            <p>Nous avons bien reçu votre demande de réservation pour la période du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}.</p>
+            <p>Malheureusement, nous ne sommes pas en mesure d'y donner une suite favorable pour le moment.</p>
+            <p>Nous vous remercions de votre intérêt et espérons avoir le plaisir de vous accueillir une prochaine fois.</p>
+            <p>Cordialement,</p>
+            <p>L'équipe du Gite de la Maladrerie - MUC</p>
+          </div>
+        </div>
+      `
+    });
+
+    res.send(`
+      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+        <h1 style="color: #dc3545;">Réservation refusée</h1>
+        <p>Le client <strong>${reservation.client.nom}</strong> a été informé par e-mail.</p>
+        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;">Fermer cette fenêtre</button>
+      </div>
+    `);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Erreur lors du refus");
+  }
+});
+
+// ===== GESTION DES DEVIS (PROSPECTS) =====
+
+// Créer un devis
+app.post('/api/admin/devis', checkAuth, async (req, res) => {
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, promoCode } = req.body;
+
+  try {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const start = new Date(dateDebut);
+    const end = new Date(dateFin);
+    const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+
+    // 1. Trouver l'administrateur pour ses coordonnées
+    const admin = await prisma.adminAccount.findUnique({
+      where: { email: req.user.email }
+    });
+
+    // 2. Calculer le montant
+    const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, promoCode);
+    
+    let totalAdultes = 0;
+    let totalPrixBase = 0;
+    
+    chambres.forEach(chId => {
+      const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
+      const nbAdultes = parseInt(details.adultes || 0);
+      const nbMineurs = parseInt(details.enfants || 0);
+      const occupantsCount = nbAdultes + nbMineurs;
+      const capacite = CHAMBRES_CAPACITE[chId] || 5;
+      const tarifPers = occupantsCount >= capacite ? 22 : 25;
+      
+      totalAdultes += nbAdultes;
+      totalPrixBase += occupantsCount * tarifPers * nuits;
+    });
+
+    const taxeSejour = totalAdultes * (totalPrixBase / (occupants.length * nuits || 1) * 0.04) * nuits;
+    // Plus simple:
+    const tarifMoyen = totalPrixBase / ((occupants ? occupants.length : 1) * nuits);
+    const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.04) * nuits;
+    
+    const prixSejour = totalPrixBase;
+
+    // 3. Générer le numéro de devis séquentiel
+    const count = await prisma.reservation.count({
+      where: {
+        numeroDevis: { startsWith: `D-${year}-` }
+      }
+    });
+    const numeroDevis = `D-${year}-${String(count + 1).padStart(3, '0')}`;
+
+    const token = jwt.sign({ email, date: Date.now() }, JWT_SECRET).substring(0, 32);
+    const expiration = new Date();
+    expiration.setHours(expiration.getHours() + 48);
+
+    // 4. Créer la réservation/devis en base
+    const devis = await prisma.reservation.create({
+      data: {
+        dateDebut: new Date(dateDebut),
+        dateFin: new Date(dateFin),
+        chambres,
+        chambresDetails: chambresDetails || null,
+        options: options || null,
+        prixTotal: backendPrixTotal,
+        codePromo: promoCode || null,
+        statut: 'DEVIS_EN_ATTENTE',
+        tokenDevis: token,
+        expireLe: expiration,
+        numeroDevis: numeroDevis,
+        validePar: admin ? admin.email : (req.user?.email || 'Admin'),
+        client: {
+          create: { 
+            nom, 
+            email, 
+            telephone, 
+            adressePostale: adressePostale || null 
+          }
+        },
+        occupants: occupants && occupants.length > 0 ? {
+          create: occupants.map(occ => ({
+            nom: occ.nom,
+            prenom: occ.prenom,
+            estAdulte: occ.estAdulte,
+            age: occ.age || null
+          }))
+        } : undefined
+      },
+      include: { client: true }
+    });
+
+    const refClient = `C-${year}-${devis.clientId}`;
+
+    // 5. Générer le PDF
+    const pdfBuffer = await generateDevisPDF({
+      numeroDevis,
+      refClient,
+      dateDebut,
+      dateFin,
+      expireLe: expiration,
+      clientNom: nom,
+      clientEmail: email,
+      clientTel: telephone,
+      clientAdresse: adressePostale,
+      adminNom: admin ? admin.nom : 'L\'équipe du Gîte',
+      adminEmail: admin ? admin.email : 'contact@gitemaladrerie.fr',
+      adminTel: admin ? admin.telephone : null,
+      chambres,
+      prixSejour,
+      taxeSejour: taxeSejourCalculee,
+      options: options ? Object.entries(options).filter(([k,v]) => v).map(([k,v]) => {
+        let optPrix = 0;
+        if (k === 'menage') optPrix = chambres.length * 50;
+        if (k === 'litsFaits' || k === 'lingeFourni') optPrix = occupants.length * 5;
+        return { nom: k === 'menage' ? 'Ménage fin de séjour' : (k === 'litsFaits' ? 'Lits faits à l\'arrivée' : 'Linge de toilette fourni'), prix: optPrix };
+      }) : [],
+      prixTotal: backendPrixTotal,
+      promoMontant: 0, // À affiner si besoin
+      codePromo: promoCode
+    });
+
+    const validationLink = `${FRONTEND_URL}/devis/validate?token=${token}`;
+
+    // 6. Envoyer le mail avec le PDF attaché
+    await sendMail({
+      to: email,
+      subject: `Votre devis personnalisé ${numeroDevis} - Gîte de La Maladrerie`,
+      attachments: [
+        {
+          content: pdfBuffer.toString('base64'),
+          name: `Devis_${numeroDevis}.pdf`
+        }
+      ],
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+          <div style="background-color: #004B93; padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
+          </div>
+          <div style="padding: 30px; color: #333; line-height: 1.6;">
+            <h2 style="color: #004B93;">Bonjour ${nom},</h2>
+            <p>Suite à votre demande, nous avons le plaisir de vous transmettre notre proposition tarifaire pour votre séjour au gîte.</p>
+            
+            <p>Veuillez trouver ci-joint votre devis détaillé au format PDF, incluant nos conditions générales de vente.</p>
+
+            <div style="background-color: #f8f9fa; border-left: 4px solid #FDB913; padding: 20px; margin: 20px 0;">
+              <p><strong>Numéro de devis :</strong> ${numeroDevis}</p>
+              <p><strong>Période :</strong> du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
+              <p style="font-size: 18px; margin-top: 10px;"><strong>Montant Total : ${backendPrixTotal.toFixed(2)} €</strong></p>
+            </div>
+
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; font-size: 14px; color: #856404; margin-bottom: 25px;">
+              ⚠️ <strong>Important :</strong> Ce devis et la disponibilité associée ne sont garantis que pendant <strong>48 heures</strong>. Passé ce délai, le créneau pourra être réservé par un autre client.
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${validationLink}" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Valider et Confirmer mon séjour</a>
+            </div>
+
+            <p>Pour confirmer, vous pouvez cliquer sur le bouton ci-dessus ou nous renvoyer le devis signé.</p>
+            <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+            <p>Cordialement,<br>${admin ? admin.nom : 'L\'équipe du Gîte de la Maladrerie - MUC'}</p>
+          </div>
+        </div>
+      `
+    });
+
+    // 7. Notifier l'administrateur
+    await sendMail({
+      to: ADMIN_EMAIL,
+      subject: `Nouveau devis émis : ${numeroDevis} - ${nom}`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px;">
+          <h2>Un nouveau devis a été envoyé</h2>
+          <p><strong>Numéro :</strong> ${numeroDevis}</p>
+          <p><strong>Client :</strong> ${nom} (${email})</p>
+          <p><strong>Période :</strong> du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
+          <p><strong>Montant :</strong> ${backendPrixTotal.toFixed(2)} €</p>
+          <p><strong>Émis par :</strong> ${admin ? admin.nom : req.user.email}</p>
+          <p>Ce devis expire le ${expiration.toLocaleString('fr-FR')}.</p>
+        </div>
+      `
+    });
+
+    res.json(devis);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur lors de la création du devis' });
+  }
+});
+
+// Valider un devis (Client)
+app.get('/api/devis/validate/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const devis = await prisma.reservation.findUnique({
+      where: { tokenDevis: token },
+      include: { client: true }
+    });
+
+    if (!devis) return res.status(404).send("Devis introuvable ou expiré.");
+    if (devis.statut !== 'DEVIS_EN_ATTENTE') return res.status(400).send("Ce devis a déjà été traité.");
+    if (devis.expireLe && devis.expireLe < new Date()) {
+       await prisma.reservation.update({ where: { id: devis.id }, data: { statut: 'DEVIS_EXPIRE' } });
+       return res.status(400).send("Ce devis a expiré (validité de 48h dépassée).");
+    }
+
+    // Convertir en demande de réservation classique
+    await prisma.reservation.update({
+      where: { id: devis.id },
+      data: { statut: 'EN_ATTENTE', tokenDevis: null }
+    });
+
+    res.send(`
+      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+        <h1 style="color: #28a745;">Devis validé !</h1>
+        <p>Votre demande a été transmise à nos administrateurs. Vous recevrez prochainement une confirmation avec le lien de paiement.</p>
+        <p><a href="${FRONTEND_URL}">Retour au site</a></p>
+      </div>
+    `);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Erreur lors de la validation du devis.");
+  }
+});
+
+// Cron job pour expirer les devis
+cron.schedule('0 * * * *', async () => {
+  try {
+    const now = new Date();
+    const expired = await prisma.reservation.updateMany({
+      where: {
+        statut: 'DEVIS_EN_ATTENTE',
+        expireLe: { lte: now }
+      },
+      data: { statut: 'DEVIS_EXPIRE' }
+    });
+    if (expired.count > 0) console.log(`${expired.count} devis expirés.`);
+  } catch (err) {
+    console.error("Erreur cron devis:", err);
+  }
+});
+
 // Demander le solde manuellement
 app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
   const { id } = req.params;
@@ -564,6 +871,7 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
     const stripeCustomerId = await getOrCreateStripeCustomer(reser.client.email, reser.client.nom);
     const sessionParams = {
       payment_method_types: ['card'],
+      allow_promotion_codes: true,
       line_items: [{
         price_data: {
           currency: 'eur',
@@ -589,7 +897,23 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
     await sendMail({
       to: reser.client.email,
       subject: "Règlement du solde de votre séjour - Gîte de La Maladrerie",
-      html: `<p>Bonjour ${reser.client.nom},</p><p>Veuillez régler le solde de votre séjour en cliquant sur le lien suivant : <a href="${session.url}">Payer le solde</a></p>`
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+          <div style="background-color: #004B93; padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
+          </div>
+          <div style="padding: 30px; color: #333; line-height: 1.6;">
+            <p>Bonjour ${reser.client.nom},</p>
+            <p>Nous vous informons que le solde de votre séjour (du ${new Date(reser.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reser.dateFin).toLocaleDateString('fr-FR')}) est désormais dû.</p>
+            <p>Veuillez régler le solde en cliquant sur le lien sécurisé ci-dessous :</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Payer le solde de ${(reser.montantSolde || 0).toFixed(2)} €</a>
+            </div>
+            <p>Nous restons à votre disposition pour toute question.</p>
+            <p>Cordialement,<br>L'équipe du Gite de la Maladrerie - MUC</p>
+          </div>
+        </div>
+      `
     });
 
     res.json({ success: true, message: 'Demande de solde envoyée', url: session.url });
@@ -637,8 +961,24 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
 
     await sendMail({
       to: reser.client.email,
-      subject: "Dépôt de caution - Gîte de La Maladrerie",
-      html: `<p>Bonjour ${reser.client.nom},</p><p>Veuillez effectuer l'empreinte bancaire pour la caution en cliquant ici : <a href="${session.url}">Déposer la caution</a></p>`
+      subject: "Dépôt de caution (empreinte bancaire) - Gîte de La Maladrerie",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+          <div style="background-color: #004B93; padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
+          </div>
+          <div style="padding: 30px; color: #333; line-height: 1.6;">
+            <p>Bonjour ${reser.client.nom},</p>
+            <p>Dans le cadre de votre séjour au gîte, nous vous demandons de bien vouloir effectuer une empreinte bancaire pour la caution (500 €).</p>
+            <p><strong>Note importante :</strong> Ce montant ne sera pas débité de votre compte. Il s'agit d'une simple autorisation de paiement sécurisée via Stripe.</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Effectuer l'empreinte de caution</a>
+            </div>
+            <p>Nous restons à votre disposition pour toute précision.</p>
+            <p>Cordialement,<br>L'équipe du Gite de la Maladrerie - MUC</p>
+          </div>
+        </div>
+      `
     });
 
     res.json({ success: true, message: 'Demande de caution envoyée', url: session.url });
@@ -803,7 +1143,7 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
               <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Payer le solde de ${reservation.montantSolde.toFixed(2)} €</a>
             </div>
             <p>Nous restons à votre disposition pour toute question.</p>
-            <p style="margin-top: 20px;">L'équipe du MUC Omnisports</p>
+            <p style="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
           </div>
         </div>
       `
@@ -882,7 +1222,7 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
               <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Déposer la caution de 500 €</a>
             </div>
             <p>L'empreinte sera automatiquement levée après votre départ si aucun dégât n'est constaté.</p>
-            <p style="margin-top: 20px;">L'équipe du MUC Omnisports</p>
+            <p style="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
           </div>
         </div>
       `
@@ -1072,7 +1412,7 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
                 <a href="${rejectUrl}" style="background-color: #dc3545; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">✗ Je décline</a>
               </div>
               <p style="font-size: 13px; color: #999;">En cas de question, n'hésitez pas à nous contacter directement.</p>
-              <p style="margin-top: 20px;">Cordialement,<br/>L'équipe du MUC Omnisports</p>
+              <p style="margin-top: 20px;">Cordialement,<br/>L'équipe du Gite de la Maladrerie - MUC</p>
             </div>
             <div style="background-color: #FDB913; height: 5px;"></div>
           </div>
@@ -1205,6 +1545,7 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
     const stripeCustomerPL = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
     const plParams = {
       payment_method_types: ['card'],
+      allow_promotion_codes: true,
       line_items: [{
         price_data: {
           currency: 'eur',
@@ -1214,8 +1555,8 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `http://localhost:5173/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:5173/`,
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: { reservationId: reservation.id.toString() }
     };
     if (stripeCustomerPL) {
@@ -1311,7 +1652,7 @@ app.post('/api/admin/reservations/:id/notify-intervenant', checkAuth, async (req
               <a href="${acceptUrl}" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">J'accepte</a>
               <a href="${rejectUrl}" style="background-color: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Je refuse</a>
             </div>
-            <p>L'équipe du MUC Omnisports</p>
+            <p>L'équipe du Gite de la Maladrerie - MUC</p>
           </div>
         </div>
       `
@@ -1518,7 +1859,7 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
             <div style="text-align: center; margin: 30px 0;">
               <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Payer en ligne</a>
             </div>
-            <p>L'équipe du MUC Omnisports</p>
+            <p>L'équipe du Gite de la Maladrerie - MUC</p>
           </div>
         </div>
       `
@@ -1903,6 +2244,7 @@ cron.schedule('0 9 * * *', async () => {
       // Générer lien de paiement Stripe pour le solde
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
+        allow_promotion_codes: true,
         line_items: [
           {
             price_data: {
@@ -1917,10 +2259,10 @@ cron.schedule('0 9 * * *', async () => {
           },
         ],
         mode: 'payment',
-        success_url: `${process.env.FRONTEND_URL}/paiement-succes?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL}/paiement-annule`,
+        success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${FRONTEND_URL}/payment-cancel`,
         metadata: {
-          reservationId: reser.id,
+          reservationId: reser.id.toString(),
           typePaiement: 'solde'
         }
       });
@@ -1942,7 +2284,7 @@ cron.schedule('0 9 * * *', async () => {
                 <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Régler le solde de ${reser.montantSolde.toFixed(2)} €</a>
               </div>
               <p>Une fois le solde réglé, vous recevrez un autre lien sécurisé pour procéder à l'empreinte bancaire (caution de 500 €).</p>
-              <p style="margin-top: 20px;">À très bientôt !<br>L'équipe du MUC Omnisports</p>
+              <p style="margin-top: 20px;">À très bientôt !<br>L'équipe du Gite de la Maladrerie - MUC</p>
             </div>
           </div>
         `
