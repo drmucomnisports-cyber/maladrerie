@@ -1844,16 +1844,26 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/reject', async (req, 
   }
 });
 
-// Récupérer les infos de l'admin connecté
-app.get('/api/admin/me', authenticateToken, async (req, res) => {
+app.get('/api/admin/me', checkAuth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
   try {
-    const admin = await prisma.admin.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, email: true, nom: true }
+    // Si on a un ID dans le token (cas d'un compte AdminAccount), on cherche dans la DB
+    if (req.user && req.user.id) {
+      const admin = await prisma.adminAccount.findUnique({
+        where: { id: req.user.id },
+        select: { id: true, email: true, nom: true }
+      });
+      if (admin) return res.json(admin);
+    }
+    
+    // Sinon on renvoie les infos par défaut de l'admin principal
+    res.json({ 
+      id: 0, 
+      email: (req.user && req.user.email) || ADMIN_EMAIL, 
+      nom: 'Administrateur MUC' 
     });
-    res.json(admin);
   } catch (err) {
+    console.error("Erreur dans /api/admin/me:", err);
     res.status(500).json({ error: err.message });
   }
 });
