@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        'muc-blue': '#0068B3',
-        'muc-yellow': '#F9B233',
+        'muc-blue': '#004B93',
+        'muc-yellow': '#FFD700',
         'white': '#FFFFFF',
         'steel-gray': '#333333',
       },

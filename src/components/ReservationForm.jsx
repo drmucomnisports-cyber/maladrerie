@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Send, X, CheckCircle, AlertTriangle, Phone } from 'lucide-react';
 import { API_URL } from '../config';
 
@@ -12,6 +13,7 @@ const CHAMBRES_INFO = {
 };
 
 const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCreated = () => {}, adminUser = null }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -330,8 +332,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       
       if (res.ok) {
         const data = await res.json();
+        const roomNames = formData.chambres.map(id => CHAMBRES_INFO[id]?.name || `Chambre ${id}`).join(', ');
         let message = isDevis
-          ? 'Le devis a été généré et envoyé au prospect. Il est valable pendant 48 heures.'
+          ? `Le devis pour ${roomNames} a été généré et envoyé à ${formData.email}. Il est valable pendant 48 heures.`
           : isAdmin 
             ? 'Réservation ajoutée manuellement avec succès.' 
             : 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
@@ -346,7 +349,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
         setFormData({ nom: '', email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [] });
         setStep(1);
-        onCreated();
+        // onCreated(); // Retiré d'ici pour éviter de fermer la modale parente prématurément
       } else {
         const errData = await res.json();
         setErrorMsg(errData.error || "Une erreur est survenue lors de l'envoi.");
@@ -577,22 +580,22 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
       {/* Modal de Confirmation / Alerte */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300 border-t-8 border-muc-blue">
-            <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-muc-blue/5'}`}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300 border-t-8 border-muc-yellow">
+            <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-muc-blue text-white'}`}>
               <div className="flex justify-center mb-4">
                 {modalConfig.type === 'warning' ? (
                   <div className="bg-amber-100 p-4 rounded-full text-amber-600">
                     <AlertTriangle size={40} />
                   </div>
                 ) : (
-                  <div className="bg-muc-blue/10 p-4 rounded-full text-muc-blue">
+                  <div className="bg-white/20 p-4 rounded-full text-white">
                     <CheckCircle size={40} />
                   </div>
                 )}
               </div>
-              <h3 className="text-2xl font-black text-slate-800 mb-2 uppercase tracking-tight">{modalConfig.title}</h3>
-              <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">
+              <h3 className="text-2xl font-black mb-2 uppercase tracking-tight">{modalConfig.title}</h3>
+              <div className={`${modalConfig.type === 'warning' ? 'text-slate-600' : 'text-white/90'} font-medium leading-relaxed whitespace-pre-line`}>
                 {modalConfig.message}
               </div>
               
@@ -603,20 +606,21 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 </div>
               )}
             </div>
-            <div className="p-4 bg-slate-50 border-t border-slate-100">
+            <div className="p-6 bg-slate-50 border-t border-slate-100">
               <button 
                 onClick={() => {
                   setShowModal(false);
-                  if (localStorage.getItem('adminToken')) {
+                  if (isAdmin) {
+                    onCreated(); // Notifie le parent (Admin) pour rafraîchir et fermer le tiroir
                     navigate('/admin');
                   } else {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }
                 }}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
+                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg ${
                   modalConfig.type === 'warning' 
                   ? 'bg-muc-blue text-white hover:bg-blue-800' 
-                  : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400 shadow-lg'
+                  : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400'
                 }`}
               >
                 {modalConfig.type === 'warning' ? 'J\'appelle de suite' : 'Fermer'}

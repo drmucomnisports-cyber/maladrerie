@@ -1,52 +1,72 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 const CGV = () => {
   return (
     <div className="min-h-screen bg-muc-blue text-white py-20 px-6">
       <div className="max-w-4xl mx-auto bg-white/5 backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/10 shadow-2xl">
-        <div className="flex justify-between items-start mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-muc-yellow hover:gap-4 transition-all font-bold uppercase tracking-widest text-sm">
-            <ArrowLeft size={20} /> Retour à l'accueil
-          </Link>
-          <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-xs font-bold transition-all">
-            <Download size={16} /> Version PDF
-          </button>
-        </div>
+        <Link to="/" className="inline-flex items-center gap-2 text-muc-yellow hover:gap-4 transition-all mb-8 font-bold uppercase tracking-widest text-sm">
+          <ArrowLeft size={20} /> Retour à l'accueil
+        </Link>
         
-        <h1 className="text-4xl font-black mb-12 uppercase tracking-tighter">Conditions Générales de Vente</h1>
+        <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter">Conditions Générales de Vente et de Location</h1>
+        <p className="text-slate-400 mb-12">Gîte de la Maladrerie - Version 1.2 - Mai 2026</p>
         
         <div className="space-y-12 text-white/80 leading-relaxed text-sm">
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">1. Réservation et Devis</h2>
-            <p>Toute demande de réservation fait l'objet d'un devis valable 48 heures. La réservation devient ferme après acceptation du devis et versement d'un acompte de 30% du montant total du séjour.</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">1. Réservation et Paiement de l'acompte</h2>
+            <p>Pour valider toute réservation, un acompte de 30 % du montant total doit être réglé selon les modalités suivantes :</p>
+            <ul className="mt-4 space-y-2 list-disc list-inside">
+              <li>Lien de paiement en ligne : Règlement à effectuer dans les 48 heures suivant la réception du lien.</li>
+              <li>Chèque : En cas de paiement par chèque, celui-ci doit impérativement parvenir à l'établissement dans un délai de 72 heures après la réservation.</li>
+            </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">2. Conditions de Paiement</h2>
-            <p>Le solde du séjour doit être réglé au plus tard à l'arrivée. Les paiements peuvent être effectués par carte bancaire (Stripe), chèque, espèces ou virement.</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">2. Règlement du solde</h2>
+            <p>Le solde de la prestation peut être réglé par :</p>
+            <ul className="mt-4 space-y-2 list-disc list-inside">
+              <li>Carte bancaire (via lien de paiement).</li>
+              <li>Chèque et espèces (à l'arrivée sur les lieux).</li>
+            </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">3. Caution et Garantie</h2>
-            <p>Une empreinte bancaire de 500 € est exigée via la plateforme sécurisée pour couvrir d'éventuels dommages. Cette caution est libérée après l'état des lieux de sortie, sous réserve de l'absence de dégradations.</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">3. Pénalités de Retard</h2>
+            <p>Tout retard de paiement des sommes dues à l'échéance entraînera de plein droit l'application de pénalités de retard. Celles-ci sont calculées sur la base de trois fois le taux d'intérêt légal en vigueur. En sus des indemnités de retard, une indemnité forfaitaire de 40 € pour frais de recouvrement sera exigée (Art. L441-6 du Code de commerce).</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">4. Annulation</h2>
-            <p>En cas d'annulation par le client moins de 15 jours avant l'arrivée, l'acompte de 30% reste acquis à l'association MUC Omnisports.</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">4. Régime Fiscal et Tarifs</h2>
+            <p>Les tarifs appliqués sont ceux indiqués sur le devis accepté par le client ou lors de la réservation en ligne effectuée par ce dernier. Conformément à l'article 293 B du Code Général des Impôts (CGI), la TVA est non applicable sur les prestations fournies par l'association.</p>
+            <p className="mt-4"><strong>Taxe de séjour :</strong> En sus du prix de l'hébergement, une taxe de séjour est perçue pour le compte de la collectivité. Son montant est fixé à 4% du prix de la nuitée par personne majeure (dans la limite du plafond légal). Elle sera calculée lors de la facturation finale.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">5. Obligations de l'Occupant</h2>
-            <p>Le gîte est non-fumeur. Les animaux ne sont pas admis sans accord préalable. Le client s'engage à respecter le règlement intérieur et la tranquillité des lieux.</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">5. Dépôt de garantie (Caution)</h2>
+            <p>Une empreinte bancaire d'un montant de 500 € est requise avant l'entrée dans les lieux. Cette somme n'est pas débitée au moment de la saisie, mais bloquée temporairement. Cette caution est destinée à couvrir :</p>
+            <ul className="mt-4 space-y-2 list-disc list-inside">
+              <li>D'éventuels dommages ou dégradations constatés sur le bâtiment ou le matériel.</li>
+              <li>Les manquements au règlement intérieur.</li>
+              <li>Les frais de remise en état ou de ménage si les locaux ne sont pas rendus propres.</li>
+            </ul>
+            <p className="mt-4">La direction se réserve le droit de conserver tout ou partie de cette somme en fonction de l'état des lieux de sortie. La caution sera intégralement libérée dans un délai de 30 jours après le départ, déduction faite des éventuels frais de réparation ou d'indemnisation.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">6. Litiges</h2>
-            <p>À défaut d'accord amiable, tout litige relatif à l'interprétation ou à l'exécution des présentes sera de la compétence exclusive des tribunaux de Montpellier.</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">6. État des lieux et Inventaire</h2>
+            <p>Le présent contrat est complété par un état des lieux et un inventaire du matériel. Il appartient aux occupants de vérifier l'exactitude de ces documents dès leur arrivée. Tout écart ou anomalie constaté doit impérativement être signalé dans les premières heures de l'entrée dans les lieux. Passé ce délai, toute dégradation ou manque constaté lors du départ pourra faire l'objet d'une retenue sur le dépôt de garantie.</p>
           </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">7. Respect des lieux et voisinage</h2>
+            <p>Le groupe s'engage à respecter la tranquillité des lieux. Les nuisances sonores excessives ou le non-respect des règles de vie commune sont strictement interdits et pourront donner lieu à une retenue sur la caution.</p>
+          </section>
+          
+          <div className="pt-8 border-t border-white/10 italic text-white/60">
+            <p>Le client reconnaît avoir pris connaissance des présentes conditions et les accepte sans réserve.</p>
+          </div>
         </div>
       </div>
     </div>

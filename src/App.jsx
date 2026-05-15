@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import MentionsLegales from './pages/MentionsLegales';
 import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
 import CGV from './pages/CGV';
+import DevisValidate from './pages/DevisValidate';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
         <Route path="/cgv" element={<CGV />} />
         <Route path="/admin-login" element={<Login />} />
+        <Route path="/devis/validate" element={<DevisValidate />} />
       </Routes>
     </Router>
   );

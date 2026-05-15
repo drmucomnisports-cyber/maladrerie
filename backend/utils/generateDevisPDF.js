@@ -38,16 +38,16 @@ async function generateDevisPDF(data) {
             doc.text(`Réf. Client : ${data.refClient}`, leftCol, startY + 40);
             doc.text(`Date d'émission : ${new Date().toLocaleDateString('fr-FR')}`, leftCol, startY + 55);
             doc.moveDown(0.5);
-            doc.font('Helvetica-Bold').text(`Date de validité : ${new Date(data.expireLe).toLocaleDateString('fr-FR')}`, leftCol);
-            doc.font('Helvetica-Bold').fillColor('#004B93').text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol);
+            doc.fillColor('#FDB913').font('Helvetica-Bold').text(`Date de validité : ${new Date(data.expireLe).toLocaleDateString('fr-FR')}`, leftCol, startY + 75);
+            doc.fillColor('#004B93').font('Helvetica-Bold').text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol, startY + 90);
             doc.fillColor('#000000');
 
             // --- ADMIN (Émetteur) ---
             doc.fontSize(10).font('Helvetica').text('Établi par :', rightCol, startY);
             doc.fontSize(11).font('Helvetica-Bold').text(data.adminNom || 'L\'équipe du Gîte', rightCol, startY + 15);
             doc.fontSize(10).font('Helvetica');
-            if (data.adminTel) doc.text(`Tél : ${data.adminTel}`, rightCol, startY + 30);
-            doc.text(`Email : ${data.adminEmail || 'contact@gitemaladrerie.fr'}`, rightCol, startY + 45);
+            doc.text(`Email : ${data.adminEmail || 'contact@gitemaladrerie.fr'}`, rightCol, startY + 30);
+            if (data.adminTel) doc.text(`Tél : ${data.adminTel}`, rightCol, startY + 45);
 
             // --- CLIENT (Destinataire) ---
             const clientY = 220;
@@ -55,17 +55,17 @@ async function generateDevisPDF(data) {
             doc.fontSize(10).font('Helvetica').text('Destinataire :', leftCol, clientY);
             doc.fontSize(12).font('Helvetica-Bold').text(data.clientNom, leftCol, clientY + 15);
             doc.fontSize(10).font('Helvetica').text(data.clientAdresse || 'Adresse non renseignée', leftCol, clientY + 35, { width: 230 });
-            doc.text(`Tél : ${data.clientTel || 'Non renseigné'}`, leftCol, clientY + 60);
+            doc.text(`Tél : ${data.clientTel || 'Non renseigné'}`, leftCol, clientY + 65);
 
             // --- TABLEAU DES PRESTATIONS ---
             const tableTop = 330;
             doc.font('Helvetica-Bold').fontSize(9);
-            doc.rect(leftCol, tableTop, 512, 20).fill('#F8F9FA');
-            doc.fillColor('#004B93');
+            doc.rect(leftCol, tableTop, 512, 20).fill('#004B93');
+            doc.fillColor('#FFFFFF');
             
             // Header Colonnes
             doc.text('DÉSIGNATION', leftCol + 10, tableTop + 6);
-            doc.text('PU (€)', leftCol + 300, tableTop + 6, { width: 50, align: 'right' });
+            doc.text('P.U. (€)', leftCol + 300, tableTop + 6, { width: 50, align: 'right' });
             doc.text('QTÉ', leftCol + 360, tableTop + 6, { width: 50, align: 'center' });
             doc.text('TOTAL (€)', leftCol + 440, tableTop + 6, { align: 'right', width: 60 });
 
@@ -82,8 +82,8 @@ async function generateDevisPDF(data) {
                     y += 20;
                 });
             } else {
-                // Fallback si pas de détails
-                doc.text('Hébergement', leftCol + 10, y);
+                // Fallback
+                doc.text('Hébergement du séjour', leftCol + 10, y);
                 doc.text(data.prixSejour?.toFixed(2) || '0.00', leftCol + 440, y, { align: 'right', width: 60 });
                 y += 20;
             }
@@ -102,9 +102,12 @@ async function generateDevisPDF(data) {
             // Taxe de séjour
             if (data.taxeSejourDetails) {
                 const tsd = data.taxeSejourDetails;
-                doc.text(`Taxe de séjour (${tsd.adultes} adultes x ${tsd.nuits} nuits)`, leftCol + 10, y, { width: 280 });
-                doc.text((tsd.base * tsd.taux).toFixed(2), leftCol + 300, y, { width: 50, align: 'right' });
-                doc.text(tsd.adultes.toString(), leftCol + 360, y, { width: 50, align: 'center' });
+                const libelleTaxe = `Taxe de séjour (${tsd.adultes} adultes x ${tsd.nuits} nuits)`;
+                const puTaxe = (tsd.base * tsd.taux).toFixed(2);
+                
+                doc.text(libelleTaxe, leftCol + 10, y, { width: 280 });
+                doc.text(puTaxe, leftCol + 300, y, { width: 50, align: 'right' });
+                doc.text((tsd.adultes * tsd.nuits).toString(), leftCol + 360, y, { width: 50, align: 'center' });
                 doc.text(tsd.total.toFixed(2), leftCol + 440, y, { align: 'right', width: 60 });
                 y += 20;
             }
@@ -119,26 +122,34 @@ async function generateDevisPDF(data) {
             }
 
             // --- TOTAUX ---
-            y += 10;
-            doc.moveTo(leftCol + 300, y).lineTo(leftCol + 512, y).stroke('#EEEEEE');
-            y += 10;
-            doc.fontSize(11).font('Helvetica-Bold').text('TOTAL TTC', leftCol + 300, y);
-            doc.text(`${data.prixTotal.toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
-            
-            y += 25;
-            doc.fontSize(10).font('Helvetica').text('Acompte (30%) à régler :', leftCol + 300, y);
-            doc.font('Helvetica-Bold').text(`${(data.prixTotal * 0.3).toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
+             // Box Total
+             const totalBoxY = y - 5;
+             doc.rect(leftCol + 290, totalBoxY, 232, 85).fill('#F8F9FA');
+             doc.fillColor('#000000');
+             
+             y += 10;
+             doc.fontSize(12).font('Helvetica-Bold').fillColor('#004B93').text('TOTAL TTC', leftCol + 300, y);
+             doc.text(`${data.prixTotal.toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
+             
+             y += 25;
+             doc.fontSize(10).font('Helvetica-Bold').fillColor('#000000').text('Dont Acompte (30%) :', leftCol + 300, y);
+             doc.text(`${(data.prixTotal * 0.3).toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
+             
+             y += 15;
+             doc.fontSize(10).font('Helvetica').text('Solde à régler :', leftCol + 300, y);
+             doc.text(`${(data.prixTotal * 0.7).toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
 
             // --- MENTIONS LÉGALES & SIGNATURE ---
-            y = 620;
-            doc.font('Helvetica-Oblique').fontSize(8.5).fillColor('#666666');
-            doc.text("Le présent devis sera complété par l'état des lieux et l'inventaire lors de l'entrée dans les lieux.", leftCol, y);
+            y = 610;
+            doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666');
+            doc.text("Ce devis est établi sous réserve de disponibilité au moment de la signature.", leftCol, y);
+            doc.text("Le paiement de l'acompte valide définitivement la réservation.", leftCol, y + 12);
             
-            y += 35;
-            doc.fillColor('#000000').font('Helvetica-Bold').fontSize(11).text('Bon pour accord', leftCol, y);
-            doc.font('Helvetica').fontSize(10);
+            y += 40;
+            doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(11).text('Bon pour accord', leftCol, y);
+            doc.fillColor('#000000').font('Helvetica').fontSize(10);
             doc.text('Date :', leftCol, y + 20);
-            doc.text('Signature du client (précédée de la mention "Lu et approuvé") :', leftCol, y + 40);
+            doc.text('Signature (précédée de la mention "Lu et approuvé") :', leftCol, y + 40);
             
             doc.rect(leftCol, y + 60, 250, 80).stroke('#CCCCCC');
 

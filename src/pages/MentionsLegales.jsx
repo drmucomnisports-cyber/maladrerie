@@ -12,33 +12,33 @@ const MentionsLegales = () => {
         
         <h1 className="text-4xl font-black mb-12 uppercase tracking-tighter">Mentions Légales</h1>
         
-        <div className="space-y-12 text-white/80 leading-relaxed">
+        <div className="space-y-12 text-white/80 leading-relaxed text-sm">
           <section>
             <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Éditeur du site</h2>
-            <p>Le présent site internet est édité par l'association <strong>MUC Omnisports</strong>.</p>
+            <p>Le présent site internet est édité par l'association MUC Omnisports.</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
-              <li>Siège social : 150 rue François Joseph Gossec - Complexe Sportif Albert Batteux, 34070 Montpellier.</li>
-              <li>Téléphone : 04 99 58 35 35.</li>
-              <li>Email : administration@mucomnisports.fr.</li>
-              <li>SIRET : 38820857100025.</li>
-              <li>N° d'Activité : 91-34-05799-34.</li>
-              <li>Directeur de la publication : David Roujet.</li>
+              <li><strong>Siège social :</strong> 150 rue François Joseph Gossec - Complexe Sportif Albert Batteux, 34070 Montpellier.</li>
+              <li><strong>Téléphone :</strong> 04 99 58 35 35.</li>
+              <li><strong>Email :</strong> administration@mucomnisports.fr.</li>
+              <li><strong>SIRET :</strong> 38820857100025.</li>
+              <li><strong>N° d'Activité :</strong> 91-34-05799-34.</li>
+              <li><strong>Directeur de la publication :</strong> David Roujet.</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Hébergement</h2>
-            <p>Le site est hébergé par la société <strong>Railway Corp</strong>.</p>
+            <p>Le site est hébergé par la société Railway Corp.</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
-              <li>Siège social : 2261 Market Street #4659, San Francisco, CA 94114, États-Unis.</li>
-              <li>Site web : https://railway.com.</li>
-              <li>Contact : support@railway.app.</li>
+              <li><strong>Siège social :</strong> 2261 Market Street #4659, San Francisco, CA 94114, États-Unis.</li>
+              <li><strong>Site web :</strong> <a href="https://railway.com" className="text-muc-yellow hover:underline" target="_blank" rel="noreferrer">https://railway.com</a>.</li>
+              <li><strong>Contact :</strong> support@railway.app.</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Assurance</h2>
-            <p>L'activité de l'association est couverte par une police d'assurance responsabilité civile souscrite auprès de la <strong>MAIF</strong> sous le numéro 132 48 45 M.</p>
+            <p>L'activité de l'association est couverte par une police d'assurance responsabilité civile souscrite auprès de la MAIF sous le numéro 132 48 45 M.</p>
           </section>
         </div>
       </div>

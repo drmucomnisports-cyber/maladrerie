@@ -70,6 +70,8 @@ const Admin = () => {
   const [captureReservationId, setCaptureReservationId] = useState(null);
 
   const [adminForm, setAdminForm] = useState({ email: '', password: '', nom: '' });
+  const [adminAccounts, setAdminAccounts] = useState([]);
+  const [showAdminModal, setShowAdminModal] = useState(false);
   const [captureMontant, setCaptureMontant] = useState('');
   const [adminUser, setAdminUser] = useState(null);
 
@@ -126,10 +128,13 @@ const Admin = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        setIntervenants(data);
+        setIntervenants(Array.isArray(data) ? data : []);
+      } else {
+        setIntervenants([]);
       }
     } catch (err) {
       console.error(err);
+      setIntervenants([]);
     }
   };
 
@@ -371,14 +376,21 @@ const Admin = () => {
       const res = await fetch(`${API_URL}/api/admin/reservations`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         handleLogout();
         return;
       }
-      const data = await res.json();
-      setReservations(data);
+      if (res.ok) {
+        const data = await res.json();
+        setReservations(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Erreur de statut API:', res.status);
+        setReservations([]);
+      }
     } catch (err) {
+      console.error(err);
       setError('Erreur lors du chargement des réservations');
+      setReservations([]);
     }
     setLoading(false);
   };
@@ -584,12 +596,23 @@ const Admin = () => {
   };
 
   useEffect(() => {
+    console.log('Admin Component Mounted. Token:', token ? 'Present' : 'Missing');
     if (!token) {
+      console.log('No token found, redirecting to /login');
       navigate('/login');
     }
   }, [token, navigate]);
 
-  if (!token) return null;
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-muc-blue mx-auto mb-4"></div>
+          <p className="text-slate-500 font-medium">Vérification de l'authentification...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F8F8] font-sans p-8">
@@ -610,7 +633,7 @@ const Admin = () => {
               </button>
               <button 
                 onClick={() => {
-                  localStorage.removeItem('token');
+                  localStorage.removeItem('adminToken');
                   window.location.reload();
                 }}
                 className="px-6 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors"
@@ -659,9 +682,9 @@ const Admin = () => {
                 {reservations.map((res) => (
                   <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="p-4">
-                      <div className="font-bold text-slate-800">{res.client.nom}</div>
-                      <div className="text-xs text-slate-500">{res.client.email}</div>
-                      <div className="text-xs text-slate-500">{res.client.telephone}</div>
+                      <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
+                      <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
+                      <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
                     </td>
                     <td className="p-4">
                       <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
@@ -824,16 +847,18 @@ const Admin = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {reservations.filter(res => 
-                      res.statut.includes('DEVIS') && 
-                      (res.client.nom.toLowerCase().includes(clientSearch.toLowerCase()) || 
-                       res.client.email.toLowerCase().includes(clientSearch.toLowerCase()))
-                    ).map((res) => (
+                    {reservations.filter((res) => {
+                      const matchesSearch = !clientSearch || 
+                      (res.client?.nom?.toLowerCase().includes(clientSearch.toLowerCase()) || 
+                       res.client?.email?.toLowerCase().includes(clientSearch.toLowerCase()));
+                      
+                      return res.statut?.includes('DEVIS') && matchesSearch;
+                    }).map((res) => (
                       <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                         <td className="p-4">
-                          <div className="font-bold text-slate-800">{res.client.nom}</div>
-                          <div className="text-xs text-slate-500">{res.client.email}</div>
-                          <div className="text-xs text-slate-500">{res.client.telephone}</div>
+                          <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
+                          <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
+                          <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
                         </td>
                         <td className="p-4">
                           <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
@@ -845,13 +870,15 @@ const Admin = () => {
                             Au {new Date(res.dateFin).toLocaleDateString()}
                           </div>
                         </td>
+                        <td className="p-4">
                           <div className="flex flex-wrap gap-1">
-                            {res.chambres.map(id => (
+                            {res.chambres?.map(id => (
                               <span key={id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase">
                                 {CHAMBRES_NAMES[id] || `Ch. ${id}`}
                               </span>
                             ))}
                           </div>
+                        </td>
                         <td className="p-4">
                           <div className="font-black text-muc-blue">{res.prixTotal}€</div>
                         </td>
@@ -1596,7 +1623,7 @@ const Admin = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
             <div className="bg-muc-blue p-6 text-white">
               <h3 className="text-xl font-black uppercase tracking-tight">Enregistrer un paiement</h3>
-              <p className="text-sm opacity-90">Client : {manualPaymentRes.client.nom}</p>
+              <p className="text-sm opacity-90">Client : {manualPaymentRes.client?.nom || 'Inconnu'}</p>
             </div>
             <div className="p-8">
               <div className="space-y-6">

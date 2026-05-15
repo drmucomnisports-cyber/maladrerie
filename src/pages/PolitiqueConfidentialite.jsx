@@ -15,43 +15,27 @@ const PolitiqueConfidentialite = () => {
         <div className="space-y-12 text-white/80 leading-relaxed text-sm">
           <section>
             <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Introduction</h2>
-            <p>Dans le cadre de la gestion du Gîte de la Maladrerie, le MUC Omnisports traite des données à caractère personnel. Nous nous engageons à ce que la collecte et le traitement de vos données soient conformes au Règlement Général sur la Protection des Données (RGPD).</p>
+            <p>Dans le cadre de la gestion du Gîte de la Maladrerie, le MUC Omnisports traite des données à caractère personnel. Nous nous engageons à ce que la collecte et le traitement de vos données soient conformes au Règlement Général sur la Protection des Données (RGPD) et à la loi Informatique et Libertés.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Données collectées</h2>
-            <p>Nous collectons uniquement les données nécessaires à la gestion de vos réservations et séjours :</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Collecte des Données</h2>
+            <p>Nous collectons les informations nécessaires à la réservation, l'établissement de vos devis et de la facturation. Ces données incluent notamment vos noms, prénoms, adresses e-mail et numéros de téléphone.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Utilisation des Données</h2>
+            <p>Les données personnelles recueillies sur notre site sont utilisées uniquement dans le cadre des finalités suivantes :</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
-              <li>Identité (nom, prénom) et coordonnées (e-mail, téléphone) du responsable.</li>
-              <li>Informations de paiement et données relatives à l'empreinte bancaire pour la caution de 500 €.</li>
+              <li>Traitement et suivi de vos demandes de réservation.</li>
+              <li>Échanges administratifs et comptables.</li>
+              <li>Amélioration de nos services.</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Finalités du traitement</h2>
-            <p>Vos données sont utilisées exclusivement pour :</p>
-            <ul className="mt-4 space-y-2 list-disc list-inside">
-              <li>La gestion administrative des réservations et la facturation.</li>
-              <li>Le suivi des états des lieux et la gestion de la garantie (caution).</li>
-              <li>La communication liée à votre séjour.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Destinataires et Transfert des données</h2>
-            <p>Les données sont destinées aux services habilités du MUC Omnisports (notamment l'administration et la gestion du gîte par David Roujet).</p>
-            <p className="mt-4 text-xs italic">Le site étant hébergé par Railway Corp. aux États-Unis, les transferts de données hors Union Européenne sont encadrés par des clauses contractuelles types afin de garantir un niveau de protection conforme au RGPD.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Durée de conservation</h2>
-            <p>Vos données sont conservées pendant la durée de la relation contractuelle et selon les obligations légales de conservation des pièces comptables.</p>
-            <p className="mt-4">Les données concernant l'empreinte bancaire de 500 € sont libérées dans un délai maximal de 30 jours après l'état des lieux de sortie.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Vos droits</h2>
-            <p>Conformément à la loi « Informatique et Libertés », vous disposez d'un droit d'accès, de rectification, de suppression et de portabilité de vos données. Vous pouvez exercer ces droits en contactant : <strong>administration@mucomnisports.fr</strong>.</p>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">Vos Droits</h2>
+            <p>Conformément à la réglementation applicable, vous disposez d'un droit d'accès, de rectification, d'effacement et de portabilité de vos données. Vous pouvez exercer ce droit en nous contactant à l'adresse e-mail suivante : administration@mucomnisports.fr.</p>
           </section>
         </div>
       </div>

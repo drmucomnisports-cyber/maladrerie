@@ -723,10 +723,9 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       clientAdresse: adressePostale,
       adminNom: admin ? admin.nom : 'L\'équipe du Gîte',
       adminEmail: admin ? admin.email : 'contact@gitemaladrerie.fr',
-      adminTel: admin ? admin.telephone : null,
+      adminTel: admin ? admin.telephone : '04 99 58 35 35',
       chambres: chambres.map(id => CHAMBRES_NAMES[id] || `Chambre ${id}`),
       nuits,
-      prixUnitaire: totalPrixBase / (nuits || 1), // Simplification pour le PDF si multiples chambres
       detailsLignes: chambres.map(chId => {
         const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
         const nbAdultes = parseInt(details.adultes || 0);
@@ -734,8 +733,9 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
         const occupantsCount = nbAdultes + nbMineurs;
         const capacite = CHAMBRES_CAPACITE[chId] || 5;
         const tarifPers = occupantsCount >= capacite ? 22 : 25;
+        const dateRange = `du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}`;
         return {
-          designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} (${occupantsCount} pers.)`,
+          designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} - Séjour ${dateRange} (${occupantsCount} pers. : ${nbAdultes} adultes, ${nbMineurs} enfants)`,
           pu: occupantsCount * tarifPers,
           qte: nuits,
           total: occupantsCount * tarifPers * nuits
@@ -759,11 +759,11 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
         } else if (k === 'litsFaits') {
           optNom = 'Lits faits à l\'arrivée';
           optPrix = 5;
-          qte = occupants.length;
+          qte = (occupants && occupants.length) || 1;
         } else if (k === 'lingeFourni') {
           optNom = 'Linge de toilette fourni';
           optPrix = 5;
-          qte = occupants.length;
+          qte = (occupants && occupants.length) || 1;
         }
         return { nom: optNom, pu: optPrix, qte: qte, total: optPrix * qte };
       }) : [],
