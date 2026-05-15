@@ -8,7 +8,8 @@ import IntervenantPortal from './pages/IntervenantPortal';
 import Login from './pages/Login';
 import MentionsLegales from './pages/MentionsLegales';
 import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
-import CGVPage from './pages/CGVPage';
+import CGV from './pages/CGV';
+import AdminLogin from './pages/AdminLogin';
 
 function App() {
   return (
@@ -22,7 +23,8 @@ function App() {
         <Route path="/portail-intervenant" element={<IntervenantPortal />} />
         <Route path="/mentions-legales" element={<MentionsLegales />} />
         <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
-        <Route path="/cgv" element={<CGVPage />} />
+        <Route path="/cgv" element={<CGV />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
       </Routes>
     </Router>
   );

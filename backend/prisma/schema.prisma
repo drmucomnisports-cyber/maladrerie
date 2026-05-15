@@ -28,6 +28,7 @@ model Reservation {
   montantAcompte  Float?
   montantSolde    Float?
   statutPaiement  String       @default("EN_ATTENTE") // EN_ATTENTE, ACOMPTE_PAYE, PAYE
+  modePaiement    String?      // STRIPE, ESPECES, CHEQUE, VIREMENT
   statutCaution   String       @default("NON_DEMANDEE") // NON_DEMANDEE, EN_ATTENTE, DEPOSEE, UTILISEE, RESTITUEE
   stripeSessionId String?      // Legacy or generic
   stripeAcompteId String?

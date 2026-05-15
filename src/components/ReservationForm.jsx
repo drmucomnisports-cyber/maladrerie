@@ -11,7 +11,7 @@ const CHAMBRES_INFO = {
   6: { num: 6, name: 'Chambre standard', lits: 5, etage: '2e étage' }
 };
 
-const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCreated = () => {} }) => {
+const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCreated = () => {}, adminUser = null }) => {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -305,7 +305,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       const payload = {
         ...formData,
         prixTotal: calculerPrix(),
-        promoCode: promoApplied?.code
+        promoCode: promoApplied?.code,
+        adminEmail: adminUser?.email,
+        adminName: adminUser?.nom
       };
       
       const url = (isAdmin && isDevis)
@@ -575,7 +577,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
       {/* Modal de Confirmation / Alerte */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-32 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300 border-t-8 border-muc-blue">
             <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-muc-blue/5'}`}>
               <div className="flex justify-center mb-4">
@@ -605,7 +607,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               <button 
                 onClick={() => {
                   setShowModal(false);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  if (localStorage.getItem('adminToken')) {
+                    navigate('/admin');
+                  } else {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
                 }}
                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
                   modalConfig.type === 'warning' 

@@ -168,6 +168,7 @@ const getMissionDetail = (m, dateDebut, dateFin) => {
 };
 
 const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 8, 5: 6, 6: 5 };
+const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Chambre 4", 5: "Chambre 5", 6: "Chambre 6" };
 
 const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, options, promoCode) => {
   const start = new Date(dateDebut);
@@ -709,7 +710,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
 
     const refClient = `C-${year}-${devis.clientId}`;
 
-    // 5. Générer le PDF
+    // 5. Générer le PDF avec détails
     const pdfBuffer = await generateDevisPDF({
       numeroDevis,
       refClient,
@@ -723,17 +724,51 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       adminNom: admin ? admin.nom : 'L\'équipe du Gîte',
       adminEmail: admin ? admin.email : 'contact@gitemaladrerie.fr',
       adminTel: admin ? admin.telephone : null,
-      chambres,
-      prixSejour,
-      taxeSejour: taxeSejourCalculee,
+      chambres: chambres.map(id => CHAMBRES_NAMES[id] || `Chambre ${id}`),
+      nuits,
+      prixUnitaire: totalPrixBase / (nuits || 1), // Simplification pour le PDF si multiples chambres
+      detailsLignes: chambres.map(chId => {
+        const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
+        const nbAdultes = parseInt(details.adultes || 0);
+        const nbMineurs = parseInt(details.enfants || 0);
+        const occupantsCount = nbAdultes + nbMineurs;
+        const capacite = CHAMBRES_CAPACITE[chId] || 5;
+        const tarifPers = occupantsCount >= capacite ? 22 : 25;
+        return {
+          designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} (${occupantsCount} pers.)`,
+          pu: occupantsCount * tarifPers,
+          qte: nuits,
+          total: occupantsCount * tarifPers * nuits
+        };
+      }),
+      taxeSejourDetails: {
+        adultes: totalAdultes,
+        taux: 0.04,
+        nuits: nuits,
+        base: tarifMoyen,
+        total: taxeSejourCalculee
+      },
       options: options ? Object.entries(options).filter(([k,v]) => v).map(([k,v]) => {
         let optPrix = 0;
-        if (k === 'menage') optPrix = chambres.length * 50;
-        if (k === 'litsFaits' || k === 'lingeFourni') optPrix = occupants.length * 5;
-        return { nom: k === 'menage' ? 'Ménage fin de séjour' : (k === 'litsFaits' ? 'Lits faits à l\'arrivée' : 'Linge de toilette fourni'), prix: optPrix };
+        let optNom = '';
+        let qte = 1;
+        if (k === 'menage') {
+          optNom = 'Ménage fin de séjour';
+          optPrix = 50;
+          qte = chambres.length;
+        } else if (k === 'litsFaits') {
+          optNom = 'Lits faits à l\'arrivée';
+          optPrix = 5;
+          qte = occupants.length;
+        } else if (k === 'lingeFourni') {
+          optNom = 'Linge de toilette fourni';
+          optPrix = 5;
+          qte = occupants.length;
+        }
+        return { nom: optNom, pu: optPrix, qte: qte, total: optPrix * qte };
       }) : [],
       prixTotal: backendPrixTotal,
-      promoMontant: 0, // À affiner si besoin
+      promoMontant: 0,
       codePromo: promoCode
     });
 
@@ -1665,6 +1700,47 @@ app.post('/api/admin/reservations/:id/notify-intervenant', checkAuth, async (req
   }
 });
 
+// Convertir un devis en réservation (Admin)
+app.post('/api/admin/reservations/:id/convert-devis', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const reservation = await prisma.reservation.update({
+      where: { id: parseInt(id) },
+      data: { 
+        statut: 'RESERVE',
+        validePar: req.user.email
+      }
+    });
+    res.json({ success: true, reservation });
+  } catch (error) {
+    console.error("Erreur conversion devis:", error);
+    res.status(500).json({ error: "Erreur lors de la conversion du devis." });
+  }
+});
+
+// Enregistrer un paiement manuel (Admin)
+app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const { montant, mode, typePaiement } = req.body; // typePaiement: ACOMPTE or TOTAL
+
+  try {
+    const data = {
+      modePaiement: mode,
+      statutPaiement: typePaiement === 'ACOMPTE' ? 'ACOMPTE_PAYE' : 'PAYE'
+    };
+    
+    const reservation = await prisma.reservation.update({
+      where: { id: parseInt(id) },
+      data
+    });
+    
+    res.json({ success: true, reservation });
+  } catch (error) {
+    console.error("Erreur paiement manuel:", error);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement du paiement." });
+  }
+});
+
 // ==== PORTAIL INTERVENANT ====
 
 // Connexion Intervenant (vérification email)
@@ -1765,6 +1841,20 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/reject', async (req, 
   } catch (error) {
     console.error(error);
     res.status(500).send("Erreur lors du refus");
+  }
+});
+
+// Récupérer les infos de l'admin connecté
+app.get('/api/admin/me', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
+  try {
+    const admin = await prisma.admin.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, email: true, nom: true }
+    });
+    res.json(admin);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

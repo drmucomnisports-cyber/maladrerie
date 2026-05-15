@@ -4,6 +4,15 @@ import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock 
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
+const CHAMBRES_NAMES = {
+  1: "Chambre 1",
+  2: "Chambre 2",
+  3: "Chambre 3",
+  4: "Chambre 4",
+  5: "Chambre 5",
+  6: "Chambre 6"
+};
+
 const Admin = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -60,11 +69,14 @@ const Admin = () => {
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureReservationId, setCaptureReservationId] = useState(null);
 
-  // Comptes Admin
-  const [adminAccounts, setAdminAccounts] = useState([]);
-  const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminForm, setAdminForm] = useState({ email: '', password: '', nom: '' });
   const [captureMontant, setCaptureMontant] = useState('');
+  const [adminUser, setAdminUser] = useState(null);
+
+  // Paiement manuel
+  const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
+  const [manualPaymentRes, setManualPaymentRes] = useState(null);
+  const [manualPaymentForm, setManualPaymentForm] = useState({ montant: '', mode: 'ESPECES', typePaiement: 'ACOMPTE' });
 
   useEffect(() => {
     if (token) {
@@ -73,6 +85,7 @@ const Admin = () => {
       fetchFinances();
       fetchPromoCodes();
       fetchAdminAccounts();
+      fetchAdminMe();
     }
   }, [token]);
 
@@ -91,6 +104,20 @@ const Admin = () => {
     });
     setClients(Array.from(clientMap.values()));
   }, [reservations]);
+
+  const fetchAdminMe = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminUser(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchIntervenants = async () => {
     try {
@@ -641,7 +668,9 @@ const Admin = () => {
                       <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
                     </td>
                     <td className="p-4">
-                      <div className="text-sm font-bold text-muc-blue">Ch. {res.chambres.join(', ')}</div>
+                      <div className="text-sm font-bold text-muc-blue">
+                        {res.chambres.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
+                      </div>
                       <div className="text-xs text-slate-500">
                         {res.options?.litsFaits && <span className="mr-2">🛏️ Lits faits</span>}
                         {res.options?.lingeFourni && <span className="mr-2">🧴 Linge</span>}
@@ -739,6 +768,10 @@ const Admin = () => {
                             )}
                           </div>
                         )}
+                          <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded hover:bg-green-600 hover:text-white transition-colors w-full" title="Enregistrer un paiement manuel">
+                            Enregistrer Paiement
+                          </button>
+                        )}
                         <button onClick={() => setDeleteModalId(res.id)} className="px-3 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded hover:bg-red-500 hover:text-white transition-colors w-full mt-2">Supprimer</button>
                       </div>
                     </td>
@@ -813,15 +846,15 @@ const Admin = () => {
                             Au {new Date(res.dateFin).toLocaleDateString()}
                           </div>
                         </td>
-                        <td className="p-4">
                           <div className="flex flex-wrap gap-1">
-                            {res.chambres.map(c => (
-                              <span key={c.id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase">{c.nom}</span>
+                            {res.chambres.map(id => (
+                              <span key={id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase">
+                                {CHAMBRES_NAMES[id] || `Ch. ${id}`}
+                              </span>
                             ))}
                           </div>
-                        </td>
                         <td className="p-4">
-                          <div className="font-black text-muc-blue">{res.total}€</div>
+                          <div className="font-black text-muc-blue">{res.prixTotal}€</div>
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col gap-1">
@@ -1554,6 +1587,96 @@ const Admin = () => {
               <button onClick={() => setPaymentLinkData(null)} className="px-5 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
                 Fermer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modale Paiement Manuel */}
+      {showManualPaymentModal && manualPaymentRes && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-muc-blue p-6 text-white">
+              <h3 className="text-xl font-black uppercase tracking-tight">Enregistrer un paiement</h3>
+              <p className="text-sm opacity-90">Client : {manualPaymentRes.client.nom}</p>
+            </div>
+            <div className="p-8">
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Montant (€)</label>
+                  <input 
+                    type="number" 
+                    value={manualPaymentForm.montant}
+                    onChange={(e) => setManualPaymentForm({...manualPaymentForm, montant: e.target.value})}
+                    placeholder="Ex: 150"
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-muc-blue outline-none transition-all font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Mode de paiement</label>
+                  <select 
+                    value={manualPaymentForm.mode}
+                    onChange={(e) => setManualPaymentForm({...manualPaymentForm, mode: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-muc-blue outline-none transition-all font-bold"
+                  >
+                    <option value="ESPECES">Espèces</option>
+                    <option value="CHEQUE">Chèque</option>
+                    <option value="VIREMENT">Virement</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Type de règlement</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => setManualPaymentForm({...manualPaymentForm, typePaiement: 'ACOMPTE'})}
+                      className={`py-3 rounded-xl font-bold border-2 transition-all ${manualPaymentForm.typePaiement === 'ACOMPTE' ? 'bg-muc-blue text-white border-muc-blue' : 'bg-white text-slate-600 border-slate-100 hover:border-muc-blue/30'}`}
+                    >
+                      Acompte (30%)
+                    </button>
+                    <button 
+                      onClick={() => setManualPaymentForm({...manualPaymentForm, typePaiement: 'TOTAL'})}
+                      className={`py-3 rounded-xl font-bold border-2 transition-all ${manualPaymentForm.typePaiement === 'TOTAL' ? 'bg-muc-blue text-white border-muc-blue' : 'bg-white text-slate-600 border-slate-100 hover:border-muc-blue/30'}`}
+                    >
+                      Solde Total
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4 mt-8">
+                <button 
+                  onClick={() => setShowManualPaymentModal(false)}
+                  className="flex-1 py-4 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-all"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`${API_URL}/api/admin/reservations/${manualPaymentRes.id}/manual-payment`, {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(manualPaymentForm)
+                      });
+                      if (res.ok) {
+                        showFeedback('Paiement enregistré avec succès !');
+                        setShowManualPaymentModal(false);
+                        fetchReservations();
+                      } else {
+                        const data = await res.json();
+                        alert(data.error || 'Erreur');
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                  className="flex-1 py-4 bg-muc-blue text-white font-black uppercase tracking-wider rounded-xl hover:bg-muc-blue/90 shadow-lg shadow-muc-blue/20 transition-all"
+                >
+                  Confirmer
+                </button>
+              </div>
             </div>
           </div>
         </div>
