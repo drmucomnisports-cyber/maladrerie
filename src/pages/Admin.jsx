@@ -771,7 +771,6 @@ const Admin = () => {
                           <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded hover:bg-green-600 hover:text-white transition-colors w-full" title="Enregistrer un paiement manuel">
                             Enregistrer Paiement
                           </button>
-                        )}
                         <button onClick={() => setDeleteModalId(res.id)} className="px-3 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded hover:bg-red-500 hover:text-white transition-colors w-full mt-2">Supprimer</button>
                       </div>
                     </td>
