@@ -9,7 +9,6 @@ import Login from './pages/Login';
 import MentionsLegales from './pages/MentionsLegales';
 import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
 import CGV from './pages/CGV';
-import AdminLogin from './pages/AdminLogin';
 
 function App() {
   return (
@@ -24,7 +23,7 @@ function App() {
         <Route path="/mentions-legales" element={<MentionsLegales />} />
         <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
         <Route path="/cgv" element={<CGV />} />
-        <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/admin-login" element={<Login />} />
       </Routes>
     </Router>
   );
