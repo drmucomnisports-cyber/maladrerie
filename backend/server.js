@@ -1150,50 +1150,6 @@ app.post('/api/reservations/:id/cancel-caution', checkAuth, async (req, res) => 
   }
 });
 
-// Refuser une réservation
-app.get('/api/reservations/:id/reject', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const reservation = await prisma.reservation.update({
-      where: { id: parseInt(id) },
-      data: { statut: 'REFUSE' },
-      include: { client: true }
-    });
-
-    // Envoyer mail de refus au client
-    await sendMail({
-      to: reservation.client.email,
-      subject: "Mise à jour concernant votre demande - Gîte de La Maladrerie",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #333;">Bonjour ${reservation.client.nom},</h2>
-            <p>Nous avons bien reçu votre demande de réservation pour le séjour du ${new Date(reservation.dateDebut).toLocaleDateString()} au ${new Date(reservation.dateFin).toLocaleDateString()}.</p>
-            <p>Malheureusement, nous ne sommes pas en mesure de donner suite favorablement à votre demande pour ces dates (gîte complet ou indisponible).</p>
-            <p>Nous vous remercions de votre intérêt et espérons vous accueillir lors d'un prochain séjour.</p>
-            <p style="margin-top: 20px;">L'équipe du MUC Omnisports</p>
-          </div>
-          <div style="background-color: #dc3545; height: 5px;"></div>
-        </div>
-      `
-    });
-
-    res.send(`
-      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h1 style="color: #dc3545;">Réservation refusée</h1>
-        <p>Le client <strong>${reservation.client.nom}</strong> a été informé par e-mail.</p>
-        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;">Fermer cette fenêtre</button>
-      </div>
-    `);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Erreur lors du refus");
-  }
-});
-
 // Générer et envoyer le lien pour le solde (70%)
 app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
   const { id } = req.params;
