@@ -208,7 +208,7 @@ const Planning = () => {
             </h2>
             <ReservationForm 
               events={events} 
-              isAdmin={!!localStorage.getItem('adminToken')} 
+              isAdmin={false} 
               isDevis={new URLSearchParams(window.location.search).get('mode') === 'devis'}
               onCreated={fetchReservations} 
             />

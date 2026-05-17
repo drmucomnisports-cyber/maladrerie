@@ -39,13 +39,16 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const reservationId = session.metadata?.reservationId;
-    const paymentType = session.metadata?.paymentType; // 'acompte', 'solde', 'caution'
+    const paymentType = session.metadata?.paymentType?.toLowerCase(); // 'acompte', 'solde', 'caution'
     
     if(reservationId) {
        if (paymentType === 'acompte') {
          const reservation = await prisma.reservation.update({
            where: { id: parseInt(reservationId) },
-           data: { statutPaiement: 'ACOMPTE_PAYE' },
+           data: { 
+             statutPaiement: 'ACOMPTE_PAYE',
+             statut: 'RESERVE'
+           },
            include: { client: true, intervenant: true }
          });
          console.log(`Acompte payé pour la réservation ${reservationId}`);
@@ -400,38 +403,115 @@ app.post('/api/reservations', async (req, res) => {
     const adminEmails = ['david.roujet@mucomnisports.fr', 'philippe.morereau@mucomnisports.fr'];
     console.log(`Tentative d'envoi d'alerte admin à: ${adminEmails.join(', ')}`);
     
-    await sendMail({
-      to: adminEmails.join(', '),
-      subject: `🛎️ Nouvelle demande : ${client.nom} (${nbPersonnes} pers.)`,
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333;">
-            <h2 style="color: #004B93;">Nouvelle demande de réservation</h2>
-            <p><strong>Client :</strong> ${client.nom}</p>
-            <p><strong>E-mail :</strong> ${client.email}</p>
-            <p><strong>Téléphone :</strong> ${client.telephone}</p>
-            <p><strong>Dates :</strong> du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</p>
-            <p><strong>Durée :</strong> ${nbNuits} nuit(s)</p>
-            <p><strong>Total de personnes :</strong> ${nbPersonnes} personne(s)</p>
-            <p><strong>Chambres demandées :</strong> ${reservation.chambres.join(', ')}</p>
-            ${detailsChambresHTML ? `<ul>${detailsChambresHTML}</ul>` : ''}
-            ${occupantsHTML}
-            ${optionsHTML}
-            ${intervenantsHTML}
-            <p style="font-size: 18px; margin-top: 20px;"><strong>Tarif Total Estimé :</strong> ${backendPrixTotal.toFixed(2)} €</p>
-            
-            <div style="margin-top: 30px; text-align: center;">
-              <a href="${acceptLink}" style="display: inline-block; padding: 12px 25px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-right: 10px;">ACCEPTER ET DEMANDER PAIEMENT</a>
-              <a href="${rejectLink}" style="display: inline-block; padding: 12px 25px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">REFUSER</a>
-            </div>
-          </div>
-          <div style="background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666;">
-            Ceci est une notification automatique du système de réservation. L'assignation de l'intervenant se fait depuis l'interface Administrateur.
-          </div>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0; font-size: 20px;">Nouvelle demande de réservation</h2>
+                    <p style="margin-bottom: 20px;">Un nouveau prospect vient de soumettre une demande via le site internet.</p>
+                    
+                    <table width="100%" cellpadding="10" cellspacing="0" border="0" style="background-color: #f9f9f9; border-radius: 8px; margin-bottom: 25px;">
+                      <tr>
+                        <td width="40%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Client</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${client.nom}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">E-mail</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${client.email}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Téléphone</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${client.telephone}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Dates</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">Du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Chambres</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${reservation.chambres.join(', ')}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold;">Montant Estimé</td>
+                        <td style="font-size: 18px; font-weight: bold; color: #004B93;">${backendPrixTotal.toFixed(2)} €</td>
+                      </tr>
+                    </table>
+
+                    ${occupantsHTML ? `<div style="margin-bottom: 20px;">${occupantsHTML}</div>` : ''}
+                    ${optionsHTML ? `<div style="margin-bottom: 20px;">${optionsHTML}</div>` : ''}
+                    
+                    <div style="margin-bottom: 30px;">
+                      ${intervenantsHTML}
+                    </div>
+
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td align="center">
+                          <table cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="background-color: #28a745; border-radius: 6px;">
+                                <a href="${acceptLink}" style="display: inline-block; padding: 15px 25px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">ACCEPTER ET DEMANDER PAIEMENT</a>
+                              </td>
+                              <td width="20"></td>
+                              <td style="background-color: #dc3545; border-radius: 6px;">
+                                <a href="${rejectLink}" style="display: inline-block; padding: 15px 25px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">REFUSER</a>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #777777; border-top: 1px solid #eeeeee;">
+                    <p style="margin: 0;">Ceci est une notification automatique du système de réservation du Gîte de La Maladrerie.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `
+    });
+
+    // Envoyer le mail de confirmation au client
+    await sendMail({
+      to: email,
+      subject: "Demande de réservation - Gîte de La Maladrerie",
+      html: `
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Bonjour ${nom},</h2>
+                    <p>Nous avons bien reçu votre demande de réservation pour la période du <strong>${new Date(dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
+                    <p>Notre équipe va étudier votre demande et vous répondra dans les plus brefs délais pour vous confirmer la disponibilité et vous envoyer les instructions de paiement.</p>
+                    <p style="margin-top: 30px;">À très bientôt,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -474,7 +554,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
             currency: 'eur',
             product_data: {
               name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
-              description: `Du ${new Date(existingReservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(existingReservation.dateFin).toLocaleDateString('fr-FR')}`,
+              description: `Client: ${existingReservation.client.nom}\nDu ${new Date(existingReservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(existingReservation.dateFin).toLocaleDateString('fr-FR')}\n${existingReservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`,
             },
             unit_amount: Math.round(montantAcompte * 100), // En centimes
           },
@@ -513,44 +593,77 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     const dDebutAccept = new Date(reservation.dateDebut);
     const dFinAccept = new Date(reservation.dateFin);
     const nbNuitsAccept = Math.round((dFinAccept - dDebutAccept) / (1000 * 60 * 60 * 24));
-    const nbPersonnesAccept = existingReservation.occupants ? existingReservation.occupants.length : 0;
-
-    // Envoyer mail de confirmation au client
-    await sendMail({
+     await sendMail({
       to: reservation.client.email,
       subject: "Confirmation de votre réservation et Paiement - Gîte de La Maladrerie",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #004B93;">Bonjour ${reservation.client.nom},</h2>
-            <p>Nous avons le plaisir de vous confirmer votre réservation pour votre séjour au <strong>Gîte de La Maladrerie</strong>.</p>
-            <p><strong>Détails du séjour :</strong></p>
-            <ul>
-              <li><strong>Chambres :</strong> ${reservation.chambres.join(', ')}</li>
-              <li><strong>Arrivée :</strong> ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} à partir de 17h</li>
-              <li><strong>Départ :</strong> ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')} avant 11h</li>
-              <li><strong>Durée :</strong> ${nbNuitsAccept} nuit(s)</li>
-              ${reservation.prixTotal ? `<li><strong>Montant Total :</strong> ${reservation.prixTotal.toFixed(2)} €</li>` : ''}
-            </ul>
-            ${existingReservation.occupants && existingReservation.occupants.length > 0 ? `
-              <p><strong>Occupants inscrits (${nbPersonnesAccept} personnes) :</strong></p>
-              <ul>
-                ${existingReservation.occupants.map(occ => `<li>${occ.nom} ${occ.prenom} - ${occ.estAdulte ? 'Adulte' : `Mineur (${occ.age} ans)`}</li>`).join('')}
-              </ul>
-            ` : ''}
-            ${paymentLink ? `
-              <div style="text-align: center; margin: 30px 0;">
-                <p style="font-weight: bold; margin-bottom: 15px;">Pour finaliser votre réservation, veuillez procéder au paiement de l'acompte (30%) :</p>
-                <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Payer l'acompte de ${montantAcompte.toFixed(2)} €</a>
-                <p style="margin-top: 15px; font-size: 14px; color: #666;">Le solde de ${montantSolde.toFixed(2)} € sera à régler une semaine avant votre arrivée.</p>
-              </div>
-            ` : '<p>Votre réservation est confirmée. Le règlement se fera selon les modalités convenues.</p>'}
-            <p>Nous restons à votre disposition pour toute question complémentaire.</p>
-            <p>À très bientôt !</p>
-            <p style="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+                    <p>Nous avons le plaisir de vous confirmer votre réservation pour votre séjour au <strong>Gîte de La Maladrerie</strong>.</p>
+                    
+                    <table width="100%" cellpadding="10" cellspacing="0" border="0" style="background-color: #f9f9f9; border-radius: 8px; margin: 20px 0;">
+                      <tr>
+                        <td width="40%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Période</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">Du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Durée</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${nbNuitsAccept} nuit(s)</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Chambres</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${reservation.chambres.join(', ')}</td>
+                      </tr>
+                      ${reservation.prixTotal ? `
+                      <tr>
+                        <td style="font-weight: bold;">Montant Total</td>
+                        <td style="font-weight: bold; color: #004B93;">${reservation.prixTotal.toFixed(2)} €</td>
+                      </tr>` : ''}
+                    </table>
+
+                    ${existingReservation.occupants && existingReservation.occupants.length > 0 ? `
+                      <p style="font-weight: bold; margin-bottom: 10px;">Occupants inscrits (${nbPersonnesAccept} personnes) :</p>
+                      <ul style="padding-left: 20px; margin-bottom: 25px;">
+                        ${existingReservation.occupants.map(occ => `<li>${occ.nom} ${occ.prenom} - ${occ.estAdulte ? 'Adulte' : `Mineur (${occ.age} ans)`}</li>`).join('')}
+                      </ul>
+                    ` : ''}
+
+                    ${paymentLink ? `
+                      <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
+                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'acompte (30%) :</p>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td align="center">
+                              <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer l'acompte de ${montantAcompte.toFixed(2)} €</a>
+                            </td>
+                          </tr>
+                        </table>
+                        <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">Le solde de ${montantSolde.toFixed(2)} € sera à régler une semaine avant votre arrivée.</p>
+                      </div>
+                    ` : '<p>Votre réservation est confirmée. Le règlement se fera selon les modalités convenues.</p>'}
+                    
+                    <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `
+    });="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
           </div>
           <div style="background-color: #FDB913; height: 5px;"></div>
         </div>
@@ -588,19 +701,31 @@ app.get('/api/reservations/:id/reject', checkAuth, async (req, res) => {
       to: reservation.client.email,
       subject: "Information concernant votre demande de réservation - Gîte de La Maladrerie",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #004B93;">Bonjour ${reservation.client.nom},</h2>
-            <p>Nous avons bien reçu votre demande de réservation pour la période du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}.</p>
-            <p>Malheureusement, nous ne sommes pas en mesure d'y donner une suite favorable pour le moment.</p>
-            <p>Nous vous remercions de votre intérêt et espérons avoir le plaisir de vous accueillir une prochaine fois.</p>
-            <p>Cordialement,</p>
-            <p>L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #333333; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+                    <p>Nous avons bien reçu votre demande de réservation pour la période du <strong>${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
+                    <p>Malheureusement, nous ne sommes pas en mesure d'y donner une suite favorable pour le moment (indisponibilité ou gîte déjà complet).</p>
+                    <p>Nous vous remercions de votre intérêt et espérons avoir le plaisir de vous accueillir une prochaine fois.</p>
+                    <p style="margin-top: 30px;">Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #dc3545; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -785,35 +910,59 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
         }
       ],
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #004B93;">Bonjour ${nom},</h2>
-            <p>Suite à votre demande, nous avons le plaisir de vous transmettre notre proposition tarifaire pour votre séjour au gîte.</p>
-            
-            <p>Veuillez trouver ci-joint votre devis détaillé au format PDF, incluant nos conditions générales de vente.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Bonjour ${nom},</h2>
+                    <p>Suite à votre demande, nous avons le plaisir de vous transmettre notre proposition tarifaire pour votre séjour au gîte.</p>
+                    <p>Veuillez trouver ci-joint votre devis détaillé au format PDF, incluant nos conditions générales de vente.</p>
 
-            <div style="background-color: #f8f9fa; border-left: 4px solid #FDB913; padding: 20px; margin: 20px 0;">
-              <p><strong>Numéro de devis :</strong> ${numeroDevis}</p>
-              <p><strong>Période :</strong> du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
-              <p style="font-size: 18px; margin-top: 10px;"><strong>Montant Total : ${backendPrixTotal.toFixed(2)} €</strong></p>
-            </div>
+                    <table width="100%" cellpadding="10" cellspacing="0" border="0" style="background-color: #f9f9f9; border-radius: 8px; margin: 25px 0;">
+                      <tr>
+                        <td width="40%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">N° de devis</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${numeroDevis}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Période</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">Du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold;">Montant Total</td>
+                        <td style="font-size: 18px; font-weight: bold; color: #004B93;">${backendPrixTotal.toFixed(2)} €</td>
+                      </tr>
+                    </table>
 
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; font-size: 14px; color: #856404; margin-bottom: 25px;">
-              ⚠️ <strong>Important :</strong> Ce devis et la disponibilité associée ne sont garantis que pendant <strong>48 heures</strong>. Passé ce délai, le créneau pourra être réservé par un autre client.
-            </div>
+                    <div style="background-color: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 8px; font-size: 14px; color: #856404; margin-bottom: 25px;">
+                      ⚠️ <strong>Important :</strong> Ce devis et la disponibilité associée ne sont garantis que pendant <strong>48 heures</strong>. Passé ce délai, le créneau pourra être réservé par un autre client.
+                    </div>
 
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${validationLink}" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Valider et Confirmer mon séjour</a>
-            </div>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td align="center">
+                          <a href="${validationLink}" style="background-color: #28a745; color: #ffffff; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block;">Valider et Confirmer mon séjour</a>
+                        </td>
+                      </tr>
+                    </table>
 
-            <p>Pour confirmer, vous pouvez cliquer sur le bouton ci-dessus ou nous renvoyer le devis signé.</p>
-            <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
-            <p>Cordialement,<br>${admin ? admin.nom : 'L\'équipe du Gîte de la Maladrerie - MUC'}</p>
-          </div>
-        </div>
+                    <p style="margin-top: 30px;">Pour confirmer, vous pouvez cliquer sur le bouton ci-dessus ou nous renvoyer le devis signé.</p>
+                    <p>Cordialement,<br><strong>${admin ? admin.nom : 'L\'équipe du Gîte de La Maladrerie - MUC'}</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -822,15 +971,19 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       to: ADMIN_EMAIL,
       subject: `Nouveau devis émis : ${numeroDevis} - ${nom}`,
       html: `
-        <div style="font-family: sans-serif; padding: 20px;">
-          <h2>Un nouveau devis a été envoyé</h2>
-          <p><strong>Numéro :</strong> ${numeroDevis}</p>
-          <p><strong>Client :</strong> ${nom} (${email})</p>
-          <p><strong>Période :</strong> du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
-          <p><strong>Montant :</strong> ${backendPrixTotal.toFixed(2)} €</p>
-          <p><strong>Émis par :</strong> ${admin ? admin.nom : req.user.email}</p>
-          <p>Ce devis expire le ${expiration.toLocaleString('fr-FR')}.</p>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #333333;">
+          <tr>
+            <td style="padding: 20px; border: 1px solid #eeeeee; border-radius: 8px;">
+              <h2 style="color: #004B93; margin-top: 0;">Un nouveau devis a été envoyé</h2>
+              <p><strong>Numéro :</strong> ${numeroDevis}</p>
+              <p><strong>Client :</strong> ${nom} (${email})</p>
+              <p><strong>Période :</strong> du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
+              <p><strong>Montant :</strong> ${backendPrixTotal.toFixed(2)} €</p>
+              <p><strong>Émis par :</strong> ${admin ? admin.nom : req.user.email}</p>
+              <p style="color: #d32f2f; font-weight: bold;">Ce devis expire le ${expiration.toLocaleString('fr-FR')}.</p>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -857,17 +1010,54 @@ app.get('/api/devis/validate/:token', async (req, res) => {
        return res.status(400).send("Ce devis a expiré (validité de 48h dépassée).");
     }
 
-    // Convertir en demande de réservation classique
+    // Convertir en demande de réservation classique (RESERVE)
+    const montantAcompte = devis.prixTotal * 0.3;
+    const montantSolde = devis.prixTotal * 0.7;
+
+    const stripeCustomerPL = await getOrCreateStripeCustomer(devis.client.email, devis.client.nom);
+    const plParams = {
+      payment_method_types: ['card'],
+      allow_promotion_codes: true,
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: { 
+            name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
+            description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
+          },
+          unit_amount: Math.round(montantAcompte * 100),
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
+      metadata: { reservationId: devis.id.toString(), paymentType: 'ACOMPTE' }
+    };
+    if (stripeCustomerPL) plParams.customer = stripeCustomerPL;
+    else if (devis.client.email && devis.client.email !== 'N/A') plParams.customer_email = devis.client.email;
+    
+    const session = await stripe.checkout.sessions.create(plParams);
+
     await prisma.reservation.update({
       where: { id: devis.id },
-      data: { statut: 'EN_ATTENTE', tokenDevis: null }
+      data: { 
+        statut: 'RESERVE', 
+        tokenDevis: null,
+        montantAcompte: montantAcompte,
+        montantSolde: montantSolde,
+        stripeSessionId: session.id
+      }
     });
 
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1 style="color: #28a745;">Devis validé !</h1>
-        <p>Votre demande a été transmise à nos administrateurs. Vous recevrez prochainement une confirmation avec le lien de paiement.</p>
-        <p><a href="${FRONTEND_URL}">Retour au site</a></p>
+        <p>Votre demande a été confirmée.</p>
+        <p>Pour finaliser votre réservation, veuillez procéder au paiement de l'acompte (30%).</p>
+        <div style="margin-top: 30px;">
+          <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block;">Payer l'acompte en ligne</a>
+        </div>
       </div>
     `);
   } catch (error) {
@@ -893,163 +1083,8 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
-// Demander le solde manuellement
-app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
-  const { id } = req.params;
-  try {
-    const reser = await prisma.reservation.findUnique({
-      where: { id: parseInt(id) },
-      include: { client: true }
-    });
-    if (!reser) return res.status(404).json({ error: 'Réservation non trouvée' });
 
-    const stripeCustomerId = await getOrCreateStripeCustomer(reser.client.email, reser.client.nom);
-    const sessionParams = {
-      payment_method_types: ['card'],
-      allow_promotion_codes: true,
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: `Solde - Séjour Gîte de La Maladrerie`,
-            description: `Du ${new Date(reser.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reser.dateFin).toLocaleDateString('fr-FR')}`,
-          },
-          unit_amount: Math.round((reser.montantSolde || 0) * 100),
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/payment-cancel`,
-      metadata: { reservationId: reser.id.toString(), paymentType: 'solde' }
-    };
 
-    if (stripeCustomerId) sessionParams.customer = stripeCustomerId;
-    else if (reser.client.email && reser.client.email !== 'N/A') sessionParams.customer_email = reser.client.email;
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
-
-    await sendMail({
-      to: reser.client.email,
-      subject: "Règlement du solde de votre séjour - Gîte de La Maladrerie",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <p>Bonjour ${reser.client.nom},</p>
-            <p>Nous vous informons que le solde de votre séjour (du ${new Date(reser.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reser.dateFin).toLocaleDateString('fr-FR')}) est désormais dû.</p>
-            <p>Veuillez régler le solde en cliquant sur le lien sécurisé ci-dessous :</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Payer le solde de ${(reser.montantSolde || 0).toFixed(2)} €</a>
-            </div>
-            <p>Nous restons à votre disposition pour toute question.</p>
-            <p>Cordialement,<br>L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-        </div>
-      `
-    });
-
-    res.json({ success: true, message: 'Demande de solde envoyée', url: session.url });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur lors de la demande de solde' });
-  }
-});
-
-// Demander la caution manuellement
-app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
-  const { id } = req.params;
-  try {
-    const reser = await prisma.reservation.findUnique({
-      where: { id: parseInt(id) },
-      include: { client: true }
-    });
-    if (!reser) return res.status(404).json({ error: 'Réservation non trouvée' });
-
-    const stripeCustomerId = await getOrCreateStripeCustomer(reser.client.email, reser.client.nom);
-    const sessionParams = {
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: `Empreinte bancaire (Caution) - Gîte de La Maladrerie`,
-            description: `Caution de 500€ (non débitée, sauf dégradations)`,
-          },
-          unit_amount: 50000,
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      payment_intent_data: { capture_method: 'manual' },
-      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/payment-cancel`,
-      metadata: { reservationId: reser.id.toString(), paymentType: 'caution' }
-    };
-
-    if (stripeCustomerId) sessionParams.customer = stripeCustomerId;
-    else if (reser.client.email && reser.client.email !== 'N/A') sessionParams.customer_email = reser.client.email;
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
-
-    await sendMail({
-      to: reser.client.email,
-      subject: "Dépôt de caution (empreinte bancaire) - Gîte de La Maladrerie",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <p>Bonjour ${reser.client.nom},</p>
-            <p>Dans le cadre de votre séjour au gîte, nous vous demandons de bien vouloir effectuer une empreinte bancaire pour la caution (500 €).</p>
-            <p><strong>Note importante :</strong> Ce montant ne sera pas débité de votre compte. Il s'agit d'une simple autorisation de paiement sécurisée via Stripe.</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Effectuer l'empreinte de caution</a>
-            </div>
-            <p>Nous restons à votre disposition pour toute précision.</p>
-            <p>Cordialement,<br>L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-        </div>
-      `
-    });
-
-    res.json({ success: true, message: 'Demande de caution envoyée', url: session.url });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur lors de la demande de caution' });
-  }
-});
-
-// Capturer la caution (retenue partielle ou totale)
-app.post('/api/reservations/:id/capture-caution', checkAuth, async (req, res) => {
-  const { id } = req.params;
-  const { montant } = req.body; 
-  try {
-    const reser = await prisma.reservation.findUnique({ where: { id: parseInt(id) } });
-    if (!reser || !reser.stripeCautionId) return res.status(404).json({ error: 'Empreinte introuvable' });
-
-    const amountToCapture = Math.round(parseFloat(montant) * 100);
-    await stripe.paymentIntents.capture(reser.stripeCautionId, {
-      amount_to_capture: amountToCapture,
-    });
-
-    await prisma.reservation.update({
-      where: { id: parseInt(id) },
-      data: { 
-        statutCaution: 'UTILISEE',
-        montantCautionRetenu: parseFloat(montant)
-      }
-    });
-
-    res.json({ success: true, message: `Caution capturée (${montant}€) avec succès` });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur lors de la capture de la caution' });
-  }
-});
 
 // Annuler la caution
 app.post('/api/reservations/:id/cancel-caution', checkAuth, async (req, res) => {
@@ -1124,8 +1159,14 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
       include: { client: true }
     });
 
-    if (!reservation || !reservation.montantSolde) {
-      return res.status(404).json({ error: "Réservation ou montant solde introuvable" });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable" });
+    }
+
+    const montantSoldeCalcule = (reservation.prixTotal || 0) - (reservation.montantPaye || 0);
+
+    if (montantSoldeCalcule <= 0) {
+      return res.status(400).json({ error: "Le solde est de 0€ (déjà réglé ou prix total non défini)" });
     }
 
     const stripeCustomerSolde = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
@@ -1135,10 +1176,10 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: {
-            name: 'Solde (70%) - Séjour Gîte de La Maladrerie',
-            description: `Du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}`,
+            name: 'Solde du séjour - Gîte de La Maladrerie',
+            description: `Client: ${reservation.client.nom}\nDu ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`,
           },
-          unit_amount: Math.round(reservation.montantSolde * 100),
+          unit_amount: Math.round(montantSoldeCalcule * 100),
         },
         quantity: 1,
       }],
@@ -1166,21 +1207,40 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
       to: reservation.client.email,
       subject: "Paiement du solde de votre séjour - Gîte de La Maladrerie",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #004B93;">Bonjour ${reservation.client.nom},</h2>
-            <p>Votre séjour approche à grands pas (arrivée le ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}).</p>
-            <p>Afin de finaliser votre réservation, veuillez procéder au règlement du solde de votre séjour.</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Payer le solde de ${reservation.montantSolde.toFixed(2)} €</a>
-            </div>
-            <p>Nous restons à votre disposition pour toute question.</p>
-            <p style="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+                    <p>Votre séjour approche à grands pas (arrivée prévue le <strong>${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}</strong>).</p>
+                    <p>Afin de finaliser votre réservation, veuillez procéder au règlement du solde de votre séjour.</p>
+                    
+                    <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
+                      <tr>
+                        <td>
+                          <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer le solde de ${montantSoldeCalcule.toFixed(2)} €</a>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <p>Nous restons à votre disposition pour toute question.</p>
+                    <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -1212,7 +1272,7 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
           currency: 'eur',
           product_data: {
             name: 'Caution - Empreinte bancaire (Gîte de La Maladrerie)',
-            description: `Le montant de 500€ sera bloqué mais non débité.`,
+            description: `Client: ${reservation.client.nom}\nDu ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nCe montant ne sera pas prélevé.`,
           },
           unit_amount: 50000, // 500€
         },
@@ -1222,8 +1282,8 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
       payment_intent_data: {
         capture_method: 'manual', // Autorise sans capturer
       },
-      success_url: `http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:5173/payment-cancel`,
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: {
         reservationId: reservation.id.toString(),
         paymentType: 'caution'
@@ -1245,21 +1305,50 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
       to: reservation.client.email,
       subject: "Dépôt de garantie (Caution) - Gîte de La Maladrerie",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #004B93;">Bonjour ${reservation.client.nom},</h2>
-            <p>Conformément à nos conditions de réservation, un dépôt de garantie de 500 € est requis avant votre arrivée au gîte.</p>
-            <p>Ce montant fera l'objet d'une <strong>empreinte bancaire</strong> sécurisée (il sera bloqué temporairement mais non débité, sauf en cas de dommages constatés).</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Déposer la caution de 500 €</a>
-            </div>
-            <p>L'empreinte sera automatiquement levée après votre départ si aucun dégât n'est constaté.</p>
-            <p style="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+                    <p>Nous vous remercions pour votre réservation au Gîte de La Maladrerie.</p>
+                    <p>Afin de finaliser les préparatifs de votre séjour prévu du <strong>${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</strong>, et conformément à nos Conditions Générales de Vente, un dépôt de garantie de 500 € est requis.</p>
+                    
+                    <table width="100%" cellpadding="20" cellspacing="0" border="0" style="background-color: #f8f9fa; border-left: 4px solid #004B93; margin: 25px 0; border-radius: 0 8px 8px 0;">
+                      <tr>
+                        <td style="padding: 15px;">
+                          <p style="margin: 0;"><strong>Veuillez noter :</strong> Il s'agit d'une simple <strong>empreinte bancaire</strong> sécurisée. Aucun montant ne sera débité de votre compte. Cette somme est uniquement bloquée temporairement et sera automatiquement libérée après votre départ, sous réserve de l'état des lieux.</p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p>Nous vous invitons à procéder à l'enregistrement de cette garantie en cliquant sur le lien sécurisé ci-dessous :</p>
+
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td align="center">
+                          <a href="${session.url}" style="background-color: #004B93; color: #ffffff; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block;">Enregistrer la garantie de 500 €</a>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <p style="margin-top: 30px;">Si vous avez la moindre question, n'hésitez pas à nous contacter.</p>
+                    <p>Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -1417,40 +1506,74 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
         to: intervenant.email,
         subject: `Missions assignées — Séjour du ${dateDebut.toLocaleDateString('fr-FR')} au ${dateFin.toLocaleDateString('fr-FR')}`,
         html: `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
-            <div style="background-color: #004B93; padding: 24px; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 22px;">Gîte de La Maladrerie</h1>
-              <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0; font-size: 13px;">Notification de missions</p>
-            </div>
-            <div style="padding: 30px; color: #333; line-height: 1.7;">
-              <h2 style="color: #004B93; margin-top: 0;">Bonjour ${intervenant.prenom},</h2>
-              <p>Nous vous informons que de nouvelles missions vous ont été confiées dans le cadre d'un séjour programmé au Gîte de La Maladrerie.</p>
-              
-              <div style="background-color: #f8f9fa; border-left: 4px solid #FDB913; padding: 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
-                <p style="margin: 0 0 5px 0; font-weight: bold; color: #004B93;">📅 Période du séjour</p>
-                <p style="margin: 0; font-size: 15px;">Du <strong>${dateDebut.toLocaleDateString('fr-FR')}</strong> au <strong>${dateFin.toLocaleDateString('fr-FR')}</strong></p>
-              </div>
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                  <tr>
+                    <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                      <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0; font-size: 14px;">Notification de missions</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                      <h2 style="color: #004B93; margin-top: 0;">Bonjour ${intervenant.prenom},</h2>
+                      <p>De nouvelles missions vous ont été confiées pour un séjour programmé au gîte.</p>
+                      
+                      <table width="100%" cellpadding="15" cellspacing="0" border="0" style="background-color: #fff8e1; border-left: 4px solid #FDB913; margin: 25px 0; border-radius: 0 8px 8px 0;">
+                        <tr>
+                          <td>
+                            <p style="margin: 0 0 5px 0; font-weight: bold; color: #004B93;">📅 Période du séjour</p>
+                            <p style="margin: 0; font-size: 16px;">Du <strong>${dateDebut.toLocaleDateString('fr-FR')}</strong> au <strong>${dateFin.toLocaleDateString('fr-FR')}</strong></p>
+                          </td>
+                        </tr>
+                      </table>
 
-              <p style="font-weight: bold; margin-bottom: 10px;">Vos missions :</p>
-              <ul style="padding-left: 20px; list-style-type: none;">
-                ${missionsHtml}
-              </ul>
-              
-              <div style="background-color: #e8f5e9; padding: 12px 16px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                <p style="margin: 0; font-size: 16px; font-weight: bold; color: #2e7d32;">Rémunération totale : ${totalRemuneration.toFixed(2)} €</p>
-              </div>
+                      <p style="font-weight: bold; margin-bottom: 10px;">Détails des missions :</p>
+                      <ul style="padding-left: 20px; margin-bottom: 25px;">
+                        ${missionsHtml}
+                      </ul>
+                      
+                      <table width="100%" cellpadding="15" cellspacing="0" border="0" style="background-color: #e8f5e9; border-radius: 8px; margin-bottom: 25px; text-align: center;">
+                        <tr>
+                          <td>
+                            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #2e7d32;">Rémunération totale : ${totalRemuneration.toFixed(2)} €</p>
+                          </td>
+                        </tr>
+                      </table>
 
-              <p>Merci de bien vouloir confirmer votre disponibilité en cliquant sur l'un des boutons ci-dessous :</p>
-              
-              <div style="text-align: center; margin: 30px 0; display: flex; gap: 12px; justify-content: center;">
-                <a href="${acceptUrl}" style="background-color: #28a745; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">✓ J'accepte</a>
-                <a href="${rejectUrl}" style="background-color: #dc3545; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">✗ Je décline</a>
-              </div>
-              <p style="font-size: 13px; color: #999;">En cas de question, n'hésitez pas à nous contacter directement.</p>
-              <p style="margin-top: 20px;">Cordialement,<br/>L'équipe du Gite de la Maladrerie - MUC</p>
-            </div>
-            <div style="background-color: #FDB913; height: 5px;"></div>
-          </div>
+                      <p>Veuillez confirmer votre disponibilité en cliquant sur l'un des boutons ci-dessous :</p>
+                      
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                        <tr>
+                          <td align="center">
+                            <table cellpadding="0" cellspacing="0" border="0">
+                              <tr>
+                                <td style="background-color: #28a745; border-radius: 6px;">
+                                  <a href="${acceptUrl}" style="display: inline-block; padding: 15px 30px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">✓ J'accepte</a>
+                                </td>
+                                <td width="20"></td>
+                                <td style="background-color: #dc3545; border-radius: 6px;">
+                                  <a href="${rejectUrl}" style="display: inline-block; padding: 15px 30px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">✗ Je décline</a>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <p style="font-size: 13px; color: #999999; margin-top: 30px;">En cas de question, n'hésitez pas à nous contacter directement.</p>
+                      <p>Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background-color: #FDB913; height: 5px;"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         `
       });
     }
@@ -1584,15 +1707,18 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
       line_items: [{
         price_data: {
           currency: 'eur',
-          product_data: { name: 'Séjour Gîte de La Maladrerie' },
-          unit_amount: Math.round(reservation.prixTotal * 100),
+          product_data: { 
+            name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
+            description: `Client: ${reservation.client.nom}\nSéjour: du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
+          },
+          unit_amount: Math.round(reservation.prixTotal * 0.3 * 100),
         },
         quantity: 1,
       }],
       mode: 'payment',
       success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/payment-cancel`,
-      metadata: { reservationId: reservation.id.toString() }
+      metadata: { reservationId: reservation.id.toString(), paymentType: 'ACOMPTE' }
     };
     if (stripeCustomerPL) {
       plParams.customer = stripeCustomerPL;
@@ -1666,30 +1792,60 @@ app.post('/api/admin/reservations/:id/notify-intervenant', checkAuth, async (req
       to: intervenant.email,
       subject: "Nouvelles missions assignées - Gîte de La Maladrerie",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Missions Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #004B93;">Bonjour ${intervenant.prenom},</h2>
-            <p>De nouvelles missions vous ont été assignées pour la réservation du <strong>${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
-            
-            <div style="border-left: 4px solid #FDB913; padding-left: 15px; margin: 20px 0;">
-              <p style="margin: 5px 0;"><strong>Vos missions :</strong></p>
-              <ul>
-                ${missionsHtml}
-              </ul>
-            </div>
-            
-            <p>Veuillez confirmer si vous acceptez ces missions :</p>
-            
-            <div style="text-align: center; margin: 30px 0; display: flex; gap: 10px; justify-content: center;">
-              <a href="${acceptUrl}" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">J'accepte</a>
-              <a href="${rejectUrl}" style="background-color: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Je refuse</a>
-            </div>
-            <p>L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Bonjour ${intervenant.prenom},</h2>
+                    <p>De nouvelles missions vous ont été assignées pour la réservation du <strong>${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
+                    
+                    <table width="100%" cellpadding="15" cellspacing="0" border="0" style="background-color: #fff8e1; border-left: 4px solid #FDB913; margin: 25px 0; border-radius: 0 8px 8px 0;">
+                      <tr>
+                        <td>
+                          <p style="margin: 0; font-weight: bold; color: #004B93;">Vos missions :</p>
+                          <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                            ${missionsHtml}
+                          </ul>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <p>Veuillez confirmer si vous acceptez ces missions :</p>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                      <tr>
+                        <td align="center">
+                          <table cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="background-color: #28a745; border-radius: 6px;">
+                                <a href="${acceptUrl}" style="display: inline-block; padding: 15px 30px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">J'accepte</a>
+                              </td>
+                              <td width="20"></td>
+                              <td style="background-color: #dc3545; border-radius: 6px;">
+                                <a href="${rejectUrl}" style="display: inline-block; padding: 15px 30px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">Je refuse</a>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                    <p>Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -1806,6 +1962,26 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/accept', async (req, 
       data: { statut: 'ACCEPTEE' }
     });
     const intervenant = await prisma.intervenant.findUnique({ where: { id: parseInt(intervenantId) }});
+    const reservation = await prisma.reservation.findUnique({ where: { id: parseInt(id) }});
+
+    // Envoyer mail à l'admin
+    try {
+      const adminEmail = (reservation?.validePar && reservation.validePar.includes('@')) ? reservation.validePar : (process.env.ADMIN_EMAIL || 'dr.mucomnisports@gmail.com');
+      await sendMail({
+        to: adminEmail,
+        subject: `Missions acceptées par ${intervenant ? intervenant.prenom + ' ' + intervenant.nom : 'un intervenant'}`,
+        html: `
+          <div style="font-family: sans-serif;">
+            <p>Bonjour,</p>
+            <p>L'intervenant <strong>${intervenant ? intervenant.prenom + ' ' + intervenant.nom : ''}</strong> a accepté ses missions pour la réservation du <strong>${reservation ? new Date(reservation.dateDebut).toLocaleDateString('fr-FR') : ''} au ${reservation ? new Date(reservation.dateFin).toLocaleDateString('fr-FR') : ''}</strong>.</p>
+            <p>Vous pouvez consulter les détails sur l'espace administration.</p>
+          </div>
+        `
+      });
+    } catch (err) {
+      console.error("Erreur envoi email admin acceptation mission:", err);
+    }
+
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1 style="color: #28a745;">Missions acceptées !</h1>
@@ -1831,6 +2007,25 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/reject', async (req, 
       data: { statut: 'REFUSEE' }
     });
     const intervenant = await prisma.intervenant.findUnique({ where: { id: parseInt(intervenantId) }});
+    const reservation = await prisma.reservation.findUnique({ where: { id: parseInt(id) }});
+
+    // Envoyer mail à l'admin
+    try {
+      const adminEmail = (reservation?.validePar && reservation.validePar.includes('@')) ? reservation.validePar : (process.env.ADMIN_EMAIL || 'dr.mucomnisports@gmail.com');
+      await sendMail({
+        to: adminEmail,
+        subject: `Missions refusées par ${intervenant ? intervenant.prenom + ' ' + intervenant.nom : 'un intervenant'}`,
+        html: `
+          <div style="font-family: sans-serif;">
+            <p>Bonjour,</p>
+            <p>L'intervenant <strong>${intervenant ? intervenant.prenom + ' ' + intervenant.nom : ''}</strong> a refusé ses missions pour la réservation du <strong>${reservation ? new Date(reservation.dateDebut).toLocaleDateString('fr-FR') : ''} au ${reservation ? new Date(reservation.dateFin).toLocaleDateString('fr-FR') : ''}</strong>.</p>
+            <p>Veuillez consulter l'espace administration pour réassigner ces missions à un autre intervenant.</p>
+          </div>
+        `
+      });
+    } catch (err) {
+      console.error("Erreur envoi email admin refus mission:", err);
+    }
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1 style="color: #dc3545;">Missions refusées</h1>
@@ -1878,6 +2073,8 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
         dateFin: new Date(dateFin),
         chambres: chambres, // Expecting array of ints
         prixTotal: prixTotal ? parseFloat(prixTotal) : null,
+        montantAcompte: prixTotal ? Math.round(parseFloat(prixTotal) * 0.3 * 100) / 100 : null,
+        montantSolde: prixTotal ? Math.round(parseFloat(prixTotal) * 0.7 * 100) / 100 : null,
         statut: 'RESERVE',
         statutPaiement: 'EN_ATTENTE',
         client: {
@@ -1894,6 +2091,32 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
       },
       include: { client: true, occupants: true }
     });
+
+    if (email && email !== 'N/A') {
+      try {
+        await sendMail({
+          to: email,
+          subject: "Confirmation d'enregistrement de votre réservation - Gîte de La Maladrerie",
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+              <div style="background-color: #004B93; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
+              </div>
+              <div style="padding: 20px;">
+                <h2 style="color: #004B93;">Bonjour ${nom},</h2>
+                <p>Nous vous confirmons que votre réservation a bien été enregistrée par notre équipe pour un séjour du <strong>${new Date(dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
+                <p>Si un paiement est requis, vous recevrez prochainement un e-mail avec un lien sécurisé pour procéder au règlement.</p>
+                <br>
+                <p>À très bientôt,<br>L'équipe du Gîte de La Maladrerie</p>
+              </div>
+            </div>
+          `
+        });
+      } catch (err) {
+        console.error("Erreur lors de l'envoi de l'e-mail de confirmation manuelle:", err);
+      }
+    }
+
     res.json(reservation);
   } catch (error) {
     console.error("Erreur création manuelle:", error);
@@ -1939,29 +2162,58 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
       to: reservation.client.email,
       subject: "Lien de paiement pour votre réservation - Gîte de La Maladrerie",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px; color: #333; line-height: 1.6;">
-            <h2 style="color: #004B93;">Bonjour ${reservation.client.nom},</h2>
-            <p>Voici le lien pour finaliser le paiement de votre réservation.</p>
-            
-            <div style="border-left: 4px solid #FDB913; padding-left: 15px; margin: 20px 0;">
-              <p style="margin: 5px 0;"><strong>Dates :</strong> du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</p>
-              <p style="margin: 5px 0;"><strong>Durée :</strong> ${nbNuits} nuit(s)</p>
-              <p style="margin: 5px 0;"><strong>Chambres demandées :</strong> ${reservation.chambres.join(', ')}</p>
-              <p style="margin: 5px 0; font-size: 16px;"><strong>Montant :</strong> ${reservation.prixTotal ? reservation.prixTotal.toFixed(2) + ' €' : 'Non défini'}</p>
-            </div>
-            
-            ${occupantsHTML}
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+                    <p>Voici le lien pour finaliser le règlement de votre réservation.</p>
+                    
+                    <table width="100%" cellpadding="10" cellspacing="0" border="0" style="background-color: #f9f9f9; border-radius: 8px; margin: 25px 0;">
+                      <tr>
+                        <td width="40%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Dates</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">Du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Durée</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${nbNuits} nuit(s)</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Chambres</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${reservation.chambres.join(', ')}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold;">Montant</td>
+                        <td style="font-size: 18px; font-weight: bold; color: #004B93;">${reservation.prixTotal ? reservation.prixTotal.toFixed(2) + ' €' : 'Non défini'}</td>
+                      </tr>
+                    </table>
+                    
+                    ${occupantsHTML}
 
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Payer en ligne</a>
-            </div>
-            <p>L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-        </div>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                      <tr>
+                        <td align="center">
+                          <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer en ligne</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p>Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `
     });
 
@@ -1981,7 +2233,12 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
 app.get('/api/admin/intervenants', checkAuth, async (req, res) => {
   try {
     const intervenants = await prisma.intervenant.findMany({
-      include: { disponibilites: true }
+      include: { 
+        disponibilites: true,
+        missions: {
+          include: { reservation: true }
+        }
+      }
     });
     res.json(intervenants);
   } catch (error) {
@@ -2372,21 +2629,40 @@ cron.schedule('0 9 * * *', async () => {
         to: reser.client.email,
         subject: "Rappel automatique : Règlement du solde - Gîte de La Maladrerie",
         html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-            <div style="background-color: #004B93; padding: 20px; text-align: center;">
-              <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-            </div>
-            <div style="padding: 30px; color: #333; line-height: 1.6;">
-              <h2 style="color: #004B93;">Bonjour ${reser.client.nom},</h2>
-              <p>Votre séjour approche ! Il débutera le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong>.</p>
-              <p>Conformément à nos conditions, le solde de votre réservation (<strong>${reser.montantSolde.toFixed(2)} €</strong>) doit être réglé au plus tard 7 jours avant votre arrivée.</p>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Régler le solde de ${reser.montantSolde.toFixed(2)} €</a>
-              </div>
-              <p>Une fois le solde réglé, vous recevrez un autre lien sécurisé pour procéder à l'empreinte bancaire (caution de 500 €).</p>
-              <p style="margin-top: 20px;">À très bientôt !<br>L'équipe du Gite de la Maladrerie - MUC</p>
-            </div>
-          </div>
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                  <tr>
+                    <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                      <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reser.client.nom},</h2>
+                      <p>Votre séjour approche ! Il débutera le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong>.</p>
+                      <p>Conformément à nos conditions, le solde de votre réservation (<strong>${reser.montantSolde.toFixed(2)} €</strong>) doit être réglé au plus tard 7 jours avant votre arrivée.</p>
+                      
+                      <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
+                        <tr>
+                          <td>
+                            <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le solde de ${reser.montantSolde.toFixed(2)} €</a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p>Une fois le solde réglé, vous recevrez un autre lien sécurisé pour procéder à l'empreinte bancaire (caution de 500 €).</p>
+                      <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background-color: #FDB913; height: 5px;"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         `
       });
 

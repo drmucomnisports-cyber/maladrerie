@@ -24,7 +24,7 @@ async function generateDevisPDF(data) {
             // --- HEADER ---
             doc.rect(0, 0, 612, 100).fill('#004B93');
             doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(22).text('GÎTE DE LA MALADRERIE', 50, 40);
-            doc.fontSize(10).font('Helvetica').text('Complexe Sportif Universitaire - MUC OMNISPORTS', 50, 65);
+            doc.fontSize(10).font('Helvetica').text('MUC OMNISPORTS', 50, 65);
             
             // --- INFOS DEVIS ---
             doc.fillColor('#000000').moveDown(4);

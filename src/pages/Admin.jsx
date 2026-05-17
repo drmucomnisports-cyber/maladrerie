@@ -675,11 +675,12 @@ const Admin = () => {
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
+                  <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
                   <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {reservations.map((res) => (
+                {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
                   <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="p-4">
                       <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
@@ -758,6 +759,9 @@ const Admin = () => {
                     </td>
                     <td className="p-4">
                       <div className="text-xs font-bold text-slate-600">{res.validePar || '-'}</div>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2 flex-wrap max-w-[200px] ml-auto">
@@ -843,6 +847,7 @@ const Admin = () => {
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Expire le</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                   </thead>
@@ -899,6 +904,9 @@ const Admin = () => {
                           }`}>
                             {res.statut === 'DEVIS_EN_ATTENTE' ? 'En attente' : 'Expiré'}
                           </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-2">
@@ -1469,9 +1477,18 @@ const Admin = () => {
                     className="w-full p-2.5 border border-slate-200 rounded-lg outline-none focus:border-muc-blue text-sm"
                   >
                     <option value="">Sélectionner un intervenant</option>
-                    {intervenants.map(i => <option key={i.id} value={i.id}>{i.prenom} {i.nom}</option>)}
+                    {intervenants.filter(i => {
+                      if (!currentReservationForMission) return true;
+                      const rDebut = new Date(currentReservationForMission.dateDebut);
+                      const rFin = new Date(currentReservationForMission.dateFin);
+                      const isAvailable = i.disponibilites?.some(d => {
+                        const dDebut = new Date(d.dateDebut);
+                        const dFin = new Date(d.dateFin);
+                        return rDebut < dFin && rFin > dDebut;
+                      });
+                      return isAvailable;
+                    }).map(i => <option key={i.id} value={i.id}>{i.prenom} {i.nom}</option>)}
                   </select>
-                </div>
                 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-3">Types de missions</label>

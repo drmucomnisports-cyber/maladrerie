@@ -336,7 +336,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         let message = isDevis
           ? `Le devis pour ${roomNames} a été généré et envoyé à ${formData.email}. Il est valable pendant 48 heures.`
           : isAdmin 
-            ? 'Réservation ajoutée manuellement avec succès.' 
+            ? 'La réservation a bien été enregistrée.' 
             : 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
         
         setModalConfig({
