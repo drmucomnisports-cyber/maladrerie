@@ -270,9 +270,7 @@ app.get('/api/reservations', async (req, res) => {
   try {
     const reservations = await prisma.reservation.findMany({
       where: {
-        statut: {
-          in: ['EN_ATTENTE', 'RESERVE']
-        }
+        statut: 'RESERVE'
       },
       include: {
         client: true
@@ -632,7 +630,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
                     </table>
 
                     ${existingReservation.occupants && existingReservation.occupants.length > 0 ? `
-                      <p style="font-weight: bold; margin-bottom: 10px;">Occupants inscrits (${nbPersonnesAccept} personnes) :</p>
+                      <p style="font-weight: bold; margin-bottom: 10px;">Occupants inscrits (${existingReservation.occupants.length} personnes) :</p>
                       <ul style="padding-left: 20px; margin-bottom: 25px;">
                         ${existingReservation.occupants.map(occ => `<li>${occ.nom} ${occ.prenom} - ${occ.estAdulte ? 'Adulte' : `Mineur (${occ.age} ans)`}</li>`).join('')}
                       </ul>
@@ -662,11 +660,6 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
             </td>
           </tr>
         </table>
-      `
-    });="margin-top: 20px;">L'équipe du Gite de la Maladrerie - MUC</p>
-          </div>
-          <div style="background-color: #FDB913; height: 5px;"></div>
-        </div>
       `
     });
 
@@ -1050,6 +1043,54 @@ app.get('/api/devis/validate/:token', async (req, res) => {
       }
     });
 
+    // Envoyer un e-mail à l'admin créateur du devis pour l'alerter
+    if (devis.validePar && devis.validePar !== 'Admin' && devis.validePar.includes('@')) {
+      try {
+        await sendMail({
+          to: devis.validePar,
+          subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eeeeee; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #004B93; margin: 0;">Gîte de la Maladrerie</h1>
+                <p style="color: #555555; font-size: 14px; margin-top: 5px;">MUC Omnisports</p>
+              </div>
+              <hr style="border: 0; border-top: 1px solid #eeeeee; margin-bottom: 20px;" />
+              <h2 style="color: #28a745; margin-bottom: 15px;">Félicitations ! Le client a validé votre devis.</h2>
+              <p>Bonjour,</p>
+              <p>Le devis <strong>${devis.numeroDevis}</strong> que vous avez créé a été validé par le client <strong>${devis.client.nom}</strong>.</p>
+              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #004B93; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Détails du séjour :</strong></p>
+                <ul style="margin: 0; padding-left: 20px;">
+                  <li><strong>Dates :</strong> du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}</li>
+                  <li><strong>Chambres :</strong> ${devis.chambres.join(', ')}</li>
+                  <li><strong>Prix Total :</strong> ${devis.prixTotal} €</li>
+                </ul>
+              </div>
+              
+              <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
+                <p style="margin: 0; font-weight: bold; color: #856404;">🧹 Action Requise : Affectation d'un Intervenant</p>
+                <p style="margin: 8px 0 0 0; font-size: 14px; color: #666666;">
+                  Veuillez vous connecter à l'espace d'administration pour affecter un <strong>agent de ménage / accueil</strong> pour ce séjour.
+                </p>
+              </div>
+              
+              <p style="text-align: center; margin-top: 30px;">
+                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder à l'administration</a>
+              </p>
+              <hr style="border: 0; border-top: 1px solid #eeeeee; margin-top: 30px; margin-bottom: 20px;" />
+              <p style="font-size: 11px; color: #999999; text-align: center; margin: 0;">
+                Ceci est une notification automatique générée par le système du Gîte de la Maladrerie.
+              </p>
+            </div>
+          `
+        });
+        console.log(`Notification envoyée à l'admin créateur du devis: ${devis.validePar}`);
+      } catch (mailErr) {
+        console.error("Erreur envoi notification mail à l'admin créateur du devis:", mailErr);
+      }
+    }
+
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1 style="color: #28a745;">Devis validé !</h1>
@@ -1163,7 +1204,7 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
       return res.status(404).json({ error: "Réservation introuvable" });
     }
 
-    const montantSoldeCalcule = (reservation.prixTotal || 0) - (reservation.montantPaye || 0);
+    const montantSoldeCalcule = reservation.montantSolde ? reservation.montantSolde : ((reservation.prixTotal || 0) - (reservation.montantAcompte || 0));
 
     if (montantSoldeCalcule <= 0) {
       return res.status(400).json({ error: "Le solde est de 0€ (déjà réglé ou prix total non défini)" });
@@ -1880,10 +1921,32 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
   const { montant, mode, typePaiement } = req.body; // typePaiement: ACOMPTE or TOTAL
 
   try {
+    const parsedMontant = parseFloat(montant) || 0;
+    
+    const existing = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+
     const data = {
       modePaiement: mode,
       statutPaiement: typePaiement === 'ACOMPTE' ? 'ACOMPTE_PAYE' : 'PAYE'
     };
+
+    if (typePaiement === 'ACOMPTE') {
+      data.montantAcompte = parsedMontant;
+      if (!existing.montantSolde && existing.prixTotal) {
+        data.montantSolde = Math.round((existing.prixTotal - parsedMontant) * 100) / 100;
+      }
+    } else {
+      data.montantSolde = parsedMontant;
+      if (!existing.montantAcompte && existing.prixTotal) {
+        data.montantAcompte = Math.round((existing.prixTotal - parsedMontant) * 100) / 100;
+      }
+    }
     
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(id) },

@@ -341,7 +341,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         
         setModalConfig({
           type: data.isLastMinute ? 'warning' : 'success',
-          title: data.isLastMinute ? 'Action Requise !' : (isDevis ? 'Devis Envoyé' : 'Demande Envoyée'),
+          title: data.isLastMinute ? 'Action Requise !' : (isDevis ? 'Devis Envoyé' : (isAdmin ? 'Réservation Enregistrée' : 'Demande Envoyée')),
           message: data.isLastMinute ? data.lastMinuteWarning : message
         });
         setShowModal(true);
@@ -572,7 +572,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             {isSubmitting ? (
               <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-muc-blue"></div> Traitement en cours...</>
             ) : (
-              <><Send size={20} /> {isAdmin ? 'Valider et Créer' : 'Confirmer la demande'}</>
+              <><Send size={20} /> {isAdmin ? 'Valider' : 'Confirmer la demande'}</>
             )}
           </button>
         </div>
