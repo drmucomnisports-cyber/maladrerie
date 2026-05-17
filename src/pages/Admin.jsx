@@ -736,12 +736,12 @@ const Admin = () => {
                             onChange={(e) => updateStatut(res.id, e.target.value)}
                             className={`w-full text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg outline-none border-2 cursor-pointer ${res.statut === 'EN_ATTENTE' ? 'border-amber-200 bg-amber-50 text-amber-700' :
                                 res.statut === 'RESERVE' ? 'border-muc-blue/20 bg-muc-blue/10 text-muc-blue' :
-                                  'border-red-200 bg-red-50 text-red-700'
+                                  res.statut === 'REFUSEE' ? 'border-red-200 bg-red-50 text-red-700' : ''
                               }`}
                           >
                             <option value="EN_ATTENTE">En attente</option>
                             <option value="RESERVE">Réservé</option>
-                            <option value="REFUSE">Refusé</option>
+                            <option value="REFUSEE">Refusé</option>
                           </select>
                           <button
                             onClick={() => {
