@@ -12,6 +12,7 @@ async function generateDevisPDF(data) {
         try {
             const doc = new PDFDocument({ 
                 margin: 50,
+                bufferPages: true,
                 info: {
                     Title: `Devis ${data.numeroDevis} - Gîte de la Maladrerie`,
                     Author: 'Gîte de la Maladrerie - MUC'
@@ -143,6 +144,9 @@ async function generateDevisPDF(data) {
              doc.text(`${(data.prixTotal * 0.7).toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
 
             // --- MENTIONS LÉGALES & SIGNATURE ---
+            // Temporarily reduce bottom margin to prevent automatic premature page break
+            doc.page.margins.bottom = 10;
+
             y = 610;
             doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666');
             doc.text("Ce devis est établi sous réserve de disponibilité au moment de la signature.", leftCol, y);
@@ -161,22 +165,31 @@ async function generateDevisPDF(data) {
 
             // --- PAGE 2 : CGV ---
             doc.addPage();
+            // Restore bottom margin for CGV page
+            doc.page.margins.bottom = 50;
+
             doc.rect(0, 0, 612, 50).fill('#004B93');
             doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(16).text('CONDITIONS GÉNÉRALES DE VENTE', 50, 18);
             
-            doc.fillColor('#000000').moveDown(3);
-            doc.font('Helvetica').fontSize(7.5); // Slightly smaller to ensure it fits
+            doc.fillColor('#000000');
+            doc.font('Helvetica').fontSize(7.5).lineGap(1); // Small lineGap and font size to fit CGV perfectly
             
             try {
                 const cgvPath = path.join(__dirname, '../CGV.txt');
                 if (fs.existsSync(cgvPath)) {
                     const cgvText = fs.readFileSync(cgvPath, 'utf8');
-                    doc.text(cgvText, { align: 'justify', columns: 2, columnGap: 30 });
+                    doc.text(cgvText, 50, 75, { align: 'justify', columns: 2, columnGap: 30, width: 512, height: 660 });
                 } else {
-                    doc.text("Les conditions générales de vente sont disponibles sur demande.");
+                    doc.text("Les conditions générales de vente sont disponibles sur demande.", 50, 75);
                 }
             } catch (e) {
-                doc.text("Erreur lors du chargement des CGV.");
+                doc.text("Erreur lors du chargement des CGV.", 50, 75);
+            }
+
+            // Force the CGV page to be immediately after the first page (verso of page 1)
+            if (doc._pageBuffer && doc._pageBuffer.length > 1) {
+                const cgvPage = doc._pageBuffer.pop();
+                doc._pageBuffer.splice(1, 0, cgvPage);
             }
 
             doc.end();
