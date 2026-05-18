@@ -312,16 +312,18 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         adminName: adminUser?.nom
       };
       
-      const url = (isAdmin && isDevis)
+      const url = isDevis
         ? `${API_URL}/api/admin/devis`
         : isAdmin 
           ? `${API_URL}/api/admin/reservations`
           : `${API_URL}/api/reservations`;
 
       const headers = { 'Content-Type': 'application/json' };
-      if (isAdmin) {
+      if (isAdmin || isDevis) {
         const token = localStorage.getItem('adminToken');
-        headers['Authorization'] = `Bearer ${token}`;
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
       }
       
       const res = await fetch(url, {
