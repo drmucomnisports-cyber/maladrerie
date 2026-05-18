@@ -341,17 +341,20 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             ? 'La réservation a bien été enregistrée.' 
             : 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
         
-        setModalConfig({
-          type: data.isLastMinute ? 'warning' : 'success',
-          title: data.isLastMinute ? 'Action Requise !' : (isDevis ? 'Devis Envoyé' : (isAdmin ? 'Réservation Enregistrée' : 'Demande Envoyée')),
-          message: data.isLastMinute ? data.lastMinuteWarning : message
-        });
-        setShowModal(true);
+        if (data.isLastMinute) {
+          setModalConfig({
+            type: 'warning',
+            title: 'Action Requise !',
+            message: data.lastMinuteWarning
+          });
+          setShowModal(true);
+        } else {
+          setSuccessMsg(message);
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
         setFormData({ nom: '', email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [] });
         setStep(1);
-        // onCreated(); // Retiré d'ici pour éviter de fermer la modale parente prématurément
       } else {
         const errData = await res.json();
         setErrorMsg(errData.error || "Une erreur est survenue lors de l'envoi.");
@@ -365,11 +368,6 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
   return (
     <form onSubmit={step === 1 ? goToStep2 : handleSubmit} className="space-y-6 relative">
-      {successMsg && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-          <span className="block sm:inline font-bold">{successMsg}</span>
-        </div>
-      )}
       {errorMsg && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
           <span className="block sm:inline font-bold">{errorMsg}</span>
@@ -624,6 +622,40 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               }`}
             >
               {modalConfig.type === 'warning' ? 'J\'appelle de suite' : 'Fermer'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up de Confirmation de Succès style MUC */}
+      {successMsg && (
+        <div className="fixed inset-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100 flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4 animate-bounce shrink-0">
+              <CheckCircle size={40} />
+            </div>
+            
+            <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight">
+              {isDevis ? "Devis Envoyé" : isAdmin ? "Réservation Enregistrée" : "Demande enregistrée !"}
+            </h3>
+            
+            <p className="text-sm text-slate-600 mb-6 font-medium leading-relaxed">
+              {isDevis || isAdmin ? successMsg : "Votre demande de réservation pour le gîte a bien été transmise. L'équipe va l'étudier rapidement."}
+            </p>
+            
+            <button 
+              onClick={() => {
+                setSuccessMsg('');
+                if (isAdmin) {
+                  onCreated();
+                  navigate('/admin');
+                } else {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }} 
+              className="bg-[#004B93] text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-800 transition-colors w-full uppercase tracking-wider"
+            >
+              D'accord
             </button>
           </div>
         </div>
