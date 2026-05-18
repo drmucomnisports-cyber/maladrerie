@@ -33,7 +33,7 @@ async function generateDevisPDF(data) {
             const leftCol = 50;
             const rightCol = 350;
 
-            doc.fontSize(14).font('Helvetica-Bold').text(`DEVIS PROFESSIONNEL`, leftCol, startY);
+            doc.fontSize(14).font('Helvetica-Bold').text(`DEVIS`, leftCol, startY);
             doc.fontSize(10).font('Helvetica');
             doc.text(`N° : ${data.numeroDevis}`, leftCol, startY + 25);
             doc.text(`Réf. Client : ${data.refClient}`, leftCol, startY + 40);

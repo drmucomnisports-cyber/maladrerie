@@ -35,6 +35,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
+  const [isLastMinute, setIsLastMinute] = useState(false);
+  const [lastMinuteWarning, setLastMinuteWarning] = useState('');
 
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(null);
@@ -341,15 +343,13 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             ? 'La réservation a bien été enregistrée.' 
             : 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
         
+        setSuccessMsg(message);
         if (data.isLastMinute) {
-          setModalConfig({
-            type: 'warning',
-            title: 'Action Requise !',
-            message: data.lastMinuteWarning
-          });
-          setShowModal(true);
+          setIsLastMinute(true);
+          setLastMinuteWarning(data.lastMinuteWarning);
         } else {
-          setSuccessMsg(message);
+          setIsLastMinute(false);
+          setLastMinuteWarning('');
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -367,7 +367,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   };
 
   return (
-    <form onSubmit={step === 1 ? goToStep2 : handleSubmit} className="space-y-6 relative">
+    <div className="w-full">
+      <form onSubmit={step === 1 ? goToStep2 : handleSubmit} className="space-y-6 relative">
       {errorMsg && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
           <span className="block sm:inline font-bold">{errorMsg}</span>
@@ -578,59 +579,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         </div>
       )}
 
-      {/* Modal de Confirmation / Alerte */}
-      {showModal && (
-        <div className="fixed inset-0 w-screen h-screen z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100">
-            <div className="flex justify-center mb-4">
-              {modalConfig.type === 'warning' ? (
-                <div className="bg-amber-100 p-4 rounded-full text-amber-600">
-                  <AlertTriangle size={40} />
-                </div>
-              ) : (
-                <div className="bg-green-100 p-4 rounded-full text-green-600 flex justify-center items-center">
-                  <CheckCircle size={40} />
-                </div>
-              )}
-            </div>
-            <h3 className="text-2xl font-black mb-2 uppercase tracking-tight text-slate-800">{modalConfig.title}</h3>
-            <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line mb-6">
-              {modalConfig.message}
-            </div>
-            
-            {modalConfig.type === 'warning' && (
-              <div className="mt-6 flex items-center justify-center gap-2 text-muc-blue font-bold bg-white/50 p-3 rounded-xl border border-amber-200 mb-6">
-                <Phone size={18} />
-                <a href="tel:0667993681">06 67 99 36 81</a>
-              </div>
-            )}
-            
-            <button 
-              onClick={() => {
-                setShowModal(false);
-                if (isAdmin) {
-                  onCreated(); // Notifie le parent (Admin) pour rafraîchir et fermer le tiroir
-                  navigate('/admin');
-                } else {
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-              }}
-              className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg ${
-                modalConfig.type === 'warning' 
-                ? 'bg-muc-blue text-white hover:bg-blue-800' 
-                : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400'
-              }`}
-            >
-              {modalConfig.type === 'warning' ? 'J\'appelle de suite' : 'Fermer'}
-            </button>
-          </div>
-        </div>
-      )}
+      </form>
 
-      {/* Pop-up de Confirmation de Succès style MUC */}
+      {/* Pop-up de Confirmation de Succès / Alerte avec avertissement de dernière minute */}
       {successMsg && (
         <div className="fixed inset-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100 flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100 flex flex-col items-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4 animate-bounce shrink-0">
               <CheckCircle size={40} />
             </div>
@@ -639,13 +593,27 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               {isDevis ? "Devis Envoyé" : isAdmin ? "Réservation Enregistrée" : "Demande enregistrée !"}
             </h3>
             
-            <p className="text-sm text-slate-600 mb-6 font-medium leading-relaxed">
+            <p className="text-sm text-slate-600 mb-6 font-medium leading-relaxed animate-fade-in">
               {isDevis || isAdmin ? successMsg : "Votre demande de réservation pour le gîte a bien été transmise. L'équipe va l'étudier rapidement."}
             </p>
+
+            {isLastMinute && lastMinuteWarning && (
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-left w-full">
+                <div className="flex items-start gap-3 text-amber-800">
+                  <AlertTriangle className="shrink-0 text-amber-600 mt-0.5 animate-pulse" size={18} />
+                  <div>
+                    <span className="text-xs font-black uppercase tracking-wider block mb-1 text-amber-700">Avertissement de dernière minute</span>
+                    <p className="text-xs font-semibold leading-relaxed">{lastMinuteWarning}</p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <button 
               onClick={() => {
                 setSuccessMsg('');
+                setIsLastMinute(false);
+                setLastMinuteWarning('');
                 if (isAdmin) {
                   onCreated();
                   navigate('/admin');
@@ -660,7 +628,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           </div>
         </div>
       )}
-    </form>
+    </div>
   );
 };
 
