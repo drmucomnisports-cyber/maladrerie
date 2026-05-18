@@ -43,26 +43,26 @@ async function generateDevisPDF(data) {
             doc.fillColor('#000000');
 
             // --- ADMIN (Émetteur) ---
-            doc.fontSize(10).font('Helvetica').text('Établi par :', rightCol, startY);
+            doc.fontSize(10).font('Helvetica').text('Établit par :', rightCol, startY);
             doc.fontSize(11).font('Helvetica-Bold').text(data.adminNom, rightCol, startY + 15);
             doc.fontSize(10).font('Helvetica');
             doc.text(`Email : ${data.adminEmail}`, rightCol, startY + 30);
             doc.text(`Tél : ${data.adminTel}`, rightCol, startY + 45);
 
-            // --- CLIENT (Destinataire) ---
-            const clientY = 210;
+            // --- DATES DU SÉJOUR (en dessous des dates de validité) ---
+            doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(10).text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol, 220);
+            doc.fillColor('#000000');
+
+            // --- CLIENT (Destinataire, en dessous des dates du séjour) ---
+            const clientY = 250;
             doc.rect(leftCol - 10, clientY - 10, 250, 90).stroke('#EEEEEE');
             doc.fontSize(10).font('Helvetica').text('Destinataire :', leftCol, clientY);
             doc.fontSize(12).font('Helvetica-Bold').text(data.clientNom, leftCol, clientY + 15);
             doc.fontSize(10).font('Helvetica').text(data.clientAdresse || 'Adresse non renseignée', leftCol, clientY + 35, { width: 230 });
             doc.text(`Tél : ${data.clientTel || 'Non renseigné'}`, leftCol, clientY + 65);
 
-            // --- DATES DU SÉJOUR (en dessous du bloc client) ---
-            doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(10).text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol, 310);
-            doc.fillColor('#000000');
-
             // --- TABLEAU DES PRESTATIONS ---
-            const tableTop = 340;
+            const tableTop = 360;
             doc.font('Helvetica-Bold').fontSize(9);
             doc.rect(leftCol, tableTop, 512, 20).fill('#004B93');
             doc.fillColor('#FFFFFF');
@@ -147,7 +147,7 @@ async function generateDevisPDF(data) {
             // Temporarily reduce bottom margin to prevent automatic premature page break
             doc.page.margins.bottom = 10;
 
-            y = 610;
+            y = 570;
             doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666');
             doc.text("Ce devis est établi sous réserve de disponibilité au moment de la signature.", leftCol, y);
             doc.text("Le paiement de l'acompte valide définitivement la réservation.", leftCol, y + 12);
@@ -158,7 +158,7 @@ async function generateDevisPDF(data) {
             doc.text('Date :', leftCol, y + 20);
             doc.text('Signature (précédée de la mention "Lu et approuvé") :', leftCol, y + 40);
             
-            doc.rect(leftCol, y + 60, 250, 80).stroke('#CCCCCC');
+            doc.rect(leftCol, y + 60, 250, 70).stroke('#CCCCCC');
 
             // --- PIED DE PAGE ---
             doc.fontSize(8).fillColor('#999999').text('Gîte de la Maladrerie - MUC OMNISPORTS | SIRET: 38820857100025 | Assurance MAIF n° 132 48 45 M', 0, 760, { align: 'center', width: 612 });
