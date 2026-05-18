@@ -39,26 +39,29 @@ async function generateDevisPDF(data) {
             doc.text(`Date d'émission : ${new Date().toLocaleDateString('fr-FR')}`, leftCol, startY + 55);
             doc.moveDown(0.5);
             doc.fillColor('#FDB913').font('Helvetica-Bold').text(`Date de validité : ${new Date(data.expireLe).toLocaleDateString('fr-FR')}`, leftCol, startY + 75);
-            doc.fillColor('#004B93').font('Helvetica-Bold').text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol, startY + 90);
             doc.fillColor('#000000');
 
             // --- ADMIN (Émetteur) ---
             doc.fontSize(10).font('Helvetica').text('Établi par :', rightCol, startY);
-            doc.fontSize(11).font('Helvetica-Bold').text(data.adminNom || 'L\'équipe du Gîte', rightCol, startY + 15);
+            doc.fontSize(11).font('Helvetica-Bold').text(data.adminNom, rightCol, startY + 15);
             doc.fontSize(10).font('Helvetica');
-            doc.text(`Email : ${data.adminEmail || 'contact@gitemaladrerie.fr'}`, rightCol, startY + 30);
-            if (data.adminTel) doc.text(`Tél : ${data.adminTel}`, rightCol, startY + 45);
+            doc.text(`Email : ${data.adminEmail}`, rightCol, startY + 30);
+            doc.text(`Tél : ${data.adminTel}`, rightCol, startY + 45);
 
             // --- CLIENT (Destinataire) ---
-            const clientY = 220;
+            const clientY = 210;
             doc.rect(leftCol - 10, clientY - 10, 250, 90).stroke('#EEEEEE');
             doc.fontSize(10).font('Helvetica').text('Destinataire :', leftCol, clientY);
             doc.fontSize(12).font('Helvetica-Bold').text(data.clientNom, leftCol, clientY + 15);
             doc.fontSize(10).font('Helvetica').text(data.clientAdresse || 'Adresse non renseignée', leftCol, clientY + 35, { width: 230 });
             doc.text(`Tél : ${data.clientTel || 'Non renseigné'}`, leftCol, clientY + 65);
 
+            // --- DATES DU SÉJOUR (en dessous du bloc client) ---
+            doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(10).text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol, 310);
+            doc.fillColor('#000000');
+
             // --- TABLEAU DES PRESTATIONS ---
-            const tableTop = 330;
+            const tableTop = 340;
             doc.font('Helvetica-Bold').fontSize(9);
             doc.rect(leftCol, tableTop, 512, 20).fill('#004B93');
             doc.fillColor('#FFFFFF');
