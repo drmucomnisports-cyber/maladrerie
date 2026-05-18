@@ -790,7 +790,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
     });
     const numeroDevis = `D-${year}-${String(count + 1).padStart(3, '0')}`;
 
-    const token = jwt.sign({ email, date: Date.now() }, JWT_SECRET).substring(0, 32);
+    const token = require('crypto').randomBytes(24).toString('hex');
     const expiration = new Date();
     expiration.setHours(expiration.getHours() + 48);
 
