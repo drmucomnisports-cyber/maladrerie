@@ -582,52 +582,49 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
       {/* Modal de Confirmation / Alerte */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300 border-t-8 border-muc-yellow">
-            <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-muc-blue text-white'}`}>
-              <div className="flex justify-center mb-4">
-                {modalConfig.type === 'warning' ? (
-                  <div className="bg-amber-100 p-4 rounded-full text-amber-600">
-                    <AlertTriangle size={40} />
-                  </div>
-                ) : (
-                  <div className="bg-white/20 p-4 rounded-full text-white">
-                    <CheckCircle size={40} />
-                  </div>
-                )}
-              </div>
-              <h3 className="text-2xl font-black mb-2 uppercase tracking-tight">{modalConfig.title}</h3>
-              <div className={`${modalConfig.type === 'warning' ? 'text-slate-600' : 'text-white/90'} font-medium leading-relaxed whitespace-pre-line`}>
-                {modalConfig.message}
-              </div>
-              
-              {modalConfig.type === 'warning' && (
-                <div className="mt-6 flex items-center justify-center gap-2 text-muc-blue font-bold bg-white/50 p-3 rounded-xl border border-amber-200">
-                  <Phone size={18} />
-                  <a href="tel:0667993681">06 67 99 36 81</a>
+        <div className="fixed inset-0 w-screen h-screen z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100">
+            <div className="flex justify-center mb-4">
+              {modalConfig.type === 'warning' ? (
+                <div className="bg-amber-100 p-4 rounded-full text-amber-600">
+                  <AlertTriangle size={40} />
+                </div>
+              ) : (
+                <div className="bg-green-100 p-4 rounded-full text-green-600 flex justify-center items-center">
+                  <CheckCircle size={40} />
                 </div>
               )}
             </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-100">
-              <button 
-                onClick={() => {
-                  setShowModal(false);
-                  if (isAdmin) {
-                    onCreated(); // Notifie le parent (Admin) pour rafraîchir et fermer le tiroir
-                    navigate('/admin');
-                  } else {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }
-                }}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg ${
-                  modalConfig.type === 'warning' 
-                  ? 'bg-muc-blue text-white hover:bg-blue-800' 
-                  : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400'
-                }`}
-              >
-                {modalConfig.type === 'warning' ? 'J\'appelle de suite' : 'Fermer'}
-              </button>
+            <h3 className="text-2xl font-black mb-2 uppercase tracking-tight text-slate-800">{modalConfig.title}</h3>
+            <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line mb-6">
+              {modalConfig.message}
             </div>
+            
+            {modalConfig.type === 'warning' && (
+              <div className="mt-6 flex items-center justify-center gap-2 text-muc-blue font-bold bg-white/50 p-3 rounded-xl border border-amber-200 mb-6">
+                <Phone size={18} />
+                <a href="tel:0667993681">06 67 99 36 81</a>
+              </div>
+            )}
+            
+            <button 
+              onClick={() => {
+                setShowModal(false);
+                if (isAdmin) {
+                  onCreated(); // Notifie le parent (Admin) pour rafraîchir et fermer le tiroir
+                  navigate('/admin');
+                } else {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg ${
+                modalConfig.type === 'warning' 
+                ? 'bg-muc-blue text-white hover:bg-blue-800' 
+                : 'bg-muc-yellow text-muc-blue hover:bg-yellow-400'
+              }`}
+            >
+              {modalConfig.type === 'warning' ? 'J\'appelle de suite' : 'Fermer'}
+            </button>
           </div>
         </div>
       )}
