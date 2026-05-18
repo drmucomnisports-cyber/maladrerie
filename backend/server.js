@@ -1480,8 +1480,7 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
     const reservation = await prisma.reservation.findUnique({
       where: { id: parseInt(id) },
       include: {
-        client: true,
-        missions: { where: { intervenantId: parseInt(intervenantId) } }
+        client: true
       }
     });
 
@@ -1489,14 +1488,14 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
       where: { id: parseInt(intervenantId) }
     });
 
-    if (reservation && intervenant && reservation.missions.length > 0) {
+    if (reservation && intervenant && createdMissions.length > 0) {
       const dateDebut = new Date(reservation.dateDebut);
       const dateFin = new Date(reservation.dateFin);
       const veilleDateDebut = new Date(dateDebut);
       veilleDateDebut.setDate(veilleDateDebut.getDate() - 1);
 
-      const missionsHtml = reservation.missions.map(m => `<li style="margin-bottom: 12px;">${getMissionDetail(m, reservation.dateDebut, reservation.dateFin)}</li>`).join('');
-      const totalRemuneration = reservation.missions.reduce((sum, m) => sum + m.montant, 0);
+      const missionsHtml = createdMissions.map(m => `<li style="margin-bottom: 12px;">${getMissionDetail(m, reservation.dateDebut, reservation.dateFin)}</li>`).join('');
+      const totalRemuneration = createdMissions.reduce((sum, m) => sum + m.montant, 0);
 
       const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
       const acceptUrl = `${backendUrl}/api/reservations/${id}/intervenants/${intervenantId}/accept`;
