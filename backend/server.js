@@ -402,7 +402,7 @@ app.post('/api/reservations', async (req, res) => {
     console.log(`Tentative d'envoi d'alerte admin à: ${adminEmails.join(', ')}`);
     
     await sendMail({
-      to: adminEmails,
+      to: adminEmails.join(','),
       subject: "Nouvelle demande de réservation - Gîte de La Maladrerie",
       html: `
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
