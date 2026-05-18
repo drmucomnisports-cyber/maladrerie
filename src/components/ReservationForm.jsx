@@ -582,7 +582,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
       {/* Modal de Confirmation / Alerte */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform animate-in zoom-in-95 duration-300 border-t-8 border-muc-yellow">
             <div className={`p-8 text-center ${modalConfig.type === 'warning' ? 'bg-amber-50' : 'bg-muc-blue text-white'}`}>
               <div className="flex justify-center mb-4">
