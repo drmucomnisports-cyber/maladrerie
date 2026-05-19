@@ -2303,7 +2303,7 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
     if (req.user && req.user.id) {
       const admin = await prisma.adminAccount.findUnique({
         where: { id: req.user.id },
-        select: { id: true, email: true, nom: true }
+        select: { id: true, email: true, nom: true, telephone: true }
       });
       if (admin) return res.json(admin);
     }
@@ -2317,6 +2317,39 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
   } catch (err) {
     console.error("Erreur dans /api/admin/me:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Mise à jour du profil administrateur
+app.put('/api/admin/profile', checkAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
+  const { nom, prenom, email, telephone } = req.body;
+
+  try {
+    // Construire le nom complet si prénom fourni
+    const fullNom = prenom ? `${prenom} ${nom}` : nom;
+
+    if (req.user && req.user.id) {
+      const updated = await prisma.adminAccount.update({
+        where: { id: req.user.id },
+        data: {
+          ...(fullNom && { nom: fullNom }),
+          ...(email && { email }),
+          ...(telephone !== undefined && { telephone })
+        },
+        select: { id: true, email: true, nom: true, telephone: true }
+      });
+      return res.json(updated);
+    }
+
+    // Admin principal (id 0) — pas de compte en DB
+    res.status(400).json({ error: "Le compte administrateur principal ne peut pas être modifié ici. Utilisez les variables d'environnement." });
+  } catch (err) {
+    console.error('Erreur PUT /api/admin/profile:', err);
+    if (err.code === 'P2002') {
+      return res.status(400).json({ error: 'Cet email est déjà utilisé par un autre compte.' });
+    }
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du profil.' });
   }
 });
 

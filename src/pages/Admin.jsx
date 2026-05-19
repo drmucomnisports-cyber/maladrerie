@@ -75,6 +75,10 @@ const Admin = () => {
   const [captureMontant, setCaptureMontant] = useState('');
   const [adminUser, setAdminUser] = useState(null);
 
+  // Profil admin
+  const [profileForm, setProfileForm] = useState({ nom: '', prenom: '', email: '', telephone: '' });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   // Paiement manuel
   const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
   const [manualPaymentRes, setManualPaymentRes] = useState(null);
@@ -115,9 +119,42 @@ const Admin = () => {
       if (res.ok) {
         const data = await res.json();
         setAdminUser(data);
+        // Pré-remplir le formulaire de profil
+        const parts = (data.nom || '').split(' ');
+        setProfileForm({
+          prenom: parts.length > 1 ? parts[0] : '',
+          nom: parts.length > 1 ? parts.slice(1).join(' ') : (data.nom || ''),
+          email: data.email || '',
+          telephone: data.telephone || ''
+        });
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const saveProfile = async (e) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(profileForm)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminUser(data);
+        showFeedback('Profil mis à jour avec succès.');
+      } else {
+        const errData = await res.json();
+        showFeedback(errData.error || 'Erreur lors de la mise à jour.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showFeedback('Erreur réseau.', 'error');
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -643,15 +680,7 @@ const Admin = () => {
               </div>
             </div>
 
-            {adminFeedback && (
-              <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[10000] max-w-md w-full px-6 py-4 rounded-xl border shadow-xl flex items-center justify-center text-center font-bold font-sans ${
-                adminFeedback.type === 'error'
-                  ? 'bg-red-50 border-red-200 text-red-800'
-                  : 'bg-green-50 border-green-200 text-green-800'
-              }`}>
-                <span>{adminFeedback.msg}</span>
-              </div>
-            )}
+
 
             <div className="flex gap-4">
               <button onClick={() => setActiveTab('reservations')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'reservations' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Réservations</button>
@@ -661,6 +690,7 @@ const Admin = () => {
               <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
               <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'promos' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Promos</button>
               <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'accounts' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Comptes</button>
+              <button onClick={() => setActiveTab('profil')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'profil' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Mon Profil</button>
             </div>
           </div>
         </div>
@@ -1723,6 +1753,54 @@ const Admin = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'profil' && (
+        <div className="max-w-xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+            <h2 className="text-xl font-black text-muc-blue uppercase tracking-tight mb-6 pb-4 border-b border-slate-100">Mon Profil</h2>
+            <form onSubmit={saveProfile} className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Prénom</label>
+                  <input type="text" value={profileForm.prenom} onChange={e => setProfileForm({...profileForm, prenom: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium transition-all" placeholder="Prénom" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Nom</label>
+                  <input type="text" value={profileForm.nom} onChange={e => setProfileForm({...profileForm, nom: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium transition-all" placeholder="Nom" required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Email</label>
+                <input type="email" value={profileForm.email} onChange={e => setProfileForm({...profileForm, email: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium transition-all" placeholder="email@exemple.fr" required />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Téléphone</label>
+                <input type="tel" value={profileForm.telephone} onChange={e => setProfileForm({...profileForm, telephone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium transition-all" placeholder="04 XX XX XX XX" />
+              </div>
+              <button type="submit" disabled={isSavingProfile} className={`w-full py-4 bg-muc-blue text-white font-black uppercase tracking-widest rounded-xl hover:bg-muc-blue/90 shadow-lg transition-all ${isSavingProfile ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                {isSavingProfile ? 'Enregistrement...' : 'Enregistrer les modifications'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {adminFeedback && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 w-screen h-screen">
+          <div className={`bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100`}>
+            <div className={`mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center ${adminFeedback.type === 'error' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+              {adminFeedback.type === 'error' ? <AlertTriangle size={36} /> : <CheckCircle size={36} />}
+            </div>
+            <p className={`text-lg font-bold mb-6 ${adminFeedback.type === 'error' ? 'text-red-800' : 'text-green-800'}`}>{adminFeedback.msg}</p>
+            <button
+              onClick={() => { setAdminFeedback(null); setActiveTab('reservations'); }}
+              className="w-full py-3 bg-muc-blue text-white font-black uppercase tracking-widest rounded-xl hover:bg-muc-blue/90 transition-all shadow-lg"
+            >
+              D'accord
+            </button>
           </div>
         </div>
       )}
