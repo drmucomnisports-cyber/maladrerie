@@ -18,6 +18,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     nom: '',
+    prenom: '',
+    structure: '',
+    devisAdultes: 0,
+    devisMineurs: 0,
     email: '',
     telephone: '',
     adressePostale: '',
@@ -109,6 +113,45 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     }
   }, [formData.dateDebut, formData.dateFin, events]);
 
+  const getChambresDetailsDistribues = () => {
+    if (!isDevis) return formData.chambresDetails;
+    const distribDetails = {};
+    let remainingAdultes = parseInt(formData.devisAdultes) || 0;
+    let remainingMineurs = parseInt(formData.devisMineurs) || 0;
+
+    formData.chambres.forEach(chId => {
+      const info = CHAMBRES_INFO[chId];
+      const cap = info.lits;
+      let allocAdultes = Math.min(remainingAdultes, cap);
+      remainingAdultes -= allocAdultes;
+      
+      let capRestante = cap - allocAdultes;
+      let allocMineurs = Math.min(remainingMineurs, capRestante);
+      remainingMineurs -= allocMineurs;
+
+      distribDetails[chId] = {
+        adultes: allocAdultes,
+        mineurs: allocMineurs,
+        enfants: allocMineurs
+      };
+    });
+
+    return distribDetails;
+  };
+
+  const generateFakeOccupants = () => {
+    const list = [];
+    const totalAdults = parseInt(formData.devisAdultes) || 0;
+    const totalMineurs = parseInt(formData.devisMineurs) || 0;
+    for (let i = 1; i <= totalAdults; i++) {
+      list.push({ nom: formData.nom, prenom: `Adulte ${i}`, estAdulte: true });
+    }
+    for (let i = 1; i <= totalMineurs; i++) {
+      list.push({ nom: formData.nom, prenom: `Mineur ${i}`, estAdulte: false, age: 10 });
+    }
+    return list;
+  };
+
   const calculerPrix = () => {
     if (!formData.dateDebut || !formData.dateFin) return 0;
     const start = new Date(formData.dateDebut);
@@ -120,8 +163,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     let totalAdultes = 0;
     let totalMineurs = 0;
 
+    const detailsSource = isDevis ? getChambresDetailsDistribues() : formData.chambresDetails;
+
     formData.chambres.forEach(chId => {
-      const details = formData.chambresDetails[chId] || { adultes: 0, mineurs: 0 };
+      const details = detailsSource[chId] || { adultes: 0, mineurs: 0 };
       const info = CHAMBRES_INFO[chId];
       const nbAdultes = parseInt(details.adultes || 0);
       const nbMineurs = parseInt(details.mineurs || 0);
@@ -192,7 +237,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         
         const newDetails = { ...prev.chambresDetails };
         if (!checked) delete newDetails[chambreId];
-        else newDetails[chambreId] = { adultes: 0, mineurs: 0 };
+        else newDetails[chambreId] = { adultes: 0, mineurs: 0, enfants: 0 };
 
         return { ...prev, chambres: newChambres, chambresDetails: newDetails };
       });
@@ -203,7 +248,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         options: { ...prev.options, [optName]: checked }
       }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData(prev => ({ ...prev, [name]: type === 'number' ? (parseInt(value) || 0) : value }));
     }
   };
 
@@ -293,21 +338,75 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     setErrorMsg('');
     setSuccessMsg('');
     
-    for (let occ of formData.occupants) {
-      if (!occ.nom || !occ.prenom) {
-        setErrorMsg("Veuillez remplir les noms et prénoms de tous les occupants.");
+    if (isDevis) {
+      if (!formData.nom || !formData.prenom || !formData.email || !formData.telephone || !formData.adressePostale) {
+        setErrorMsg("Veuillez remplir toutes les informations du demandeur.");
         return;
       }
-      if (!occ.estAdulte && (!occ.age || occ.age < 0 || occ.age > 18)) {
-        setErrorMsg("Veuillez indiquer un âge valide pour les mineurs.");
+      if (!formData.dateDebut || !formData.dateFin) {
+        setErrorMsg("Veuillez sélectionner des dates.");
         return;
+      }
+      const start = new Date(formData.dateDebut);
+      const end = new Date(formData.dateFin);
+      if (start >= end) {
+        setErrorMsg("La date de départ doit être après la date d'arrivée.");
+        return;
+      }
+      if (formData.chambres.length === 0) {
+        setErrorMsg("Veuillez sélectionner au moins une chambre.");
+        return;
+      }
+      const totalAdults = parseInt(formData.devisAdultes) || 0;
+      const totalMineurs = parseInt(formData.devisMineurs) || 0;
+      const totalOccupants = totalAdults + totalMineurs;
+      if (totalOccupants <= 0) {
+        setErrorMsg("Veuillez indiquer le nombre d'adultes et de mineurs.");
+        return;
+      }
+      const totalCapacite = formData.chambres.reduce((acc, chId) => acc + CHAMBRES_INFO[chId].lits, 0);
+      if (totalOccupants > totalCapacite) {
+        setErrorMsg(`La capacité totale des chambres sélectionnées est dépassée (${totalOccupants} occupants pour ${totalCapacite} lits maximum).`);
+        return;
+      }
+    } else {
+      for (let occ of formData.occupants) {
+        if (!occ.nom || !occ.prenom) {
+          setErrorMsg("Veuillez remplir les noms et prénoms de tous les occupants.");
+          return;
+        }
+        if (!occ.estAdulte && (!occ.age || occ.age < 0 || occ.age > 18)) {
+          setErrorMsg("Veuillez indiquer un âge valide pour les mineurs.");
+          return;
+        }
       }
     }
 
     setIsSubmitting(true);
     try {
-      const payload = {
+      // Map mineurs to enfants in non-devis mode to maintain backend compatibility
+      const mappedChambresDetails = {};
+      if (formData.chambresDetails) {
+        Object.entries(formData.chambresDetails).forEach(([chId, details]) => {
+          mappedChambresDetails[chId] = {
+            ...details,
+            enfants: details.mineurs || 0
+          };
+        });
+      }
+
+      const payload = isDevis ? {
         ...formData,
+        nom: `${formData.prenom} ${formData.nom}${formData.structure ? ' - ' + formData.structure : ''}`,
+        chambresDetails: getChambresDetailsDistribues(),
+        occupants: generateFakeOccupants(),
+        prixTotal: calculerPrix(),
+        promoCode: promoApplied?.code,
+        adminEmail: adminUser?.email,
+        adminName: adminUser?.nom
+      } : {
+        ...formData,
+        chambresDetails: mappedChambresDetails,
         prixTotal: calculerPrix(),
         promoCode: promoApplied?.code,
         adminEmail: adminUser?.email,
@@ -353,7 +452,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [] });
+        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [] });
         setStep(1);
       } else {
         const errData = await res.json();
@@ -368,7 +467,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
   return (
     <div className="w-full">
-      <form onSubmit={step === 1 ? goToStep2 : handleSubmit} className="space-y-6 relative">
+      <form onSubmit={isDevis ? handleSubmit : (step === 1 ? goToStep2 : handleSubmit)} className="space-y-6 relative">
       {errorMsg && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
           <span className="block sm:inline font-bold">{errorMsg}</span>
@@ -376,10 +475,29 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       )}
       {step === 1 && (
         <>
-          <div className="space-y-1">
-            <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Client'}</label>
-            <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: Jean Dupont" />
-          </div>
+          {isDevis ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Nom</label>
+                  <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Dupont" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Prénom</label>
+                  <input required type="text" name="prenom" value={formData.prenom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Jean" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Structure, entreprise ou association</label>
+                <input type="text" name="structure" value={formData.structure} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: MUC OMNISPORTS" />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Client'}</label>
+              <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: Jean Dupont" />
+            </div>
+          )}
           
           <div className="space-y-1">
             <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">E-mail</label>
@@ -390,6 +508,13 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Téléphone</label>
             <input required type="tel" name="telephone" value={formData.telephone} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="06 00 00 00 00" />
           </div>
+
+          {isDevis && (
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Adresse Postale Complète</label>
+              <textarea required name="adressePostale" value={formData.adressePostale} onChange={handleChange} rows="2" className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: 123 rue de la Paix, 75000 Paris" />
+            </div>
+          )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
@@ -425,7 +550,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   </div>
                 </label>
                 
-                {isChecked && !isUnavailable && (
+                {isChecked && !isUnavailable && !isDevis && (
                   <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Adultes (≥13 ans)</label>
@@ -442,6 +567,35 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           })}
         </div>
       </div>
+
+      {isDevis && (
+        <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Nombre d'adultes</label>
+            <input 
+              required 
+              type="number" 
+              min="0" 
+              name="devisAdultes" 
+              value={formData.devisAdultes} 
+              onChange={handleChange} 
+              className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" 
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Nombre de mineurs</label>
+            <input 
+              required 
+              type="number" 
+              min="0" 
+              name="devisMineurs" 
+              value={formData.devisMineurs} 
+              onChange={handleChange} 
+              className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" 
+            />
+          </div>
+        </div>
+      )}
 
       <div className="pt-4 border-t border-slate-100">
         <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-4 block">Options Complémentaires</label>
@@ -511,8 +665,16 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         </div>
       )}
 
-          <button type="submit" className="w-full bg-muc-blue text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-muc-blue/90 hover:scale-[1.02] transition-all shadow-xl mt-8">
-            <Send size={20} /> Valider
+          <button disabled={isSubmitting} type="submit" className="w-full bg-muc-blue text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-muc-blue/90 hover:scale-[1.02] transition-all shadow-xl mt-8 disabled:opacity-70 disabled:cursor-not-allowed">
+            {isDevis ? (
+              isSubmitting ? (
+                <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Traitement en cours...</>
+              ) : (
+                <><Send size={20} /> Générer le devis</>
+              )
+            ) : (
+              <><Send size={20} /> Valider</>
+            )}
           </button>
         </>
       )}
