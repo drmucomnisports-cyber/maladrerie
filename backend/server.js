@@ -17,7 +17,18 @@ const app = express();
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-app.use(cors({ origin: ['https://gite-maladrerie.fr', 'http://localhost:5173', 'http://localhost:5000'], credentials: true }));
+app.use(cors({
+  origin: [
+    'https://gite-maladrerie.fr',
+    'https://www.gite-maladrerie.fr',
+    'https://api.gite-maladrerie.fr',
+    'http://localhost:5173',
+    'http://localhost:5000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Stripe Webhook doit être avant express.json()
 app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (request, response) => {
