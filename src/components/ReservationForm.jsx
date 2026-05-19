@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, X, CheckCircle, AlertTriangle, Phone } from 'lucide-react';
+import { Send, X, CheckCircle, AlertTriangle, Phone, UtensilsCrossed, Info } from 'lucide-react';
 import { API_URL } from '../config';
 
 const CHAMBRES_INFO = {
@@ -34,8 +34,16 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       lingeFourni: false,
       menage: false
     },
-    occupants: []
+    occupants: [],
+    repas: {}
   });
+
+  // Grille tarifaire restauration
+  const TARIFS_REPAS = {
+    PETIT_DEJ: { ADULTE: 6, ENFANT_MOINS_12: 5, ENFANT_MOINS_5: 4, label: 'Petit-déjeuner' },
+    DEJEUNER:  { ADULTE: 11.5, ENFANT_MOINS_12: 9.5, ENFANT_MOINS_5: 8, label: 'Déjeuner' },
+    DINER:     { ADULTE: 14, ENFANT_MOINS_12: 12, ENFANT_MOINS_5: 10, label: 'Dîner' }
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
@@ -199,6 +207,59 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     }
 
     return total;
+  };
+
+  // Vérifie si la commande de repas est encore ouverte (avant le jeudi S-1)
+  const isRepasCommandeOuverte = () => {
+    if (!formData.dateDebut) return false;
+    const debut = new Date(formData.dateDebut);
+    const dayOfWeek = debut.getDay(); // 0=dim
+    const mondayOfSejourWeek = new Date(debut);
+    mondayOfSejourWeek.setDate(debut.getDate() - ((dayOfWeek + 6) % 7));
+    const jeudiPrecedent = new Date(mondayOfSejourWeek);
+    jeudiPrecedent.setDate(mondayOfSejourWeek.getDate() - 7 + 3);
+    jeudiPrecedent.setHours(23, 59, 59, 999);
+    return new Date() <= jeudiPrecedent;
+  };
+
+  // Calcule le total des repas commandés
+  const calculerTotalRepas = () => {
+    let total = 0;
+    Object.values(formData.repas).forEach(dayRepas => {
+      Object.entries(dayRepas).forEach(([typeRepas, categories]) => {
+        const tarifs = TARIFS_REPAS[typeRepas];
+        if (!tarifs) return;
+        Object.entries(categories).forEach(([categorie, qty]) => {
+          const prix = tarifs[categorie] || 0;
+          total += prix * (parseInt(qty) || 0);
+        });
+      });
+    });
+    return Math.round(total * 100) / 100;
+  };
+
+  // Génère la liste des dates du séjour (pour le sélecteur de repas)
+  const getDatesSejour = () => {
+    if (!formData.dateDebut || !formData.dateFin) return [];
+    const dates = [];
+    const start = new Date(formData.dateDebut);
+    const end = new Date(formData.dateFin);
+    const current = new Date(start);
+    while (current < end) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const handleRepasChange = (dateStr, typeRepas, categorie, value) => {
+    setFormData(prev => {
+      const newRepas = { ...prev.repas };
+      if (!newRepas[dateStr]) newRepas[dateStr] = {};
+      if (!newRepas[dateStr][typeRepas]) newRepas[dateStr][typeRepas] = {};
+      newRepas[dateStr][typeRepas][categorie] = parseInt(value) || 0;
+      return { ...prev, repas: newRepas };
+    });
   };
 
   const handleApplyPromo = async () => {
@@ -403,19 +464,29 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         });
       }
 
+      const totalRepas = calculerTotalRepas();
+      const prixHebergement = calculerPrix();
+      const prixTotalGlobal = prixHebergement + totalRepas;
+
       const payload = isDevis ? {
         ...formData,
         nom: `${formData.prenom} ${formData.nom}${formData.structure ? ' - ' + formData.structure : ''}`,
         chambresDetails: getChambresDetailsDistribues(),
         occupants: generateFakeOccupants(),
-        prixTotal: calculerPrix(),
+        prixTotal: prixTotalGlobal,
+        prixHebergement,
+        totalRepas,
+        repas: formData.repas,
         promoCode: promoApplied?.code,
         adminEmail: adminUser?.email,
         adminName: adminUser?.nom
       } : {
         ...formData,
         chambresDetails: mappedChambresDetails,
-        prixTotal: calculerPrix(),
+        prixTotal: prixTotalGlobal,
+        prixHebergement,
+        totalRepas,
+        repas: formData.repas,
         promoCode: promoApplied?.code,
         adminEmail: adminUser?.email,
         adminName: adminUser?.nom
@@ -460,7 +531,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [] });
+        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [], repas: {} });
         setStep(1);
 
         // Redirection automatique vers le dashboard admin après création d'un devis
@@ -636,6 +707,81 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         </div>
       </div>
 
+      {/* ── BLOC RESTAURATION ── */}
+      {formData.dateDebut && formData.dateFin && formData.chambres.length > 0 && (
+        <div className="pt-4 border-t border-slate-100">
+          <div className="flex items-center gap-2 mb-4">
+            <UtensilsCrossed size={18} className="text-muc-blue" />
+            <label className="text-xs font-black uppercase text-slate-500 tracking-widest">Restauration (optionnel)</label>
+          </div>
+
+          {!isRepasCommandeOuverte() ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-amber-800 mb-1">Commande de repas indisponible</p>
+                  <p className="text-xs text-amber-700 leading-relaxed">Les commandes de repas doivent être passées <strong>avant le jeudi de la semaine précédant votre séjour</strong>. La date limite pour votre réservation est dépassée.</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+                <div className="flex items-start gap-3">
+                  <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-800 leading-relaxed">
+                    <p className="font-bold mb-1">Service de restauration — Cuisine Centrale de la Ville de Millau</p>
+                    <p>Menus consultables sur le site de la cantine de la Ville de Millau (63% bio, circuit court, producteurs locaux). Les repas sont <strong>livrés le matin avant 10h</strong> (le vendredi pour les week-ends), en bacs inox. Ni pique-nique ni panier repas.</p>
+                  </div>
+                </div>
+              </div>
+
+              {getDatesSejour().map(date => {
+                const dateStr = date.toISOString().split('T')[0];
+                const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+                return (
+                  <div key={dateStr} className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
+                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
+                      <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight">{jourLabel}</h4>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => (
+                        <div key={typeRepas} className="p-3 rounded-xl bg-slate-50/50 border border-slate-100">
+                          <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">{tarifs.label}</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[['ADULTE', `Adulte (${tarifs.ADULTE}€)`], ['ENFANT_MOINS_12', `<12 ans (${tarifs.ENFANT_MOINS_12}€)`], ['ENFANT_MOINS_5', `<5 ans (${tarifs.ENFANT_MOINS_5}€)`]].map(([cat, label]) => (
+                              <div key={cat}>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1 truncate" title={label}>{label}</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={formData.repas[dateStr]?.[typeRepas]?.[cat] || ''}
+                                  onChange={e => handleRepasChange(dateStr, typeRepas, cat, e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm text-center font-bold"
+                                  placeholder="0"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {calculerTotalRepas() > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex justify-between items-center">
+                  <span className="text-sm font-bold text-orange-800">Total Restauration</span>
+                  <span className="text-lg font-black text-orange-900">{calculerTotalRepas().toFixed(2)} €</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {formData.dateDebut && formData.dateFin && formData.chambres.length > 0 && (
         <div className="space-y-4">
           <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
@@ -674,14 +820,33 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
           <div className="bg-muc-blue/5 p-6 rounded-2xl border-2 border-muc-blue/10">
             <h3 className="text-sm font-black uppercase text-muc-blue tracking-widest mb-4">Récapitulatif</h3>
-            <div className="flex justify-between items-center text-xl font-black text-slate-900">
-              <span>Total Estimé</span>
-              <div className="text-right">
-                {promoApplied && <span className="text-sm text-slate-400 line-through mr-2 font-normal">{(calculerPrix() / (promoApplied.type === 'pourcentage' ? (1 - promoApplied.valeur / 100) : 1) + (promoApplied.type === 'fixe' ? promoApplied.valeur : 0)).toFixed(2)} €</span>}
-                <span>{calculerPrix().toFixed(2)} €</span>
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between items-center text-sm text-slate-700">
+                <span className="font-medium">Hébergement</span>
+                <span className="font-bold">{calculerPrix().toFixed(2)} €</span>
+              </div>
+              {calculerTotalRepas() > 0 && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">Restauration</span>
+                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
+                </div>
+              )}
+              <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-xl font-black text-slate-900">
+                <span>Total</span>
+                <div className="text-right">
+                  {promoApplied && <span className="text-sm text-slate-400 line-through mr-2 font-normal">{(calculerPrix() / (promoApplied.type === 'pourcentage' ? (1 - promoApplied.valeur / 100) : 1) + (promoApplied.type === 'fixe' ? promoApplied.valeur : 0) + calculerTotalRepas()).toFixed(2)} €</span>}
+                  <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
+                </div>
               </div>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">* Inclut la taxe de séjour (4% du prix de la nuitée / adulte)</p>
+            <div className="bg-white/80 rounded-xl p-3 border border-muc-blue/10">
+              <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-600">30% hébergement + 100% restauration</span>
+                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-3">* Inclut la taxe de séjour (4% du prix de la nuitée / adulte)</p>
           </div>
         </div>
       )}
@@ -804,9 +969,29 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           </div>
 
           <div className="bg-muc-blue/5 p-6 rounded-2xl border-2 border-muc-blue/10">
-            <div className="flex justify-between items-center text-xl font-black text-slate-900">
-              <span>Total Estimé</span>
-              <span>{calculerPrix().toFixed(2)} €</span>
+            <h3 className="text-sm font-black uppercase text-muc-blue tracking-widest mb-3">Récapitulatif final</h3>
+            <div className="space-y-2 mb-3">
+              <div className="flex justify-between items-center text-sm text-slate-700">
+                <span className="font-medium">Hébergement</span>
+                <span className="font-bold">{calculerPrix().toFixed(2)} €</span>
+              </div>
+              {calculerTotalRepas() > 0 && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">Restauration</span>
+                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
+                </div>
+              )}
+              <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-xl font-black text-slate-900">
+                <span>Total</span>
+                <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
+              </div>
+            </div>
+            <div className="bg-white/80 rounded-xl p-3 border border-muc-blue/10">
+              <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-600">30% hébergement + 100% restauration</span>
+                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
+              </div>
             </div>
           </div>
 

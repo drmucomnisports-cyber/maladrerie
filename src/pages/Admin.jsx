@@ -37,6 +37,7 @@ const Admin = () => {
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [currentReservationForMission, setCurrentReservationForMission] = useState(null);
   const [missionChecks, setMissionChecks] = useState({
+    'Préparation petit-déjeuner': { checked: false, montant: 30 },
     'Draps et ménage': { checked: false, montant: 70 },
     'Remise des clés': { checked: false, montant: 30 },
     'Astreinte de nuit sur place': { checked: false, montant: 200 },
@@ -478,6 +479,7 @@ const Admin = () => {
         showFeedback(`${selectedMissions.length} mission(s) assignée(s) et notification envoyée.`);
         // Reset
         setMissionChecks({
+          'Préparation petit-déjeuner': { checked: false, montant: 30 },
           'Draps et ménage': { checked: false, montant: 70 },
           'Remise des clés': { checked: false, montant: 30 },
           'Astreinte de nuit sur place': { checked: false, montant: 200 },
