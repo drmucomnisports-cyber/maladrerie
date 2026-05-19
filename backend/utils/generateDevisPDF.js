@@ -63,85 +63,113 @@ async function generateDevisPDF(data) {
 
             // --- TABLEAU DES PRESTATIONS ---
             const tableTop = 360;
-            doc.font('Helvetica-Bold').fontSize(9);
+            const colDesig = leftCol + 5;
+            const colPers = leftCol + 220;
+            const colPU = leftCol + 290;
+            const colNuits = leftCol + 370;
+            const colTotal = leftCol + 440;
+            const colTotalW = 65;
+
+            doc.font('Helvetica-Bold').fontSize(8);
             doc.rect(leftCol, tableTop, 512, 20).fill('#004B93');
             doc.fillColor('#FFFFFF');
             
             // Header Colonnes
-            doc.text('DÉSIGNATION', leftCol + 10, tableTop + 6);
-            doc.text('P.U. (€)', leftCol + 300, tableTop + 6, { width: 50, align: 'right' });
-            doc.text('QTÉ', leftCol + 360, tableTop + 6, { width: 50, align: 'center' });
-            doc.text('TOTAL (€)', leftCol + 440, tableTop + 6, { align: 'right', width: 60 });
+            doc.text('DÉSIGNATION', colDesig, tableTop + 6, { width: 210 });
+            doc.text('NB PERS.', colPers, tableTop + 6, { width: 60, align: 'center' });
+            doc.text('PRIX/PERS./NUIT', colPU, tableTop + 6, { width: 75, align: 'center' });
+            doc.text('NB NUITS', colNuits, tableTop + 6, { width: 60, align: 'center' });
+            doc.text('TOTAL (€)', colTotal, tableTop + 6, { align: 'right', width: colTotalW });
 
-            let y = tableTop + 30;
-            doc.fillColor('#000000').font('Helvetica').fontSize(9);
+            let y = tableTop + 28;
+            doc.fillColor('#000000').font('Helvetica').fontSize(8.5);
             
             // Lignes Hébergement
             if (data.detailsLignes && data.detailsLignes.length > 0) {
-                data.detailsLignes.forEach(ligne => {
-                    doc.text(ligne.designation, leftCol + 10, y, { width: 280 });
-                    doc.text(ligne.pu.toFixed(2), leftCol + 300, y, { width: 50, align: 'right' });
-                    doc.text(ligne.qte.toString(), leftCol + 360, y, { width: 50, align: 'center' });
-                    doc.text(ligne.total.toFixed(2), leftCol + 440, y, { align: 'right', width: 60 });
-                    y += 20;
+                data.detailsLignes.forEach((ligne, idx) => {
+                    // Alternate row background for readability
+                    if (idx % 2 === 0) {
+                        doc.rect(leftCol, y - 4, 512, 18).fill('#F8F9FA');
+                        doc.fillColor('#000000');
+                    }
+                    doc.text(ligne.designation, colDesig, y, { width: 210 });
+                    doc.text(ligne.nbPersonnes.toString(), colPers, y, { width: 60, align: 'center' });
+                    doc.text(`${ligne.tarifParPersonne.toFixed(2)} €`, colPU, y, { width: 75, align: 'center' });
+                    doc.text(ligne.nuits.toString(), colNuits, y, { width: 60, align: 'center' });
+                    doc.font('Helvetica-Bold').text(ligne.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
+                    doc.font('Helvetica');
+                    y += 18;
                 });
             } else {
                 // Fallback
-                doc.text('Hébergement du séjour', leftCol + 10, y);
-                doc.text(data.prixSejour?.toFixed(2) || '0.00', leftCol + 440, y, { align: 'right', width: 60 });
-                y += 20;
+                doc.text('Hébergement du séjour', colDesig, y);
+                doc.text(data.prixSejour?.toFixed(2) || '0.00', colTotal, y, { align: 'right', width: colTotalW });
+                y += 18;
             }
+
+            // Séparateur
+            y += 2;
+            doc.strokeColor('#DDDDDD').moveTo(leftCol, y).lineTo(leftCol + 512, y).stroke();
+            y += 8;
 
             // Options
             if (data.options && data.options.length > 0) {
                 data.options.forEach(opt => {
-                    doc.text(opt.nom, leftCol + 10, y, { width: 280 });
-                    doc.text(opt.pu.toFixed(2), leftCol + 300, y, { width: 50, align: 'right' });
-                    doc.text(opt.qte.toString(), leftCol + 360, y, { width: 50, align: 'center' });
-                    doc.text(opt.total.toFixed(2), leftCol + 440, y, { align: 'right', width: 60 });
-                    y += 20;
+                    doc.text(opt.nom, colDesig, y, { width: 210 });
+                    doc.text(opt.qte.toString(), colPers, y, { width: 60, align: 'center' });
+                    doc.text(`${opt.pu.toFixed(2)} €`, colPU, y, { width: 75, align: 'center' });
+                    doc.text('—', colNuits, y, { width: 60, align: 'center' });
+                    doc.text(opt.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
+                    y += 18;
                 });
             }
 
             // Taxe de séjour
             if (data.taxeSejourDetails) {
                 const tsd = data.taxeSejourDetails;
-                const libelleTaxe = `Taxe de séjour (${tsd.adultes} adultes x ${tsd.nuits} nuits)`;
                 const puTaxe = (tsd.base * tsd.taux).toFixed(2);
                 
-                doc.text(libelleTaxe, leftCol + 10, y, { width: 280 });
-                doc.text(puTaxe, leftCol + 300, y, { width: 50, align: 'right' });
-                doc.text((tsd.adultes * tsd.nuits).toString(), leftCol + 360, y, { width: 50, align: 'center' });
-                doc.text(tsd.total.toFixed(2), leftCol + 440, y, { align: 'right', width: 60 });
-                y += 20;
+                doc.text(`Taxe de séjour`, colDesig, y, { width: 210 });
+                doc.text(tsd.adultes.toString(), colPers, y, { width: 60, align: 'center' });
+                doc.text(`${puTaxe} €`, colPU, y, { width: 75, align: 'center' });
+                doc.text(tsd.nuits.toString(), colNuits, y, { width: 60, align: 'center' });
+                doc.text(tsd.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
+                y += 18;
             }
 
             // Promo
             if (data.promoMontant > 0) {
+                y += 4;
                 doc.fillColor('#dc3545');
-                doc.text(`Remise (Code: ${data.codePromo})`, leftCol + 10, y);
-                doc.text(`-${data.promoMontant.toFixed(2)}`, leftCol + 440, y, { align: 'right', width: 60 });
+                doc.text(`Remise (Code: ${data.codePromo})`, colDesig, y);
+                doc.text(`-${data.promoMontant.toFixed(2)}`, colTotal, y, { align: 'right', width: colTotalW });
                 doc.fillColor('#000000');
-                y += 25;
+                y += 20;
             }
 
             // --- TOTAUX ---
+             // Séparateur avant totaux
+             y += 5;
+             doc.strokeColor('#004B93').lineWidth(1).moveTo(leftCol + 280, y).lineTo(leftCol + 512, y).stroke();
+             doc.lineWidth(0.5);
+             y += 10;
+
              // Box Total
              const totalBoxY = y - 5;
-             doc.rect(leftCol + 290, totalBoxY, 232, 85).fill('#F8F9FA');
+             doc.rect(leftCol + 280, totalBoxY, 232, 85).fill('#F8F9FA');
              doc.fillColor('#000000');
              
-             y += 10;
-             doc.fontSize(12).font('Helvetica-Bold').fillColor('#004B93').text('TOTAL TTC', leftCol + 300, y);
-             doc.text(`${data.prixTotal.toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
+             y += 5;
+             doc.fontSize(12).font('Helvetica-Bold').fillColor('#004B93').text('TOTAL TTC', leftCol + 290, y);
+             doc.text(`${data.prixTotal.toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
              
              y += 25;
-             doc.fontSize(10).font('Helvetica-Bold').fillColor('#000000').text('Dont Acompte (30%) :', leftCol + 300, y);
-             doc.text(`${(data.prixTotal * 0.3).toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
+             doc.fontSize(10).font('Helvetica-Bold').fillColor('#000000').text('Dont Acompte (30%) :', leftCol + 290, y);
+             doc.text(`${(data.prixTotal * 0.3).toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
              
              y += 15;
-             doc.fontSize(10).font('Helvetica').text('Solde à régler :', leftCol + 300, y);
-             doc.text(`${(data.prixTotal * 0.7).toFixed(2)} €`, leftCol + 440, y, { align: 'right', width: 60 });
+             doc.fontSize(10).font('Helvetica').text('Solde à régler :', leftCol + 290, y);
+             doc.text(`${(data.prixTotal * 0.7).toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
 
             // --- MENTIONS LÉGALES & SIGNATURE ---
             // Temporarily reduce bottom margin to prevent automatic premature page break

@@ -144,10 +144,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     const totalAdults = parseInt(formData.devisAdultes) || 0;
     const totalMineurs = parseInt(formData.devisMineurs) || 0;
     for (let i = 1; i <= totalAdults; i++) {
-      list.push({ nom: formData.nom, prenom: `Adulte ${i}`, estAdulte: true });
+      list.push({ nom: formData.nom, prenom: `Adulte ${i}`, estAdulte: true, age: 30, nationalite: true });
     }
     for (let i = 1; i <= totalMineurs; i++) {
-      list.push({ nom: formData.nom, prenom: `Mineur ${i}`, estAdulte: false, age: 10 });
+      list.push({ nom: formData.nom, prenom: `Mineur ${i}`, estAdulte: false, age: 10, nationalite: true });
     }
     return list;
   };
@@ -316,11 +316,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       
       // Ajouter les adultes
       for (let i = 0; i < nbAdultes; i++) {
-        newOccupants.push({ nom: '', prenom: '', estAdulte: true, age: '' });
+        newOccupants.push({ nom: '', prenom: '', estAdulte: true, age: '', nationalite: true });
       }
       // Ajouter les mineurs
       for (let i = 0; i < nbMineurs; i++) {
-        newOccupants.push({ nom: '', prenom: '', estAdulte: false, age: '' });
+        newOccupants.push({ nom: '', prenom: '', estAdulte: false, age: '', nationalite: true });
       }
     }
     
@@ -371,13 +371,21 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
     } else {
       for (let occ of formData.occupants) {
-        if (!occ.nom || !occ.prenom) {
-          setErrorMsg("Veuillez remplir les noms et prénoms de tous les occupants.");
-          return;
-        }
-        if (!occ.estAdulte && (!occ.age || occ.age < 0 || occ.age > 18)) {
-          setErrorMsg("Veuillez indiquer un âge valide pour les mineurs.");
-          return;
+        if (occ.estAdulte) {
+          if (!occ.nom?.trim() || !occ.prenom?.trim()) {
+            setErrorMsg("Veuillez remplir les noms et prénoms de tous les adultes.");
+            return;
+          }
+          if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 18) {
+            setErrorMsg("Veuillez indiquer un âge valide pour tous les adultes (18 ans ou plus).");
+            return;
+          }
+        } else {
+          // Nom et prénom optionnels pour les mineurs, mais l'âge est obligatoire
+          if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 0 || occ.age >= 18) {
+            setErrorMsg("Veuillez indiquer un âge valide pour tous les mineurs (moins de 18 ans).");
+            return;
+          }
         }
       }
     }
@@ -454,6 +462,13 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
         setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [] });
         setStep(1);
+
+        // Redirection automatique vers le dashboard admin après création d'un devis
+        if (isDevis) {
+          setTimeout(() => {
+            navigate('/admin');
+          }, 2000);
+        }
       } else {
         const errData = await res.json();
         setErrorMsg(errData.error || "Une erreur est survenue lors de l'envoi.");
@@ -493,10 +508,16 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               </div>
             </>
           ) : (
-            <div className="space-y-1">
-              <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Client'}</label>
-              <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: Jean Dupont" />
-            </div>
+            <>
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Client'}</label>
+                <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: Jean Dupont" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Structure, entreprise ou association (optionnel)</label>
+                <input type="text" name="structure" value={formData.structure} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: MUC OMNISPORTS" />
+              </div>
+            </>
           )}
           
           <div className="space-y-1">
@@ -701,22 +722,80 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 return formData.occupants.map((occ, idx) => {
                   const label = occ.estAdulte ? `Adulte ${++adultCount}` : `Mineur ${++childCount}`;
                   return (
-                    <div key={idx} className={`p-4 rounded-xl border ${occ.estAdulte ? 'bg-slate-50 border-slate-200' : 'bg-amber-50 border-amber-200'}`}>
-                      <h4 className="text-sm font-bold text-slate-700 mb-3">{label}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <input required type="text" placeholder="Nom" value={occ.nom} onChange={(e) => handleOccupantChange(idx, 'nom', e.target.value)} className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-muc-yellow outline-none" />
+                    <div key={idx} className={`p-5 rounded-2xl border-2 ${occ.estAdulte ? 'bg-slate-50/50 border-slate-100' : 'bg-amber-50/30 border-amber-100/50'} space-y-4`}>
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">{label}</h4>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${occ.estAdulte ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'}`}>
+                          {occ.estAdulte ? 'Adulte (+18 ans)' : 'Mineur (-18 ans)'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Nom {occ.estAdulte && <span className="text-red-500">*</span>}</label>
+                          <input 
+                            required={occ.estAdulte} 
+                            type="text" 
+                            placeholder={occ.estAdulte ? "Nom" : "Nom (optionnel)"} 
+                            value={occ.nom} 
+                            onChange={(e) => handleOccupantChange(idx, 'nom', e.target.value)} 
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-muc-yellow bg-white outline-none text-sm transition-all" 
+                          />
                         </div>
-                        <div>
-                          <input required type="text" placeholder="Prénom" value={occ.prenom} onChange={(e) => handleOccupantChange(idx, 'prenom', e.target.value)} className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-muc-yellow outline-none" />
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Prénom {occ.estAdulte && <span className="text-red-500">*</span>}</label>
+                          <input 
+                            required={occ.estAdulte} 
+                            type="text" 
+                            placeholder={occ.estAdulte ? "Prénom" : "Prénom (optionnel)"} 
+                            value={occ.prenom} 
+                            onChange={(e) => handleOccupantChange(idx, 'prenom', e.target.value)} 
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-muc-yellow bg-white outline-none text-sm transition-all" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Âge <span className="text-red-500">*</span></label>
+                          <input 
+                            required 
+                            type="number" 
+                            min="0" 
+                            max={occ.estAdulte ? "120" : "17"} 
+                            placeholder="Âge" 
+                            value={occ.age} 
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                              handleOccupantChange(idx, 'age', val);
+                            }} 
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-muc-yellow bg-white outline-none text-sm transition-all" 
+                          />
                         </div>
                       </div>
-                      {!occ.estAdulte && (
-                        <div className="mt-3">
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">Âge du mineur</label>
-                          <input required type="number" min="0" max="18" placeholder="Âge" value={occ.age} onChange={(e) => handleOccupantChange(idx, 'age', parseInt(e.target.value))} className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-muc-yellow outline-none" />
+
+                      <div className="pt-2 border-t border-dashed border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <span className="text-xs font-bold text-slate-600">Nationalité française :</span>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                            <input 
+                              type="radio" 
+                              name={`nationalite-${idx}`} 
+                              checked={occ.nationalite === true} 
+                              onChange={() => handleOccupantChange(idx, 'nationalite', true)} 
+                              className="accent-muc-blue w-4 h-4"
+                            />
+                            Oui
+                          </label>
+                          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                            <input 
+                              type="radio" 
+                              name={`nationalite-${idx}`} 
+                              checked={occ.nationalite === false} 
+                              onChange={() => handleOccupantChange(idx, 'nationalite', false)} 
+                              className="accent-muc-blue w-4 h-4"
+                            />
+                            Non
+                          </label>
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 });

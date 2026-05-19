@@ -45,6 +45,7 @@ model Reservation {
   lienPaiementEnvoye Boolean   @default(false)
   montantCautionRetenu Float?  // Montant effectivement retenu sur la caution (ex: 50€ pour ménage)
   codePromo       String?      // Code promo utilisé
+  structure       String?      // Nom de l'entreprise ou association
   intervenant     Intervenant? @relation(fields: [intervenantId], references: [id])
   intervenantId   Int?
   missions        Mission[]
@@ -61,6 +62,7 @@ model Occupant {
   prenom        String
   estAdulte     Boolean     @default(true)
   age           Int?
+  nationalite   String?
 }
 
 model Intervenant {

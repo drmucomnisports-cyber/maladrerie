@@ -17,7 +17,7 @@ const app = express();
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-app.use(cors());
+app.use(cors({ origin: ['https://gite-maladrerie.fr', 'http://localhost:5173', 'http://localhost:5000'], credentials: true }));
 
 // Stripe Webhook doit être avant express.json()
 app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (request, response) => {
@@ -283,7 +283,7 @@ app.get('/api/reservations', async (req, res) => {
 });
 
 app.post('/api/reservations', async (req, res) => {
-  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options } = req.body;
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, structure } = req.body;
 
   // Recalculer le prix côté serveur pour sécurité
   const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, req.body.promoCode);
@@ -301,6 +301,7 @@ app.post('/api/reservations', async (req, res) => {
         prixTotal: backendPrixTotal,
         codePromo: req.body.promoCode || null,
         isGroupe: false,
+        structure: structure || null,
         client: {
           create: {
             nom,
@@ -310,12 +311,31 @@ app.post('/api/reservations', async (req, res) => {
           }
         },
         occupants: occupants && occupants.length > 0 ? {
-          create: occupants.map(occ => ({
-            nom: occ.nom,
-            prenom: occ.prenom,
-            estAdulte: occ.estAdulte,
-            age: occ.age || null
-          }))
+          create: occupants.map(occ => {
+            const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+            let occNom = occ.nom;
+            let occPrenom = occ.prenom;
+            if (!estAdulte && (!occNom?.trim() && !occPrenom?.trim())) {
+              occNom = "Mineur";
+              occPrenom = "";
+            }
+            const age = (occ.age !== undefined && occ.age !== null && occ.age !== '') ? parseInt(occ.age) : null;
+            let nationalite = occ.nationalite;
+            if (nationalite === true || nationalite === 'true') {
+              nationalite = 'Française';
+            } else if (nationalite === false || nationalite === 'false') {
+              nationalite = 'Étrangère';
+            } else if (!nationalite) {
+              nationalite = 'Française';
+            }
+            return {
+              nom: occNom || '',
+              prenom: occPrenom || '',
+              estAdulte,
+              age,
+              nationalite
+            };
+          })
         } : undefined
       },
       include: { client: true, occupants: true }
@@ -742,7 +762,7 @@ app.get('/api/reservations/:id/reject', checkAuth, async (req, res) => {
 
 // Créer un devis
 app.post('/api/admin/devis', checkAuth, async (req, res) => {
-  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, promoCode } = req.body;
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, promoCode, structure } = req.body;
 
   try {
     const now = new Date();
@@ -757,10 +777,17 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       where: { email: req.user.email }
     });
 
+    // Fallback : si le nom admin est générique ("admin", vide, etc.), afficher "David Roujet"
+    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
+    const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
+    const resolvedAdminEmail = admin ? admin.email : 'david.roujet@mucomnisports.fr';
+    const resolvedAdminTel = admin ? (admin.telephone || '04 99 58 35 35') : '04 99 58 35 35';
+
     // 2. Calculer le montant
     const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, promoCode);
     
     let totalAdultes = 0;
+    let totalMineurs = 0;
     let totalPrixBase = 0;
     
     chambres.forEach(chId => {
@@ -772,12 +799,12 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       const tarifPers = occupantsCount >= capacite ? 22 : 25;
       
       totalAdultes += nbAdultes;
+      totalMineurs += nbMineurs;
       totalPrixBase += occupantsCount * tarifPers * nuits;
     });
 
-    const taxeSejour = totalAdultes * (totalPrixBase / (occupants.length * nuits || 1) * 0.04) * nuits;
-    // Plus simple:
-    const tarifMoyen = totalPrixBase / ((occupants ? occupants.length : 1) * nuits);
+    const totalPersonnes = totalAdultes + totalMineurs;
+    const tarifMoyen = totalPrixBase / ((totalPersonnes || 1) * nuits);
     const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.04) * nuits;
     
     const prixSejour = totalPrixBase;
@@ -808,7 +835,8 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
         tokenDevis: token,
         expireLe: expiration,
         numeroDevis: numeroDevis,
-        validePar: admin ? admin.email : (req.user?.email || 'Admin'),
+        validePar: resolvedAdminEmail,
+        structure: structure || null,
         client: {
           create: { 
             nom, 
@@ -818,12 +846,31 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
           }
         },
         occupants: occupants && occupants.length > 0 ? {
-          create: occupants.map(occ => ({
-            nom: occ.nom,
-            prenom: occ.prenom,
-            estAdulte: occ.estAdulte,
-            age: occ.age || null
-          }))
+          create: occupants.map(occ => {
+            const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+            let occNom = occ.nom;
+            let occPrenom = occ.prenom;
+            if (!estAdulte && (!occNom?.trim() && !occPrenom?.trim())) {
+              occNom = "Mineur";
+              occPrenom = "";
+            }
+            const age = (occ.age !== undefined && occ.age !== null && occ.age !== '') ? parseInt(occ.age) : null;
+            let nationalite = occ.nationalite;
+            if (nationalite === true || nationalite === 'true') {
+              nationalite = 'Française';
+            } else if (nationalite === false || nationalite === 'false') {
+              nationalite = 'Étrangère';
+            } else if (!nationalite) {
+              nationalite = 'Française';
+            }
+            return {
+              nom: occNom || '',
+              prenom: occPrenom || '',
+              estAdulte,
+              age,
+              nationalite
+            };
+          })
         } : undefined
       },
       include: { client: true }
@@ -842,9 +889,9 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       clientEmail: email,
       clientTel: telephone,
       clientAdresse: adressePostale,
-      adminNom: admin ? admin.nom : 'L\'équipe du Gîte',
-      adminEmail: admin ? admin.email : 'contact@gitemaladrerie.fr',
-      adminTel: admin ? admin.telephone : '04 99 58 35 35',
+      adminNom: resolvedAdminNom,
+      adminEmail: resolvedAdminEmail,
+      adminTel: resolvedAdminTel,
       chambres: chambres.map(id => CHAMBRES_NAMES[id] || `Chambre ${id}`),
       nuits,
       detailsLignes: chambres.map(chId => {
@@ -854,11 +901,11 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
         const occupantsCount = nbAdultes + nbMineurs;
         const capacite = CHAMBRES_CAPACITE[chId] || 5;
         const tarifPers = occupantsCount >= capacite ? 22 : 25;
-        const dateRange = `du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}`;
         return {
-          designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} - Séjour ${dateRange} (${occupantsCount} pers. : ${nbAdultes} adultes, ${nbMineurs} enfants)`,
-          pu: occupantsCount * tarifPers,
-          qte: nuits,
+          designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} (${nbAdultes} ad. + ${nbMineurs} enf.)`,
+          nbPersonnes: occupantsCount,
+          tarifParPersonne: tarifPers,
+          nuits: nuits,
           total: occupantsCount * tarifPers * nuits
         };
       }),
@@ -949,7 +996,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
                     </table>
 
                     <p style="margin-top: 30px;">Pour confirmer, vous pouvez cliquer sur le bouton ci-dessus ou nous renvoyer le devis signé.</p>
-                    <p>Cordialement,<br><strong>${admin ? admin.nom : 'L\'équipe du Gîte de La Maladrerie - MUC'}</strong></p>
+                    <p>Cordialement,<br><strong>${resolvedAdminNom}</strong></p>
                   </td>
                 </tr>
                 <tr>
@@ -990,7 +1037,185 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
   }
 });
 
-// Valider un devis (Client)
+// Récupérer les informations d'un devis par son token (Client)
+app.get('/api/devis/info/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const devis = await prisma.reservation.findUnique({
+      where: { tokenDevis: token },
+      include: { 
+        client: true,
+        occupants: true
+      }
+    });
+
+    if (!devis) return res.status(404).json({ error: "Devis introuvable ou expiré." });
+    if (devis.statut !== 'DEVIS_EN_ATTENTE') return res.status(400).json({ error: "Ce devis a déjà été traité." });
+    if (devis.expireLe && devis.expireLe < new Date()) {
+       await prisma.reservation.update({ where: { id: devis.id }, data: { statut: 'DEVIS_EXPIRE' } });
+       return res.status(400).json({ error: "Ce devis a expiré (validité de 48h dépassée)." });
+    }
+
+    res.json(devis);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des détails du devis' });
+  }
+});
+
+// Valider un devis avec saisie des occupants (Client - POST)
+app.post('/api/devis/validate/:token', async (req, res) => {
+  const { token } = req.params;
+  const { occupants } = req.body;
+
+  try {
+    const devis = await prisma.reservation.findUnique({
+      where: { tokenDevis: token },
+      include: { client: true }
+    });
+
+    if (!devis) return res.status(404).json({ error: "Devis introuvable ou expiré." });
+    if (devis.statut !== 'DEVIS_EN_ATTENTE') return res.status(400).json({ error: "Ce devis a déjà été traité." });
+    if (devis.expireLe && devis.expireLe < new Date()) {
+       await prisma.reservation.update({ where: { id: devis.id }, data: { statut: 'DEVIS_EXPIRE' } });
+       return res.status(400).json({ error: "Ce devis a expiré (validité de 48h dépassée)." });
+    }
+
+    // 1. Mettre à jour les occupants si fournis
+    if (occupants && Array.isArray(occupants)) {
+      // Supprimer les occupants fictifs existants
+      await prisma.occupant.deleteMany({
+        where: { reservationId: devis.id }
+      });
+
+      // Créer les nouveaux occupants
+      await prisma.occupant.createMany({
+        data: occupants.map(occ => {
+          const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+          let occNom = occ.nom;
+          let occPrenom = occ.prenom;
+          // Si mineur et nom/prénom vides, mettre des valeurs par défaut
+          if (!estAdulte && (!occNom?.trim() && !occPrenom?.trim())) {
+            occNom = "Mineur";
+            occPrenom = "";
+          }
+          const age = (occ.age !== undefined && occ.age !== null && occ.age !== '') ? parseInt(occ.age) : null;
+          let nationalite = occ.nationalite;
+          if (nationalite === true || nationalite === 'true') {
+            nationalite = 'Française';
+          } else if (nationalite === false || nationalite === 'false') {
+            nationalite = 'Étrangère';
+          } else if (!nationalite) {
+            nationalite = 'Française';
+          }
+
+          return {
+            reservationId: devis.id,
+            nom: occNom || '',
+            prenom: occPrenom || '',
+            estAdulte,
+            age,
+            nationalite
+          };
+        })
+      });
+    }
+
+    // 2. Convertir en demande de réservation classique (RESERVE)
+    const montantAcompte = devis.prixTotal * 0.3;
+    const montantSolde = devis.prixTotal * 0.7;
+
+    const stripeCustomerPL = await getOrCreateStripeCustomer(devis.client.email, devis.client.nom);
+    const plParams = {
+      payment_method_types: ['card'],
+      allow_promotion_codes: true,
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: { 
+            name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
+            description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
+          },
+          unit_amount: Math.round(montantAcompte * 100),
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
+      metadata: { reservationId: devis.id.toString(), paymentType: 'ACOMPTE' }
+    };
+    if (stripeCustomerPL) plParams.customer = stripeCustomerPL;
+    else if (devis.client.email && devis.client.email !== 'N/A') plParams.customer_email = devis.client.email;
+    
+    const session = await stripe.checkout.sessions.create(plParams);
+
+    await prisma.reservation.update({
+      where: { id: devis.id },
+      data: { 
+        statut: 'RESERVE', 
+        tokenDevis: null,
+        montantAcompte: montantAcompte,
+        montantSolde: montantSolde,
+        stripeSessionId: session.id
+      }
+    });
+
+    // Envoyer un e-mail à l'admin créateur du devis pour l'alerter
+    if (devis.validePar && devis.validePar !== 'Admin' && devis.validePar.includes('@')) {
+      try {
+        await sendMail({
+          to: devis.validePar,
+          subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eeeeee; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #004B93; margin: 0;">Gîte de la Maladrerie</h1>
+                <p style="color: #555555; font-size: 14px; margin-top: 5px;">MUC Omnisports</p>
+              </div>
+              <hr style="border: 0; border-top: 1px solid #eeeeee; margin-bottom: 20px;" />
+              <h2 style="color: #28a745; margin-bottom: 15px;">Félicitations ! Le client a validé votre devis.</h2>
+              <p>Bonjour,</p>
+              <p>Le devis <strong>${devis.numeroDevis}</strong> que vous avez créé a été validé par le client <strong>${devis.client.nom}</strong>.</p>
+              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #004B93; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Détails du séjour :</strong></p>
+                <ul style="margin: 0; padding-left: 20px;">
+                  <li><strong>Dates :</strong> du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}</li>
+                  <li><strong>Chambres :</strong> ${devis.chambres.join(', ')}</li>
+                  <li><strong>Prix Total :</strong> ${devis.prixTotal} €</li>
+                </ul>
+              </div>
+              
+              <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
+                <p style="margin: 0; font-weight: bold; color: #856404;">🧹 Action Requise : Affectation d'un Intervenant</p>
+                <p style="margin: 8px 0 0 0; font-size: 14px; color: #666666;">
+                  Veuillez vous connecter à l'espace d'administration pour affecter un <strong>agent de ménage / accueil</strong> pour ce séjour.
+                </p>
+              </div>
+              
+              <p style="text-align: center; margin-top: 30px;">
+                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder à l'administration</a>
+              </p>
+              <hr style="border: 0; border-top: 1px solid #eeeeee; margin-top: 30px; margin-bottom: 20px;" />
+              <p style="font-size: 11px; color: #999999; text-align: center; margin: 0;">
+                Ceci est une notification automatique générée par le système du Gîte de la Maladrerie.
+              </p>
+            </div>
+          `
+        });
+      } catch (mailErr) {
+        console.error("Erreur envoi notification mail à l'admin créateur du devis:", mailErr);
+      }
+    }
+
+    res.json({ success: true, url: session.url });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erreur lors de la validation du devis." });
+  }
+});
+
+// Valider un devis (Client - Fallback GET)
 app.get('/api/devis/validate/:token', async (req, res) => {
   const { token } = req.params;
   try {
@@ -2086,7 +2311,7 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
 
 // Création manuelle d'une réservation
 app.post('/api/admin/reservations', checkAuth, async (req, res) => {
-  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, prixTotal } = req.body;
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, prixTotal, structure } = req.body;
   try {
     const reservation = await prisma.reservation.create({
       data: {
@@ -2098,16 +2323,36 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
         montantSolde: prixTotal ? Math.round(parseFloat(prixTotal) * 0.7 * 100) / 100 : null,
         statut: 'RESERVE',
         statutPaiement: 'EN_ATTENTE',
+        structure: structure || null,
         client: {
           create: { nom, email: email || 'N/A', telephone: telephone || 'N/A', adressePostale: adressePostale || null }
         },
         occupants: occupants && occupants.length > 0 ? {
-          create: occupants.map(occ => ({
-            nom: occ.nom,
-            prenom: occ.prenom,
-            estAdulte: occ.estAdulte,
-            age: occ.age || null
-          }))
+          create: occupants.map(occ => {
+            const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+            let occNom = occ.nom;
+            let occPrenom = occ.prenom;
+            if (!estAdulte && (!occNom?.trim() && !occPrenom?.trim())) {
+              occNom = "Mineur";
+              occPrenom = "";
+            }
+            const age = (occ.age !== undefined && occ.age !== null && occ.age !== '') ? parseInt(occ.age) : null;
+            let nationalite = occ.nationalite;
+            if (nationalite === true || nationalite === 'true') {
+              nationalite = 'Française';
+            } else if (nationalite === false || nationalite === 'false') {
+              nationalite = 'Étrangère';
+            } else if (!nationalite) {
+              nationalite = 'Française';
+            }
+            return {
+              nom: occNom || '',
+              prenom: occPrenom || '',
+              estAdulte,
+              age,
+              nationalite
+            };
+          })
         } : undefined
       },
       include: { client: true, occupants: true }
