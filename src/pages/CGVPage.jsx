@@ -74,6 +74,20 @@ const CGVPage = () => {
             <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">8. Respect des lieux et voisinage</h2>
             <p>Le groupe s'engage à respecter la tranquillité des lieux. Les nuisances sonores excessives ou le non-respect des règles de vie commune sont strictement interdits et pourront donner lieu à une retenue sur la caution.</p>
           </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">9. Restauration</h2>
+            <p>Pour toute commande de repas, les conditions suivantes s'appliquent :</p>
+            <ul className="mt-4 space-y-2 list-disc list-inside">
+              <li>Les commandes de repas doivent être transmises au plus tard le jeudi pour la semaine suivante.</li>
+              <li>La commande n'est validée qu'à réception du paiement intégral des repas (100 %) en plus des 30 % d'arrhes de l'hébergement.</li>
+              <li>Les repas sont livrés le matin avant 10h (le vendredi pour les week-ends), conditionnés en bacs inox. Ils comprennent une entrée, un plat et un dessert.</li>
+              <li>Il n'est pas proposé de paniers repas ni de pique-niques.</li>
+              <li><strong>Tarifs adulte :</strong> 6 € (petit-déjeuner), 11.5 € (déjeuner), 14 € (dîner).</li>
+              <li><strong>Tarifs enfant moins de 12 ans :</strong> 5 € (petit-déjeuner), 9.5 € (déjeuner), 12 € (dîner).</li>
+              <li><strong>Tarifs enfant moins de 5 ans :</strong> 4 € (petit-déjeuner), 8 € (déjeuner), 10 € (dîner).</li>
+            </ul>
+          </section>
           
           <div className="pt-8 border-t border-white/10 italic text-white/60">
             <p>Le client reconnaît avoir pris connaissance des présentes conditions et les accepte sans réserve.</p>
