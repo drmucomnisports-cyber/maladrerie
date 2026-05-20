@@ -34,6 +34,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       lingeFourni: false,
       menage: false
     },
+    salles: {
+      salle15: false,
+      salle12: false
+    },
     occupants: [],
     repas: {}
   });
@@ -121,6 +125,87 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     }
   }, [formData.dateDebut, formData.dateFin, events]);
 
+  const isVacancesScolairesZoneC = (date) => {
+    const time = date.getTime();
+    const range = (startStr, endStr) => {
+      return time >= new Date(startStr).getTime() && time <= new Date(endStr).getTime();
+    };
+    return (
+      // 2025
+      range('2025-10-18', '2025-11-03') ||
+      range('2025-12-20', '2026-01-05') ||
+      // 2026
+      range('2026-02-14', '2026-03-02') ||
+      range('2026-04-18', '2026-05-04') ||
+      range('2026-07-04', '2026-09-07') ||
+      range('2026-10-17', '2026-11-02') ||
+      range('2026-12-19', '2027-01-04') ||
+      // 2027
+      range('2027-02-13', '2027-03-01') ||
+      range('2027-04-17', '2027-05-03') ||
+      range('2027-07-03', '2027-09-06') ||
+      range('2027-10-23', '2027-11-08') ||
+      range('2027-12-18', '2028-01-03')
+    );
+  };
+
+  const areDatesValidForSalles = () => {
+    if (!formData.dateDebut || !formData.dateFin) return false;
+    const start = new Date(formData.dateDebut);
+    const end = new Date(formData.dateFin);
+    if (start >= end) return false;
+    
+    const current = new Date(start);
+    while (current < end) {
+      const day = current.getDay(); // 0=dim, 1=lun, ..., 6=sam
+      const isWeekend = (day === 5 || day === 6 || day === 0);
+      const isHoliday = isVacancesScolairesZoneC(current);
+      if (!isWeekend && !isHoliday) {
+        return false;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    return true;
+  };
+
+  const handleSalleToggle = (salleKey) => {
+    setFormData(prev => ({
+      ...prev,
+      salles: {
+        ...prev.salles,
+        [salleKey]: !prev.salles?.[salleKey]
+      }
+    }));
+  };
+
+  useEffect(() => {
+    if (formData.dateDebut && formData.dateFin) {
+      const valid = areDatesValidForSalles();
+      if (!valid) {
+        setFormData(prev => {
+          if (prev.salles?.salle15 || prev.salles?.salle12) {
+            return {
+              ...prev,
+              salles: { salle15: false, salle12: false }
+            };
+          }
+          return prev;
+        });
+      }
+    } else {
+      setFormData(prev => {
+        if (prev.salles?.salle15 || prev.salles?.salle12) {
+          return {
+            ...prev,
+            salles: { salle15: false, salle12: false }
+          };
+        }
+        return prev;
+      });
+    }
+  }, [formData.dateDebut, formData.dateFin]);
+
+
   const getChambresDetailsDistribues = () => {
     if (!isDevis) return formData.chambresDetails;
     const distribDetails = {};
@@ -196,6 +281,18 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     if (formData.options.litsFaits) total += totalPersonnes * 5;
     if (formData.options.lingeFourni) total += totalPersonnes * 5;
     if (formData.options.menage) total += formData.chambres.length * 50;
+
+    // Calcul du prix des salles de formation
+    let totalSalles = 0;
+    const aDesChambres = formData.chambres.length > 0;
+    const tarifSalleParJour = aDesChambres ? 100 : 150;
+    if (formData.salles?.salle15) {
+      totalSalles += tarifSalleParJour * nuits;
+    }
+    if (formData.salles?.salle12) {
+      totalSalles += tarifSalleParJour * nuits;
+    }
+    total += totalSalles;
 
     // Appliquer Promo
     if (promoApplied) {
@@ -347,8 +444,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       return;
     }
     
-    if(formData.chambres.length === 0) {
-      alert("Veuillez sélectionner au moins une chambre.");
+    if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12) {
+      alert("Veuillez sélectionner au moins une chambre ou une salle de formation.");
       return;
     }
     
@@ -414,21 +511,23 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         setErrorMsg("La date de départ doit être après la date d'arrivée.");
         return;
       }
-      if (formData.chambres.length === 0) {
-        setErrorMsg("Veuillez sélectionner au moins une chambre.");
+      if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12) {
+        setErrorMsg("Veuillez sélectionner au moins une chambre ou une salle de formation.");
         return;
       }
-      const totalAdults = parseInt(formData.devisAdultes) || 0;
-      const totalMineurs = parseInt(formData.devisMineurs) || 0;
-      const totalOccupants = totalAdults + totalMineurs;
-      if (totalOccupants <= 0) {
-        setErrorMsg("Veuillez indiquer le nombre d'adultes et de mineurs.");
-        return;
-      }
-      const totalCapacite = formData.chambres.reduce((acc, chId) => acc + CHAMBRES_INFO[chId].lits, 0);
-      if (totalOccupants > totalCapacite) {
-        setErrorMsg(`La capacité totale des chambres sélectionnées est dépassée (${totalOccupants} occupants pour ${totalCapacite} lits maximum).`);
-        return;
+      if (formData.chambres.length > 0) {
+        const totalAdults = parseInt(formData.devisAdultes) || 0;
+        const totalMineurs = parseInt(formData.devisMineurs) || 0;
+        const totalOccupants = totalAdults + totalMineurs;
+        if (totalOccupants <= 0) {
+          setErrorMsg("Veuillez indiquer le nombre d'adultes et de mineurs.");
+          return;
+        }
+        const totalCapacite = formData.chambres.reduce((acc, chId) => acc + CHAMBRES_INFO[chId].lits, 0);
+        if (totalOccupants > totalCapacite) {
+          setErrorMsg(`La capacité totale des chambres sélectionnées est dépassée (${totalOccupants} occupants pour ${totalCapacite} lits maximum).`);
+          return;
+        }
       }
     } else {
       for (let occ of formData.occupants) {
@@ -531,7 +630,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, occupants: [], repas: {} });
+        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false}, occupants: [], repas: {} });
         setStep(1);
 
         // Redirection automatique vers le dashboard admin après création d'un devis
@@ -550,6 +649,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       setIsSubmitting(false);
     }
   };
+
+  const datesValidesSalles = areDatesValidForSalles();
 
   return (
     <div className="w-full">
@@ -658,6 +759,62 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             );
           })}
         </div>
+      </div>
+
+      <div className="pt-4 border-t border-slate-100">
+        <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-4 block">Salles de formation (optionnel)</label>
+        
+        {!formData.dateDebut || !formData.dateFin ? (
+          <p className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-slate-200">
+            Veuillez d'abord sélectionner vos dates de séjour pour réserver une salle de formation.
+          </p>
+        ) : !datesValidesSalles ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-amber-800 font-bold">
+                Salles indisponibles aux dates choisies
+              </p>
+            </div>
+            <p className="text-xs text-amber-700 leading-relaxed pl-6">
+              Les salles de formation sont disponibles uniquement les week-ends (du vendredi 17h au dimanche) et pendant les vacances scolaires de Millau (zone C).
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            {/* Salle 15 personnes */}
+            <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.salle15 ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
+                 onClick={() => handleSalleToggle('salle15')}>
+              <div className="flex items-center gap-3">
+                <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.salle15 ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
+                  {formData.salles?.salle15 && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                </div>
+                <div>
+                  <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 15 personnes</span>
+                  <span className="text-xs font-medium text-slate-500">
+                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Salle 12 personnes */}
+            <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.salle12 ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
+                 onClick={() => handleSalleToggle('salle12')}>
+              <div className="flex items-center gap-3">
+                <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.salle12 ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
+                  {formData.salles?.salle12 && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                </div>
+                <div>
+                  <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 12 personnes</span>
+                  <span className="text-xs font-medium text-slate-500">
+                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {isDevis && (
