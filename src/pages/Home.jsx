@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Mountain, Users, ArrowRight, MapPin, Calendar, CheckCircle2, Bed, Train, Car, Bike, Info, Sparkles, Trash2, Waves, Compass } from 'lucide-react';
+import { Mountain, Users, ArrowRight, MapPin, Calendar, CheckCircle2, Bed, Train, Car, Bike, Info, Sparkles, Trash2, Waves, Compass, Utensils, GraduationCap, Presentation } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -236,7 +236,7 @@ const Home = () => {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-20 items-start">
+          <div className="grid lg:grid-cols-3 gap-10 items-start">
             {/* Liste des activités */}
             <div className="bg-white/10 backdrop-blur-md p-10 rounded-[2.5rem] border-t-8 border-muc-yellow hover-lift shadow-2xl" data-reveal="left">
               <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
@@ -269,6 +269,39 @@ const Home = () => {
                     <Bike className="text-muc-blue" size={20} />
                   </div>
                   <span className="font-medium tracking-tight"><strong>VTT & Randonnée</strong> : sentiers du PNR des Grands Causses</span>
+                </li>
+                <li className="flex items-center gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <GraduationCap className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Scolaires & Découverte</strong> : accueil de classes de découvertes et voyages scolaires (+6 ans)</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Restauration */}
+            <div className="bg-white/10 backdrop-blur-md p-10 rounded-[2.5rem] border-t-8 border-muc-yellow hover-lift shadow-2xl" data-reveal="bottom">
+              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
+                  <Utensils size={32} />
+                </div>
+                Restauration
+              </h3>
+              <p className="text-blue-100 mb-8 text-lg leading-relaxed font-medium">
+                Un service de repas de qualité adapté à vos séjours :
+              </p>
+              <ul className="space-y-8 text-lg">
+                <li className="flex items-start gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
+                    <CheckCircle2 className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
+                </li>
+                <li className="flex items-start gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
+                    <Info className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
                 </li>
               </ul>
             </div>
@@ -306,6 +339,49 @@ const Home = () => {
               </ul>
             </div>
           </div>
+
+          {/* Salles de formation */}
+          <div className="mt-20 bg-white text-slate-900 p-10 md:p-16 rounded-[2.5rem] shadow-2xl relative overflow-hidden border-b-8 border-muc-yellow" data-reveal="bottom">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-muc-blue/5 rounded-full -mr-32 -mt-32 pointer-events-none"></div>
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
+              <div className="space-y-6 lg:max-w-2xl">
+                <div className="bg-muc-blue text-white inline-block px-4 py-1 font-black text-sm uppercase tracking-widest skew-x-[-15deg]">
+                  <span className="inline-block skew-x-[15deg]">Espace Travail & Séminaires</span>
+                </div>
+                <h3 className="text-3xl md:text-4xl font-black text-muc-blue uppercase tracking-tight">Location de Salles de Formation</h3>
+                <p className="text-lg text-slate-600 font-medium leading-relaxed">
+                  Nous mettons à votre disposition <strong className="text-muc-blue font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-muc-blue font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
+                  <div className="space-y-2">
+                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Presentation size={18} className="text-muc-yellow" /> Équipement complet
+                    </p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Calendar size={18} className="text-muc-yellow" /> Conditions d'accès
+                    </p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-muc-blue text-white p-8 rounded-[2rem] text-center shrink-0 lg:w-80 shadow-lg flex flex-col justify-center border-t-4 border-muc-yellow">
+                <p className="text-xs uppercase font-black tracking-widest text-muc-yellow mb-4">Tarifs de location</p>
+                <div className="space-y-6">
+                  <div>
+                    <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="text-xs text-blue-200 mt-1 block">si réservé avec le gîte</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-4">
+                    <span className="block text-4xl font-black text-white">150 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="text-xs text-blue-200 mt-1 block">en location seule</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -323,18 +399,11 @@ const Home = () => {
             <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border-l-8 border-muc-blue relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-muc-blue/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform"></div>
               <h3 className="text-2xl font-black mb-6 text-muc-blue flex items-center gap-3 uppercase tracking-tight">
-                <Calendar size={28} /> Périodes
+                <Calendar size={28} /> Ouverture
               </h3>
-              <ul className="space-y-4 text-slate-600 font-medium text-lg">
-                <li className="flex items-start gap-3">
-                  <span className="text-muc-blue font-black">•</span>
-                  <span><strong>Groupes</strong> : L'établissement est accessible toute l'année.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-muc-blue font-black">•</span>
-                  <span><strong>Individuels</strong> : Le gîte est prioritairement dédié à l'accueil de groupes. Ainsi, pour les réservations individuelles d'avril à octobre, la présence d'un groupe sur la période demandée est requise pour valider votre venue. En revanche, entre novembre et mars, vous êtes les bienvenus la semaine sans restriction !</span>
-                </li>
-              </ul>
+              <p className="text-slate-600 font-medium text-lg leading-relaxed">
+                Le Gîte de la Maladrerie est ouvert à tous, tout au long de l'année. Que vous soyez un groupe constitué, une association sportive, une structure scolaire, une entreprise ou des voyageurs individuels, nous vous accueillons en toutes saisons.
+              </p>
             </div>
 
             <div className="bg-muc-blue text-white p-10 rounded-[2.5rem] shadow-2xl hover-lift relative overflow-hidden group">
