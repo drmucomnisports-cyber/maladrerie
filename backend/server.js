@@ -331,13 +331,16 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
     Object.entries(reservation.repas).forEach(([dateStr, dayRepas]) => {
       mealDetailsHTML += `<li><strong>${new Date(dateStr).toLocaleDateString('fr-FR')}</strong>:`;
       if (dayRepas.PETIT_DEJ) {
-        mealDetailsHTML += ` Petit-déj: ${nbAdultes} Adultes, ${nbMineurs12 + nbMineurs5} Enfants.`;
+        const p = dayRepas.PETIT_DEJ;
+        mealDetailsHTML += ` Petit-déj: ${p.ADULTE || 0} Adulte(s), ${(p.ENFANT_MOINS_12 || 0) + (p.ENFANT_MOINS_5 || 0)} Enfant(s).`;
       }
       if (dayRepas.DEJEUNER) {
-        mealDetailsHTML += ` Déjeuner: ${nbAdultes} Adultes, ${nbMineurs12 + nbMineurs5} Enfants.`;
+        const d = dayRepas.DEJEUNER;
+        mealDetailsHTML += ` Déjeuner: ${d.ADULTE || 0} Adulte(s), ${(d.ENFANT_MOINS_12 || 0) + (d.ENFANT_MOINS_5 || 0)} Enfant(s).`;
       }
       if (dayRepas.DINER) {
-        mealDetailsHTML += ` Dîner: ${nbAdultes} Adultes, ${nbMineurs12 + nbMineurs5} Enfants.`;
+        const di = dayRepas.DINER;
+        mealDetailsHTML += ` Dîner: ${di.ADULTE || 0} Adulte(s), ${(di.ENFANT_MOINS_12 || 0) + (di.ENFANT_MOINS_5 || 0)} Enfant(s).`;
       }
       mealDetailsHTML += `</li>`;
     });
@@ -1130,40 +1133,27 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
           let totalDEJ = { qte: 0, total: 0 };
           let totalDIN = { qte: 0, total: 0 };
 
-          let nbAdultes = 0;
-          let nbMineurs12 = 0;
-          let nbMineurs5 = 0;
-
-          if (occupants && occupants.length > 0) {
-            occupants.forEach(occ => {
-              const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
-              if (estAdulte) {
-                nbAdultes++;
-              } else {
-                const age = parseInt(occ.age);
-                if (!isNaN(age) && age < 5) nbMineurs5++;
-                else nbMineurs12++;
-              }
-            });
-          } else if (chambresDetails) {
-            Object.values(chambresDetails).forEach(ch => {
-              nbAdultes += parseInt(ch.adultes || 0);
-              nbMineurs12 += parseInt(ch.enfants || ch.mineurs || 0);
-            });
-          }
-
           Object.values(repas).forEach(dayRepas => {
             if (dayRepas.PETIT_DEJ) {
-              totalPDJ.qte += (nbAdultes + nbMineurs12 + nbMineurs5);
-              totalPDJ.total += (nbAdultes * 6) + (nbMineurs12 * 5) + (nbMineurs5 * 4);
+              const countA = parseInt(dayRepas.PETIT_DEJ.ADULTE || 0);
+              const count12 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0);
+              const count5 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0);
+              totalPDJ.qte += (countA + count12 + count5);
+              totalPDJ.total += (countA * 6) + (count12 * 5) + (count5 * 4);
             }
             if (dayRepas.DEJEUNER) {
-              totalDEJ.qte += (nbAdultes + nbMineurs12 + nbMineurs5);
-              totalDEJ.total += (nbAdultes * 11.5) + (nbMineurs12 * 9.5) + (nbMineurs5 * 8);
+              const countA = parseInt(dayRepas.DEJEUNER.ADULTE || 0);
+              const count12 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0);
+              const count5 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0);
+              totalDEJ.qte += (countA + count12 + count5);
+              totalDEJ.total += (countA * 11.5) + (count12 * 9.5) + (count5 * 8);
             }
             if (dayRepas.DINER) {
-              totalDIN.qte += (nbAdultes + nbMineurs12 + nbMineurs5);
-              totalDIN.total += (nbAdultes * 14) + (nbMineurs12 * 12) + (nbMineurs5 * 10);
+              const countA = parseInt(dayRepas.DINER.ADULTE || 0);
+              const count12 = parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0);
+              const count5 = parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0);
+              totalDIN.qte += (countA + count12 + count5);
+              totalDIN.total += (countA * 14) + (count12 * 12) + (count5 * 10);
             }
           });
 
