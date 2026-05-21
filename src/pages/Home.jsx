@@ -338,7 +338,7 @@ const Home = () => {
           </div>
 
           {/* Salles de formation */}
-          <div className="mt-20 bg-white/10 backdrop-blur-md border border-white/20 p-10 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="bottom">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 p-10 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 group" data-reveal="bottom">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none group-hover:scale-110 transition-transform duration-500"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
               <div className="space-y-6 lg:max-w-2xl">
@@ -351,7 +351,7 @@ const Home = () => {
                   </div>
                   Location de Salles de Formation
                 </h3>
-                <p className="text-blue-100 text-lg leading-relaxed">
+                <p className="text-blue-100 text-lg leading-relaxed font-medium">
                   Nous mettons à votre disposition <strong className="text-white font-black">2 salles de formation modulables</strong> pouvant accueillir respectivement <strong className="text-white font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
                 </p>
                 <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-white/20">
@@ -359,25 +359,25 @@ const Home = () => {
                     <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
                       <Presentation size={18} className="text-white group-hover:translate-x-1 transition-transform" /> Équipements inclus
                     </p>
-                    <p className="text-blue-100 text-lg leading-relaxed">Connexion Wifi Très Haut Débit, Vidéoprojecteur, tables, chaises, WC et lavabo.</p>
+                    <p className="text-blue-100 text-lg leading-relaxed font-medium">Connexion Wifi Très Haut Débit, Vidéoprojecteur, tables, chaises, WC et lavabo.</p>
                   </div>
                   <div className="space-y-2">
                     <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
                       <Calendar size={18} className="text-white group-hover:translate-x-1 transition-transform" /> Conditions d'accès
                     </p>
-                    <p className="text-blue-100 text-lg leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
+                    <p className="text-blue-100 text-lg leading-relaxed font-medium">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
                   </div>
                 </div>
               </div>
               <div className="bg-white/10 border border-white/20 text-white p-8 rounded-[2rem] text-center shrink-0 lg:w-80 shadow-lg flex flex-col justify-center">
                 <p className="text-xs uppercase font-black tracking-widest text-blue-100 mb-4">Tarifs de location</p>
-                <div className="space-y-6 text-blue-100">
+                <div className="space-y-6 text-blue-100 font-medium">
                   <div>
                     <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
                     <span className="text-xs text-blue-100 mt-1 block">si réservé avec le gîte</span>
                   </div>
                   <div className="border-t border-white/10 pt-4">
-                    <span className="block text-4xl font-black text-white">150 Ôé¼ <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="block text-4xl font-black text-white">150 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
                     <span className="text-xs text-blue-100 mt-1 block">en location seule</span>
                   </div>
                 </div>
