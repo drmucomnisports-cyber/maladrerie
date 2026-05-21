@@ -825,13 +825,6 @@ const Admin = () => {
                     </div>
                   </div>
                 </div>
-              </div>upprimer
-                      </button>
-                    </div>
-
-                  </div>
-
-                </div>
               </div>
             ))}
             
