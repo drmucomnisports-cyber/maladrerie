@@ -240,114 +240,118 @@ const Home = () => {
           </div>
           
           <div className="grid lg:grid-cols-3 gap-10 items-start">
-            {/* Liste des activit├®s */}
-            <div className="bg-muc-blue border-t-8 border-muc-yellow p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group" data-reveal="left">
-              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
+            {/* Liste des activités */}
+            <div className="bg-[#004B93] border-t-8 border-[#FDB913] p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="left">
+              <h3 className="text-3xl font-black mb-10 text-[#FDB913] flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-[#FDB913]/20 p-3 rounded-2xl text-[#FDB913]">
                   <Mountain size={32} />
                 </div>
                 Pleine Nature
               </h3>
               <ul className="space-y-8 text-lg">
                 <li className="flex items-center gap-5 group">
-                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
-                    <Waves className="text-muc-blue" size={20} />
+                  <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93]">
+                    <Waves size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>Cano├½-kayak</strong> : location et descentes sur le Tarn</span>
+                  <span className="text-white text-lg font-medium"><strong>Canoë-kayak</strong> : location et descentes sur le Tarn</span>
                 </li>
                 <li className="flex items-center gap-5 group">
-                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
-                    <CheckCircle2 className="text-muc-blue" size={20} />
+                  <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93]">
+                    <CheckCircle2 size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>Escalade & Via Ferrata</strong> : sites naturels d'exception</span>
+                  <span className="text-white text-lg font-medium"><strong>Escalade & Via Ferrata</strong> : sites naturels d'exception</span>
                 </li>
                 <li className="flex items-center gap-5 group">
-                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
-                    <Compass className="text-muc-blue" size={20} />
+                  <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93]">
+                    <Compass size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>Sp├®l├®ologie & Parapente</strong> : l'aventure totale</span>
+                  <span className="text-white text-lg font-medium"><strong>Spéléologie & Parapente</strong> : l'aventure totale</span>
                 </li>
                 <li className="flex items-center gap-5 group">
-                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
-                    <Bike className="text-muc-blue" size={20} />
+                  <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93]">
+                    <Bike size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>VTT & Randonn├®e</strong> : sentiers du PNR des Grands Causses</span>
+                  <span className="text-white text-lg font-medium"><strong>VTT & Randonnée</strong> : sentiers du PNR des Grands Causses</span>
                 </li>
-
               </ul>
             </div>
 
             {/* Restauration */}
-            <div className="bg-muc-blue border-t-8 border-muc-yellow p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group" data-reveal="bottom">
-              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
+            <div className="bg-[#004B93] border-t-8 border-[#FDB913] p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="bottom">
+              <h3 className="text-3xl font-black mb-10 text-[#FDB913] flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-[#FDB913]/20 p-3 rounded-2xl text-[#FDB913]">
                   <Utensils size={32} />
                 </div>
                 Restauration
               </h3>
-              <p className="text-blue-100 mb-8 text-lg leading-relaxed font-medium">
-                Un service de repas de qualit├® adapt├® ├á vos s├®jours :
+              <p className="text-white text-lg font-medium mb-8">
+                Un service de repas de qualité adapté à vos séjours :
               </p>
               <ul className="space-y-8 text-lg">
                 <li className="flex items-start gap-5 group">
-                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
-                    <CheckCircle2 className="text-muc-blue" size={20} />
+                  <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93] mt-1 shrink-0">
+                    <CheckCircle2 size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>Alimentation saine</strong> : menus ├®labor├®s en privil├®giant les produits bruts, locaux et ├á 63 % bio.</span>
+                  <span className="text-white text-lg font-medium"><strong>Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
                 </li>
                 <li className="flex items-start gap-5 group">
-                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
-                    <Info className="text-muc-blue" size={20} />
+                  <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93] mt-1 shrink-0">
+                    <Info size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
+                  <span className="text-white text-lg font-medium"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
                 </li>
               </ul>
             </div>
 
             {/* Services optionnels */}
-            <div className="bg-muc-blue border-t-8 border-muc-yellow p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group" data-reveal="right">
-              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
+            <div className="bg-[#004B93] border-t-8 border-[#FDB913] p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="right">
+              <h3 className="text-3xl font-black mb-10 text-[#FDB913] flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-[#FDB913]/20 p-3 rounded-2xl text-[#FDB913]">
                   <Sparkles size={32} />
                 </div>
                 Pack Confort
               </h3>
-              <p className="text-blue-100 mb-10 text-lg leading-relaxed font-medium">
-                Construisez votre s├®jour ┬½ ├á la carte ┬╗ :
+              <p className="text-white text-lg font-medium mb-10">
+                Construisez votre séjour « à la carte » :
               </p>
               <ul className="space-y-8 text-lg">
                 <li className="flex items-center gap-5 group">
-                   <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
-                    <Bed className="text-muc-blue" size={20} />
+                   <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93]">
+                    <Bed size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>Lits faits</strong> : confort imm├®diat ├á l'arriv├®e</span>
+                  <span className="text-white text-lg font-medium"><strong>Lits faits</strong> : confort immédiat à l'arrivée</span>
                 </li>
                 <li className="flex items-center gap-5 group">
-                   <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
-                    <Info className="text-muc-blue" size={20} />
+                   <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93]">
+                    <Info size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>Linge de toilette</strong> fourni ├á la demande</span>
+                  <span className="text-white text-lg font-medium"><strong>Linge de toilette</strong> fourni à la demande</span>
                 </li>
                 <li className="flex items-center gap-5 group">
-                   <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
-                    <Trash2 className="text-muc-blue" size={20} />
+                   <div className="bg-[#FDB913] p-1.5 rounded-lg text-[#004B93]">
+                    <Trash2 size={20} />
                   </div>
-                  <span className="font-medium tracking-tight"><strong>M├®nage inclus</strong> : partez l'esprit tranquille</span>
+                  <span className="text-white text-lg font-medium"><strong>Ménage inclus</strong> : partez l'esprit tranquille</span>
                 </li>
               </ul>
             </div>
           </div>
 
           {/* Salles de formation */}
-          <div className="mt-20 bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group" data-reveal="bottom">
+          <div className="mt-20 bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="bottom">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none group-hover:scale-110 transition-transform"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
               <div className="space-y-6 lg:max-w-2xl">
                 <div className="bg-white/20 text-white inline-block px-4 py-1 font-bold text-sm uppercase tracking-widest skew-x-[-15deg]">
                   <span className="inline-block skew-x-[15deg]">Espace Travail & Séminaires</span>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4 uppercase tracking-tight">Location de Salles de Formation</h3>
-                <p className="text-blue-100 text-lg font-medium leading-relaxed">
+                <h3 className="text-3xl font-black mb-10 text-white flex items-center gap-4 uppercase tracking-tight">
+                  <div className="bg-white/20 p-3 rounded-2xl text-white">
+                    <Presentation size={32} />
+                  </div>
+                  Location de Salles de Formation
+                </h3>
+                <p className="text-blue-100 text-lg leading-relaxed">
                   Nous mettons à votre disposition <strong className="text-white font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-white font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
                 </p>
                 <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-white/20">
@@ -355,13 +359,13 @@ const Home = () => {
                     <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
                       <Presentation size={18} className="text-white" /> Équipement complet
                     </p>
-                    <p className="text-blue-100 text-sm font-medium leading-relaxed">Tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo.</p>
+                    <p className="text-blue-100 text-lg leading-relaxed">Tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo.</p>
                   </div>
                   <div className="space-y-2">
                     <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
                       <Calendar size={18} className="text-white" /> Conditions d'accès
                     </p>
-                    <p className="text-blue-100 text-sm font-medium leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
+                    <p className="text-blue-100 text-lg leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
                   </div>
                 </div>
               </div>
@@ -369,7 +373,7 @@ const Home = () => {
                 <p className="text-xs uppercase font-black tracking-widest text-blue-100 mb-4">Tarifs de location</p>
                 <div className="space-y-6 text-blue-100">
                   <div>
-                    <span className="block text-4xl font-black text-white">100 Ôé¼ <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
                     <span className="text-xs text-blue-100 mt-1 block">si réservé avec le gîte</span>
                   </div>
                   <div className="border-t border-white/10 pt-4">
