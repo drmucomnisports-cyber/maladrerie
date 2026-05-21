@@ -235,7 +235,7 @@ const Home = () => {
               Nous proposons des séjours et stages clé en main, conçus en partenariat avec des associations locales spécialisées. En plus des activités de pleine nature plutôt sportives, nous proposons également des activités de découverte de l'environnement. Chaque projet peut être construit sur mesure afin de s'adapter aux objectifs pédagogiques, aux publics et aux contraintes des groupes accueillis.
             </p>
             <p className="text-xl text-blue-100 font-medium leading-relaxed">
-              Nous sommes également spécialisés dans l'accueil de classes de découvertes et de voyages scolaires pour les enfants de plus de 6 ans.
+              Nous pouvons accueillir vos classes de découverte et voyages scolaires pour les enfants de plus de six ans.
             </p>
           </div>
           
@@ -278,14 +278,14 @@ const Home = () => {
             </div>
 
             {/* Restauration */}
-            <div className="bg-white p-10 rounded-[2.5rem] border-t-8 border-muc-blue hover-lift shadow-2xl" data-reveal="bottom">
+            <div className="bg-white/10 backdrop-blur-md p-10 rounded-[2.5rem] border-t-8 border-muc-blue hover-lift shadow-2xl" data-reveal="bottom">
               <h3 className="text-3xl font-black mb-10 text-muc-blue flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-muc-blue/10 p-3 rounded-2xl text-muc-blue">
+                <div className="bg-muc-blue/20 p-3 rounded-2xl text-muc-blue">
                   <Utensils size={32} />
                 </div>
                 Restauration
               </h3>
-              <p className="text-slate-600 mb-8 text-lg leading-relaxed font-medium">
+              <p className="text-blue-100 mb-8 text-lg leading-relaxed font-medium">
                 Un service de repas adapté à vos séjours :
               </p>
               <ul className="space-y-8 text-lg">
@@ -293,13 +293,13 @@ const Home = () => {
                   <div className="bg-muc-blue p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
                     <CheckCircle2 className="text-white" size={20} />
                   </div>
-                  <span className="font-medium tracking-tight text-slate-700"><strong>Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
+                  <span className="font-medium tracking-tight"><strong>Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
                 </li>
                 <li className="flex items-start gap-5 group">
                   <div className="bg-muc-blue p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
                     <Info className="text-white" size={20} />
                   </div>
-                  <span className="font-medium tracking-tight text-slate-700"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
+                  <span className="font-medium tracking-tight"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
                 </li>
               </ul>
             </div>
