@@ -63,6 +63,7 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
            include: { client: true, intervenant: true }
          });
          console.log(`Acompte payé pour la réservation ${reservationId}`);
+         await sendCuisineEmailIfNeeded(reservationId);
          
          // Incrémenter l'usage du code promo si présent
          if (reservation.codePromo) {
@@ -83,6 +84,7 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
            include: { client: true, intervenant: true }
          });
          console.log(`Solde payé pour la réservation ${reservationId}`);
+         await sendCuisineEmailIfNeeded(reservationId);
        } else if (paymentType === 'caution') {
          const reservation = await prisma.reservation.update({
            where: { id: parseInt(reservationId) },
@@ -286,6 +288,65 @@ const sendMail = async (options) => {
   }
 };
 
+const sendCuisineEmailIfNeeded = async (reservationId) => {
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: parseInt(reservationId) },
+      include: { client: true }
+    });
+    
+    if (!reservation) return;
+    if (!reservation.repas || Object.keys(reservation.repas).length === 0) return;
+    if (reservation.cuisineEmailEnvoye) return;
+    
+    const validStatuses = ['ACCEPTEE', 'RESERVE', 'CONFIRMEE'];
+    const validPayStatuses = ['ACOMPTE_PAYE', 'PAYE'];
+    
+    if (!validStatuses.includes(reservation.statut) && !validPayStatuses.includes(reservation.statutPaiement)) {
+      return;
+    }
+    
+    let mealDetailsHTML = '<ul>';
+    Object.entries(reservation.repas).forEach(([dateStr, dayRepas]) => {
+      mealDetailsHTML += `<li><strong>${new Date(dateStr).toLocaleDateString('fr-FR')}</strong>:`;
+      if (dayRepas.PETIT_DEJ) {
+        mealDetailsHTML += ` Petit-déj: ${dayRepas.PETIT_DEJ.ADULTE || 0} Adultes, ${dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0} Enfants < 12 ans, ${dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0} Enfants < 5 ans.`;
+      }
+      if (dayRepas.DEJEUNER) {
+        mealDetailsHTML += ` Déjeuner: ${dayRepas.DEJEUNER.ADULTE || 0} Adultes, ${dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0} Enfants < 12 ans, ${dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0} Enfants < 5 ans.`;
+      }
+      if (dayRepas.DINER) {
+        mealDetailsHTML += ` Dîner: ${dayRepas.DINER.ADULTE || 0} Adultes, ${dayRepas.DINER.ENFANT_MOINS_12 || 0} Enfants < 12 ans, ${dayRepas.DINER.ENFANT_MOINS_5 || 0} Enfants < 5 ans.`;
+      }
+      mealDetailsHTML += `</li>`;
+    });
+    mealDetailsHTML += '</ul>';
+
+    const cuisineEmail = process.env.CUISINE_EMAIL || process.env.ADMIN_EMAIL || 'cuisine@millau.fr';
+    
+    await sendMail({
+      to: cuisineEmail,
+      subject: `Nouvelle commande de repas - Réservation de ${reservation.client?.nom || 'Client'}`,
+      html: `
+        <h2>Nouvelle commande de repas validée</h2>
+        <p><strong>Client :</strong> ${reservation.client?.nom || 'Non spécifié'}</p>
+        <p><strong>Dates du séjour :</strong> du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</p>
+        <p><strong>Détails de la commande :</strong></p>
+        ${mealDetailsHTML}
+      `
+    });
+
+    await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: { cuisineEmailEnvoye: true }
+    });
+    console.log("Email cuisine envoyé avec succès pour la réservation " + reservation.id);
+  } catch (error) {
+    console.error("Erreur lors de l'envoi de l'email cuisine:", error);
+  }
+};
+
+
 async function getOrCreateStripeCustomer(email, nom) {
   if (!email || email === 'N/A') return undefined;
   try {
@@ -336,6 +397,8 @@ app.post('/api/reservations', async (req, res) => {
         chambres,
         chambresDetails: chambresDetails || null,
         options: options || null,
+        repas: req.body.repas || null,
+        salles: req.body.salles || null,
         prixTotal: backendPrixTotal,
         codePromo: req.body.promoCode || null,
         isGroupe: false,
@@ -867,6 +930,8 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
         chambres,
         chambresDetails: chambresDetails || null,
         options: options || null,
+        repas: req.body.repas || null,
+        salles: req.body.salles || null,
         prixTotal: backendPrixTotal,
         codePromo: promoCode || null,
         statut: 'DEVIS_EN_ATTENTE',
@@ -2097,6 +2162,7 @@ app.put('/api/admin/reservations/:id', checkAuth, async (req, res) => {
       data: dataToUpdate,
       include: { client: true }
     });
+    await sendCuisineEmailIfNeeded(updated.id);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la mise à jour' });
@@ -2468,13 +2534,18 @@ app.put('/api/admin/profile', checkAuth, async (req, res) => {
 
 // Création manuelle d'une réservation
 app.post('/api/admin/reservations', checkAuth, async (req, res) => {
-  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, prixTotal, structure } = req.body;
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, repas, salles, promoCode, prixTotal, structure } = req.body;
   try {
     const reservation = await prisma.reservation.create({
       data: {
         dateDebut: new Date(dateDebut),
         dateFin: new Date(dateFin),
         chambres: chambres, // Expecting array of ints
+        chambresDetails: chambresDetails || null,
+        options: options || null,
+        repas: repas || null,
+        salles: salles || null,
+        codePromo: promoCode || null,
         prixTotal: prixTotal ? parseFloat(prixTotal) : null,
         montantAcompte: prixTotal ? Math.round(parseFloat(prixTotal) * 0.3 * 100) / 100 : null,
         montantSolde: prixTotal ? Math.round(parseFloat(prixTotal) * 0.7 * 100) / 100 : null,

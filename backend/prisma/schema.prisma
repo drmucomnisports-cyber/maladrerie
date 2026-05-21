@@ -24,6 +24,8 @@ model Reservation {
   chambres        Int[]        // Gardé pour la compatibilité avec le calendrier
   chambresDetails Json?        // Array of objects { id, adultes, enfants, prix }
   options         Json?        // Objets { litsFaits, lingeFourni, menage }
+  repas           Json?
+  salles          Json?
   prixTotal       Float?
   montantAcompte  Float?
   montantSolde    Float?
@@ -43,6 +45,7 @@ model Reservation {
   numeroDevis     String?      @unique
   isGroupe        Boolean      @default(false)
   lienPaiementEnvoye Boolean   @default(false)
+  cuisineEmailEnvoye Boolean   @default(false)
   montantCautionRetenu Float?  // Montant effectivement retenu sur la caution (ex: 50€ pour ménage)
   codePromo       String?      // Code promo utilisé
   structure       String?      // Nom de l'entreprise ou association
