@@ -36,20 +36,14 @@ const Admin = () => {
   const [finances, setFinances] = useState(null);
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [currentReservationForMission, setCurrentReservationForMission] = useState(null);
-  const [missionChecks, setMissionChecks] = useState({});
-
-  const initializeMissionChecks = (res) => {
-    const checks = {
-      'Préparation petit-déjeuner': { checked: false, montant: 30 },
-      'Remise des clés': { checked: false, montant: 30 },
-      'Astreinte de nuit sur place': { checked: false, montant: 200 },
-      'Astreinte de nuit à domicile': { checked: false, montant: 100 }
-    };
-    if (res?.options?.litsFaits) checks["Lits faits à l'arrivée"] = { checked: false, montant: 0, isOptionClient: true };
-    if (res?.options?.lingeFourni) checks["Linge de toilette fourni"] = { checked: false, montant: 0, isOptionClient: true };
-    if (res?.options?.menage) checks["Ménage de fin de séjour"] = { checked: false, montant: 0, isOptionClient: true };
-    setMissionChecks(checks);
-  };
+  const [missionChecks, setMissionChecks] = useState({
+    'Préparation petit-déjeuner': { checked: false, montant: 30 },
+    'Draps et ménage': { checked: false, montant: 70 },
+    'Remise des clés': { checked: false, montant: 30 },
+    'Astreinte de nuit sur place': { checked: false, montant: 200 },
+    'Astreinte de nuit à domicile': { checked: false, montant: 100 },
+    'Déplacement astreinte': { checked: false, montant: 100 }
+  });
   const [missionIntervenantId, setMissionIntervenantId] = useState('');
   const [isAssigningMissions, setIsAssigningMissions] = useState(false);
 
@@ -484,9 +478,14 @@ const Admin = () => {
         fetchFinances();
         showFeedback(`${selectedMissions.length} mission(s) assignée(s) et notification envoyée.`);
         // Reset
-        if (currentReservationForMission) {
-          initializeMissionChecks(currentReservationForMission);
-        }
+        setMissionChecks({
+          'Préparation petit-déjeuner': { checked: false, montant: 30 },
+          'Draps et ménage': { checked: false, montant: 70 },
+          'Remise des clés': { checked: false, montant: 30 },
+          'Astreinte de nuit sur place': { checked: false, montant: 200 },
+          'Astreinte de nuit à domicile': { checked: false, montant: 100 },
+          'Déplacement astreinte': { checked: false, montant: 100 }
+        });
         setMissionIntervenantId('');
       } else {
         const errData = await res.json();
@@ -656,9 +655,9 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F8F8] font-sans p-8">
-      <div className="w-full max-w-[96%] mx-auto relative">
+      <div className="max-w-7xl mx-auto relative">
         <div className="bg-[#F8F8F8] pb-8 border-b border-slate-200 shadow-sm mb-8">
-          <div className="w-full max-w-[96%] mx-auto">
+          <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h1 className="text-3xl font-black text-muc-blue tracking-tight uppercase">Dashboard</h1>
@@ -699,141 +698,152 @@ const Admin = () => {
         </div>
 
         {activeTab === 'reservations' && (
-          <div className="space-y-6">
-            {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
-              <div key={res.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-3 flex flex-col xl:flex-row xl:items-center justify-between gap-4 hover:bg-slate-50 transition-colors relative overflow-visible">
-                {/* Bandeau de couleur décoratif selon le statut */}
-                <div className={`absolute top-0 left-0 h-full w-1.5 rounded-l-xl ${
-                  res.statut === 'EN_ATTENTE' ? 'bg-amber-400' :
-                  res.statut === 'RESERVE' ? 'bg-muc-blue' :
-                  res.statut === 'REFUSEE' ? 'bg-red-500' : 'bg-slate-200'
-                }`}></div>
-
-                {/* Bloc 1: Client & Dates (Compact) */}
-                <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 pl-3 flex-1">
-                  <div className="flex flex-col w-48 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-slate-800 text-sm leading-tight">#{res.id}</span>
-                      <span className="font-bold text-slate-800 text-sm truncate leading-tight">{res.client?.nom || 'Client inconnu'}</span>
-                    </div>
-                    {res.client?.structure && <span className="text-xs text-slate-500 font-bold leading-tight truncate">{res.client?.structure}</span>}
-                    <div className="text-[10px] text-slate-400 mt-0.5 font-semibold">👤 {res.occupants ? res.occupants.length : 0} occupant(s)</div>
-                  </div>
-
-                  <div className="flex flex-col w-32 border-l border-slate-200 pl-4 shrink-0">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-0.5">Séjour</span>
-                    <span className="text-xs font-bold text-slate-700 leading-tight">{new Date(res.dateDebut).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})} ➔ {new Date(res.dateFin).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})}</span>
-                  </div>
-
-                  <div className="flex flex-col w-28 border-l border-slate-200 pl-4 shrink-0">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-0.5">Total</span>
-                    <span className="text-sm font-black text-muc-blue leading-tight">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : '-'}</span>
-                  </div>
-                  
-                  <div className="flex flex-col min-w-[112px] border-l border-slate-200 pl-4 shrink-0">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-0.5">Chambres</span>
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {res.chambres.slice(0,3).map(id => (
-                        <span key={id} className="text-[10px] bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded uppercase">{CHAMBRES_NAMES[id] || `Ch.${id}`}</span>
-                      ))}
-                      {res.chambres.length > 3 && <span className="text-[10px] text-slate-500">+{res.chambres.length - 3}</span>}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bloc 3: Options, Badges & Actions */}
-                <div className="flex flex-row flex-wrap items-center justify-end gap-2 shrink-0 z-10">
-                  
-                  {/* Badges d'Options ultra-compacts */}
-                  <div className="flex items-center gap-1.5 mr-2 bg-slate-100/50 px-2 py-1 rounded-lg border border-slate-100 h-9">
-                    {res.options?.litsFaits ? <span className="text-sm" title="Lits faits">🛏️</span> : null}
-                    {res.options?.lingeFourni ? <span className="text-sm" title="Linge fourni">🧴</span> : null}
-                    {res.options?.menage ? <span className="text-sm" title="Ménage de fin de séjour">🧹</span> : null}
-                    {(res.salles?.salle15 || res.salles?.salle12) ? <span className="text-sm" title="Salles de formation">💼</span> : null}
-                    {res.repas && Object.keys(res.repas).length > 0 ? <span className="text-sm" title="Restauration commandée">🍽️</span> : null}
-                    {(!res.options?.litsFaits && !res.options?.lingeFourni && !res.options?.menage && !(res.salles?.salle15 || res.salles?.salle12) && (!res.repas || Object.keys(res.repas).length === 0)) && (
-                      <span className="text-[10px] text-slate-400 italic">Aucune option</span>
-                    )}
-                  </div>
-
-                  {/* Statuts paiement textuels compacts */}
-                  <div className="flex flex-col items-start mr-2 text-[9px] font-black uppercase tracking-wider bg-slate-50 px-2 py-1 rounded border border-slate-100 h-9 justify-center">
-                    <span className={`leading-none ${res.statutPaiement === 'PAYE' || res.statutPaiement === 'ACOMPTE_PAYE' ? 'text-green-600' : 'text-amber-500'}`}>Apt: {res.statutPaiement === 'PAYE' || res.statutPaiement === 'ACOMPTE_PAYE' ? '✓' : '✗'}</span>
-                    <span className={`leading-none my-0.5 ${res.statutPaiement === 'PAYE' ? 'text-green-600' : 'text-amber-500'}`}>Sld: {res.statutPaiement === 'PAYE' ? '✓' : '✗'}</span>
-                    <span className={`leading-none ${res.statutCaution === 'DEPOSEE' ? 'text-green-600' : 'text-amber-500'}`}>Cau: {res.statutCaution === 'DEPOSEE' ? '✓' : '✗'}</span>
-                  </div>
-
-                  {/* Actions Administratives */}
-                  <div className="flex items-center gap-1.5 h-9">
-                    <select
-                      value={res.statut}
-                      onChange={(e) => updateStatut(res.id, e.target.value)}
-                      className={`h-full text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded outline-none border cursor-pointer shadow-sm appearance-none text-center ${
-                          res.statut === 'EN_ATTENTE' ? 'border-amber-300 bg-amber-50 text-amber-800' :
-                          res.statut === 'RESERVE' ? 'border-muc-blue bg-muc-blue/10 text-muc-blue' :
-                          res.statut === 'REFUSEE' ? 'border-red-300 bg-red-50 text-red-800' : ''
-                        }`}
-                    >
-                      <option value="EN_ATTENTE">Attente</option>
-                      <option value="RESERVE">Réservé</option>
-                      <option value="REFUSEE">Refusé</option>
-                    </select>
-                    
-                    <button
-                      onClick={() => {
-                        setCurrentReservationForMission(res);
-                        initializeMissionChecks(res);
-                        setShowMissionModal(true);
-                      }}
-                      className="h-full px-2 py-1 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded shadow-sm hover:bg-black transition-all flex items-center gap-1"
-                    >
-                      <span>🧑‍🔧</span>
-                      <span className="bg-white/20 px-1 rounded-full">{res.missions ? res.missions.length : 0}</span>
-                    </button>
-
-                    {res.statut === 'EN_ATTENTE' && (
-                      <div className="flex gap-1 h-full">
-                        <button onClick={() => handleAction('accept', res.id)} className="px-2 bg-green-500 text-white text-[10px] font-black rounded shadow-sm hover:bg-green-600 transition-all flex items-center justify-center">✓</button>
-                        <button onClick={() => handleAction('reject', res.id)} className="px-2 bg-red-500 text-white text-[10px] font-black rounded shadow-sm hover:bg-red-600 transition-all flex items-center justify-center">✗</button>
-                      </div>
-                    )}
-
-                    {res.statut === 'RESERVE' && (
-                      <div className="flex items-center gap-1 h-full">
-                        {res.statutPaiement !== 'PAYE' && (
-                          <button onClick={() => triggerPaymentAction(res.id, 'solde')} title="Demander Solde" className="px-2 bg-muc-blue text-white text-[12px] font-black rounded shadow-sm hover:bg-blue-700 transition-all flex items-center justify-center h-full">💳</button>
-                        )}
-                        {res.statutCaution !== 'DEPOSEE' && res.statutCaution !== 'RESTITUEE' && (
-                          <button onClick={() => triggerPaymentAction(res.id, 'caution')} title="Demander Caution" className="px-2 bg-amber-500 text-white text-[12px] font-black rounded shadow-sm hover:bg-amber-600 transition-all flex items-center justify-center h-full">🛡️</button>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Options Actions */}
-                    <div className="relative group inline-block h-full">
-                      <button className="h-full px-2 bg-slate-100 text-slate-500 text-[12px] font-black rounded border border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center">⋮</button>
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 shadow-xl rounded-lg w-36 p-1.5 hidden group-hover:flex flex-col gap-1 z-[100]">
-                        {res.statut === 'RESERVE' && res.statutCaution === 'DEPOSEE' && (
-                          <>
-                            <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-50 rounded">Annuler Caution</button>
-                            <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-purple-600 hover:bg-purple-50 rounded">Retenir Caution</button>
-                          </>
-                        )}
-                        <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-green-700 hover:bg-green-50 rounded">Paiement Manuel</button>
-                        <button onClick={() => setDeleteModalId(res.id)} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-red-500 hover:bg-red-50 rounded">Supprimer</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {reservations.length === 0 && !loading && (
-              <div className="bg-white p-16 rounded-3xl shadow-sm border border-slate-200 text-center flex flex-col items-center justify-center gap-4">
-                <span className="text-6xl opacity-30">📁</span>
-                <p className="text-slate-500 font-bold text-xl uppercase tracking-widest">Aucune réservation trouvée</p>
-              </div>
-            )}
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
+                    <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
+                        <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
+                        <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
+                        <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm font-bold text-muc-blue">
+                          {res.chambres.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {res.options?.litsFaits && <span className="mr-2">🛏️ Lits faits</span>}
+                          {res.options?.lingeFourni && <span className="mr-2">🧴 Linge</span>}
+                          {res.options?.menage && <span>🧹 Ménage</span>}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm font-black text-slate-800">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</div>
+                        <div className="flex flex-col gap-1 mt-2">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-500 font-bold uppercase">Acompte (30%)</span>
+                            {res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
+                              <span className="text-green-600 font-bold">✓ Payé</span>
+                            ) : (
+                              <span className="text-amber-600 font-bold">En attente</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-500 font-bold uppercase">Solde (70%)</span>
+                            {res.statutPaiement === 'PAYE' ? (
+                              <span className="text-green-600 font-bold">✓ Payé</span>
+                            ) : (
+                              <span className="text-amber-600 font-bold">En attente</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
+                            <span className="text-slate-500 font-bold uppercase">Caution</span>
+                            {res.statutCaution === 'DEPOSEE' ? (
+                              <span className="text-green-600 font-bold">✓ Déposée</span>
+                            ) : (
+                              <span className="text-amber-600 font-bold">En attente</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="space-y-2">
+                          <select
+                            value={res.statut}
+                            onChange={(e) => updateStatut(res.id, e.target.value)}
+                            className={`w-full text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg outline-none border-2 cursor-pointer ${res.statut === 'EN_ATTENTE' ? 'border-amber-200 bg-amber-50 text-amber-700' :
+                                res.statut === 'RESERVE' ? 'border-muc-blue/20 bg-muc-blue/10 text-muc-blue' :
+                                  res.statut === 'REFUSEE' ? 'border-red-200 bg-red-50 text-red-700' : ''
+                              }`}
+                          >
+                            <option value="EN_ATTENTE">En attente</option>
+                            <option value="RESERVE">Réservé</option>
+                            <option value="REFUSEE">Refusé</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              setCurrentReservationForMission(res);
+                              setShowMissionModal(true);
+                            }}
+                            className="w-full text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 rounded-lg outline-none border border-slate-200 bg-white text-slate-600 hover:border-muc-blue hover:text-muc-blue transition-colors flex justify-between items-center"
+                          >
+                            <span>Missions</span>
+                            <span className="bg-slate-100 px-1.5 rounded-full text-slate-500">{res.missions ? res.missions.length : 0}</span>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-xs font-bold text-slate-600">{res.validePar || '-'}</div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-2 flex-wrap max-w-[200px] ml-auto">
+                          {res.statut === 'EN_ATTENTE' && (
+                            <>
+                              <button onClick={() => handleAction('accept', res.id)} className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600 transition-colors">Accepter</button>
+                              <button onClick={() => handleAction('reject', res.id)} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded hover:bg-red-600 transition-colors">Refuser</button>
+                            </>
+                          )}
+                          {res.statut === 'RESERVE' && (
+                            <div className="flex gap-2 w-full justify-end flex-wrap">
+                              {res.statutPaiement !== 'PAYE' && (
+                                <button onClick={() => triggerPaymentAction(res.id, 'solde')} className="px-3 py-1.5 bg-muc-blue/10 text-muc-blue text-xs font-bold rounded hover:bg-muc-blue hover:text-white transition-colors" title="Demander le solde">
+                                  Demander Solde
+                                </button>
+                              )}
+                              {res.statutCaution !== 'DEPOSEE' && res.statutCaution !== 'RESTITUEE' && (
+                                <button onClick={() => triggerPaymentAction(res.id, 'caution')} className="px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-bold rounded hover:bg-amber-600 hover:text-white transition-colors" title="Demander la caution">
+                                  Demander Caution
+                                </button>
+                              )}
+                              {res.statutCaution === 'DEPOSEE' && (
+                                <>
+                                  <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-bold rounded hover:bg-red-600 hover:text-white transition-colors" title="Annuler la caution">
+                                    Annuler Caution
+                                  </button>
+                                  <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded hover:bg-purple-600 hover:text-white transition-colors" title="Retenir un montant partiel">
+                                    Retenir montant
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded hover:bg-green-600 hover:text-white transition-colors w-full" title="Enregistrer un paiement manuel">
+                            Enregistrer Paiement
+                          </button>
+                          <button onClick={() => setDeleteModalId(res.id)} className="px-3 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded hover:bg-red-500 hover:text-white transition-colors w-full mt-2">Supprimer</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {reservations.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan="6" className="p-8 text-center text-slate-500 font-medium">Aucune réservation trouvée</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -864,14 +874,14 @@ const Admin = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Prospect</th>
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Expire le</th>
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
-                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prospect</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Expire le</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -883,41 +893,34 @@ const Admin = () => {
                       return res.statut?.includes('DEVIS') && matchesSearch;
                     }).map((res) => (
                       <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                        <td className="p-6">
+                        <td className="p-4">
                           <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
-                          <div className="text-xs text-slate-500 mt-1">{res.client?.email || '-'}</div>
+                          <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
                           <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
                         </td>
-                        <td className="p-6">
+                        <td className="p-4">
                           <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
                             <Calendar size={14} className="text-muc-blue" />
                             Du {new Date(res.dateDebut).toLocaleDateString()}
                           </div>
-                          <div className="text-sm font-bold text-slate-700 flex items-center gap-2 mt-1">
+                          <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
                             <Calendar size={14} className="text-muc-blue" />
                             Au {new Date(res.dateFin).toLocaleDateString()}
                           </div>
                         </td>
-                        <td className="p-6">
+                        <td className="p-4">
                           <div className="flex flex-wrap gap-1">
                             {res.chambres?.map(id => (
-                              <span key={id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase border border-slate-200">
+                              <span key={id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase">
                                 {CHAMBRES_NAMES[id] || `Ch. ${id}`}
                               </span>
                             ))}
                           </div>
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {res.options?.litsFaits && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🛏️ Lits faits</span>}
-                            {res.options?.lingeFourni && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧴 Linge</span>}
-                            {res.options?.menage && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧹 Ménage</span>}
-                            {(res.salles?.salle15 || res.salles?.salle12) && <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-blue-200">💼 Salle(s)</span>}
-                            {res.repas && Object.keys(res.repas).length > 0 && <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-green-200">🍽️ Repas</span>}
-                          </div>
                         </td>
-                        <td className="p-6">
-                          <div className="font-black text-muc-blue text-lg">{res.prixTotal}€</div>
+                        <td className="p-4">
+                          <div className="font-black text-muc-blue">{res.prixTotal}€</div>
                         </td>
-                        <td className="p-6">
+                        <td className="p-4">
                           <div className="flex flex-col gap-1">
                             <div className="text-xs font-bold text-slate-600 flex items-center gap-2">
                               <Clock size={14} className="text-slate-400" />
@@ -928,16 +931,16 @@ const Admin = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="p-6">
-                          <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'
+                        <td className="p-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                             }`}>
                             {res.statut === 'DEVIS_EN_ATTENTE' ? 'En attente' : 'Expiré'}
                           </span>
                         </td>
-                        <td className="p-6 text-right">
+                        <td className="p-4 text-right">
                           <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
                         </td>
-                        <td className="p-6 text-right">
+                        <td className="p-4 text-right">
                           <div className="flex justify-end gap-2">
                             {res.statut === 'DEVIS_EN_ATTENTE' && (
                               <button
@@ -1525,50 +1528,28 @@ const Admin = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-3">Types de missions</label>
                   <div className="space-y-3">
-                    {Object.entries(missionChecks).map(([type, val]) => {
-                      let isRequested = false;
-                      if (type === 'Préparation petit-déjeuner' && currentReservationForMission?.repas && Object.values(currentReservationForMission.repas).some(r => r.PETIT_DEJ)) {
-                        isRequested = true;
-                      }
-                      const isOptionClient = val.isOptionClient;
-
-                      return (
-                        <label key={type} className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
-                          isOptionClient ? 'bg-amber-50 border-2 border-amber-200 border-l-4 border-l-amber-500 hover:border-amber-300' :
-                          val.checked ? 'border-2 border-muc-blue bg-muc-blue/5' : 
-                          isRequested ? 'border-2 border-amber-300 bg-amber-50 hover:border-amber-400 shadow-sm' : 
-                          'border-2 border-slate-200 bg-white hover:border-slate-300'
+                    {Object.entries(missionChecks).map(([type, val]) => (
+                      <label key={type} className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${val.checked ? 'border-muc-blue bg-muc-blue/5' : 'border-slate-200 bg-white hover:border-slate-300'
                         }`}>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={val.checked}
-                              onChange={e => setMissionChecks(prev => ({
-                                ...prev,
-                                [type]: { ...prev[type], checked: e.target.checked }
-                              }))}
-                              className="w-5 h-5 rounded accent-[#004B93]"
-                            />
-                            <div className="flex flex-col">
-                              <div className="flex items-center">
-                                <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : isRequested || isOptionClient ? 'text-amber-900' : 'text-slate-700'}`}>
-                                  {type === 'Lits faits à l\'arrivée' && '🛏️ '}
-                                  {type === 'Linge de toilette fourni' && '🧴 '}
-                                  {type === 'Ménage de fin de séjour' && '🧹 '}
-                                  {type === 'Remise des clés' && '🔑 '}
-                                  {type === 'Astreinte de nuit sur place' && '🏠 '}
-                                  {type === 'Astreinte de nuit à domicile' && '📞 '}
-                                  {type}
-                                </span>
-                                {isOptionClient && (
-                                  <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-semibold rounded">Option client</span>
-                                )}
-                              </div>
-                              {isRequested && !val.checked && !isOptionClient && (
-                                <span className="text-[10px] text-amber-700 font-bold uppercase mt-0.5 tracking-wider">⚠️ À assigner (Demandé)</span>
-                              )}
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={val.checked}
+                            onChange={e => setMissionChecks(prev => ({
+                              ...prev,
+                              [type]: { ...prev[type], checked: e.target.checked }
+                            }))}
+                            className="w-5 h-5 rounded accent-[#004B93]"
+                          />
+                          <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : 'text-slate-700'}`}>
+                            {type === 'Draps et ménage' && '🛏️ '}
+                            {type === 'Remise des clés' && '🔑 '}
+                            {type === 'Astreinte de nuit sur place' && '🏠 '}
+                            {type === 'Astreinte de nuit à domicile' && '📞 '}
+                            {type === 'Déplacement astreinte' && '🚗 '}
+                            {type}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
@@ -1583,8 +1564,7 @@ const Admin = () => {
                           <span className="text-sm font-bold text-slate-500">€</span>
                         </div>
                       </label>
-                      );
-                    })}
+                    ))}
                   </div>
                 </div>
 
