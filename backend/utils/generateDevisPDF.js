@@ -47,7 +47,7 @@ async function generateDevisPDF(data) {
             doc.fontSize(11).font('Helvetica-Bold').text(data.adminNom, rightCol, startY + 15);
             doc.fontSize(10).font('Helvetica');
             doc.text(`Email : ${data.adminEmail}`, rightCol, startY + 30);
-            doc.text(`Tél : ${data.adminTel}`, rightCol, startY + 45);
+            doc.text(`Tél : 06 67 99 36 81`, rightCol, startY + 45);
 
             // --- DATES DU SÉJOUR (en dessous des dates de validité) ---
             doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(10).text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol, 220);
@@ -85,17 +85,17 @@ async function generateDevisPDF(data) {
             doc.fillColor('#000000').font('Helvetica').fontSize(8.5);
             
             const checkPageBreak = (spaceNeeded = 18) => {
-                if (y + spaceNeeded > 700) {
+                if (y + spaceNeeded > 650) {
                     doc.addPage();
                     y = 50;
                     
                     doc.rect(leftCol, y, 512, 20).fill('#004B93');
                     doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(8);
-                    doc.text('DÉSIGNATION', colDesig, y + 6, { width: 210 });
-                    doc.text('NB PERS.', colPers, y + 6, { width: 60, align: 'center' });
-                    doc.text('PRIX', colPU, y + 6, { width: 75, align: 'center' });
-                    doc.text('NB NUITS', colNuits, y + 6, { width: 60, align: 'center' });
-                    doc.text('TOTAL (€)', colTotal, y + 6, { align: 'right', width: colTotalW });
+                    doc.text('DÉSIGNATION', colDesig, y + 6, { width: 210, lineBreak: false });
+                    doc.text('NB PERS.', colPers, y + 6, { width: 60, align: 'center', lineBreak: false });
+                    doc.text('PRIX', colPU, y + 6, { width: 75, align: 'center', lineBreak: false });
+                    doc.text('NB NUITS', colNuits, y + 6, { width: 60, align: 'center', lineBreak: false });
+                    doc.text('TOTAL (€)', colTotal, y + 6, { align: 'right', width: colTotalW, lineBreak: false });
                     
                     y += 28;
                     doc.fillColor('#000000').font('Helvetica').fontSize(8.5);
@@ -111,11 +111,11 @@ async function generateDevisPDF(data) {
                         doc.rect(leftCol, y - 4, 512, 18).fill('#F8F9FA');
                         doc.fillColor('#000000');
                     }
-                    doc.text(ligne.designation, colDesig, y, { width: 210 });
-                    doc.text(ligne.nbPersonnes.toString(), colPers, y, { width: 60, align: 'center' });
-                    doc.text(`${(ligne.tarifParPersonne || 0).toFixed(2)} €`, colPU, y, { width: 75, align: 'center' });
-                    doc.text(ligne.nuits.toString(), colNuits, y, { width: 60, align: 'center' });
-                    doc.font('Helvetica-Bold').text((ligne.total || 0).toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
+                    doc.text(ligne.designation, colDesig, y, { width: 210, lineBreak: false, ellipsis: true });
+                    doc.text(ligne.nbPersonnes.toString(), colPers, y, { width: 60, align: 'center', lineBreak: false });
+                    doc.text(`${(ligne.tarifParPersonne || 0).toFixed(2)} €`, colPU, y, { width: 75, align: 'center', lineBreak: false });
+                    doc.text(ligne.nuits.toString(), colNuits, y, { width: 60, align: 'center', lineBreak: false });
+                    doc.font('Helvetica-Bold').text((ligne.total || 0).toFixed(2), colTotal, y, { align: 'right', width: colTotalW, lineBreak: false });
                     doc.font('Helvetica');
                     y += 18;
                 });
@@ -137,11 +137,11 @@ async function generateDevisPDF(data) {
             if (data.options && data.options.length > 0) {
                 data.options.forEach(opt => {
                     checkPageBreak(18);
-                    doc.text(opt.nom, colDesig, y, { width: 210 });
-                    doc.text(opt.qte.toString(), colPers, y, { width: 60, align: 'center' });
-                    doc.text(`${opt.pu.toFixed(2)} €`, colPU, y, { width: 75, align: 'center' });
-                    doc.text('—', colNuits, y, { width: 60, align: 'center' });
-                    doc.text(opt.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
+                    doc.text(opt.nom, colDesig, y, { width: 210, lineBreak: false, ellipsis: true });
+                    doc.text(opt.qte.toString(), colPers, y, { width: 60, align: 'center', lineBreak: false });
+                    doc.text(`${opt.pu.toFixed(2)} €`, colPU, y, { width: 75, align: 'center', lineBreak: false });
+                    doc.text('—', colNuits, y, { width: 60, align: 'center', lineBreak: false });
+                    doc.text(opt.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW, lineBreak: false });
                     y += 18;
                 });
             }
@@ -152,11 +152,11 @@ async function generateDevisPDF(data) {
                 const tsd = data.taxeSejourDetails;
                 const puTaxe = (tsd.base * tsd.taux).toFixed(2);
                 
-                doc.text(`Taxe de séjour`, colDesig, y, { width: 210 });
-                doc.text(tsd.adultes.toString(), colPers, y, { width: 60, align: 'center' });
-                doc.text(`${puTaxe} €`, colPU, y, { width: 75, align: 'center' });
-                doc.text(tsd.nuits.toString(), colNuits, y, { width: 60, align: 'center' });
-                doc.text(tsd.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
+                doc.text(`Taxe de séjour`, colDesig, y, { width: 210, lineBreak: false });
+                doc.text(tsd.adultes.toString(), colPers, y, { width: 60, align: 'center', lineBreak: false });
+                doc.text(`${puTaxe} €`, colPU, y, { width: 75, align: 'center', lineBreak: false });
+                doc.text(tsd.nuits.toString(), colNuits, y, { width: 60, align: 'center', lineBreak: false });
+                doc.text(tsd.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW, lineBreak: false });
                 y += 18;
             }
 
@@ -199,8 +199,13 @@ async function generateDevisPDF(data) {
             // Temporarily reduce bottom margin to prevent automatic premature page break
             doc.page.margins.bottom = 10;
 
-            checkPageBreak(150);
-            y = Math.max(570, y + 40);
+            if (y > 600) {
+                doc.addPage();
+                y = 50;
+            } else {
+                y = Math.max(570, y + 40);
+            }
+            
             doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666');
             doc.text("Ce devis est établi sous réserve de disponibilité au moment de la signature.", leftCol, y);
             doc.text("Le paiement de l'acompte valide définitivement la réservation.", leftCol, y + 12);
