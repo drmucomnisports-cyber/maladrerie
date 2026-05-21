@@ -47,7 +47,7 @@ async function generateDevisPDF(data) {
             doc.fontSize(11).font('Helvetica-Bold').text(data.adminNom, rightCol, startY + 15);
             doc.fontSize(10).font('Helvetica');
             doc.text(`Email : ${data.adminEmail}`, rightCol, startY + 30);
-            doc.text(`Tél : 06 67 99 36 81`, rightCol, startY + 45);
+            doc.text(`Tél : ${data.adminTel || 'Non renseigné'}`, rightCol, startY + 45);
 
             // --- DATES DU SÉJOUR (en dessous des dates de validité) ---
             doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(10).text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')}`, leftCol, 220);
@@ -199,7 +199,7 @@ async function generateDevisPDF(data) {
             // Temporarily reduce bottom margin to prevent automatic premature page break
             doc.page.margins.bottom = 10;
 
-            if (y > 600) {
+            if (y > 700) {
                 doc.addPage();
                 y = 50;
             } else {
