@@ -465,8 +465,8 @@ const DevisValidate = () => {
         )}
       </div>
       {status === 'success' && (
-        <div className="fixed inset-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100">
+        <div className="fixed inset-0 w-screen h-screen z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center relative">
             <div className="bg-green-100 p-5 rounded-full w-20 h-20 flex items-center justify-center mx-auto text-green-600 mb-5">
               <CheckCircle size={44} />
             </div>
