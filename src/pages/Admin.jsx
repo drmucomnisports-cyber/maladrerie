@@ -1537,28 +1537,45 @@ const Admin = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-3">Types de missions</label>
                   <div className="space-y-3">
-                    {Object.entries(missionChecks).map(([type, val]) => (
-                      <label key={type} className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${val.checked ? 'border-muc-blue bg-muc-blue/5' : 'border-slate-200 bg-white hover:border-slate-300'
+                    {Object.entries(missionChecks).map(([type, val]) => {
+                      let isRequested = false;
+                      if (type === 'Draps et ménage' && currentReservationForMission?.options && (currentReservationForMission.options.litsFaits || currentReservationForMission.options.lingeFourni || currentReservationForMission.options.menage)) {
+                        isRequested = true;
+                      }
+                      if (type === 'Préparation petit-déjeuner' && currentReservationForMission?.repas && Object.values(currentReservationForMission.repas).some(r => r.PETIT_DEJ)) {
+                        isRequested = true;
+                      }
+
+                      return (
+                        <label key={type} className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          val.checked ? 'border-muc-blue bg-muc-blue/5' : 
+                          isRequested ? 'border-amber-300 bg-amber-50 hover:border-amber-400 shadow-sm' : 
+                          'border-slate-200 bg-white hover:border-slate-300'
                         }`}>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={val.checked}
-                            onChange={e => setMissionChecks(prev => ({
-                              ...prev,
-                              [type]: { ...prev[type], checked: e.target.checked }
-                            }))}
-                            className="w-5 h-5 rounded accent-[#004B93]"
-                          />
-                          <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : 'text-slate-700'}`}>
-                            {type === 'Draps et ménage' && '🛏️ '}
-                            {type === 'Remise des clés' && '🔑 '}
-                            {type === 'Astreinte de nuit sur place' && '🏠 '}
-                            {type === 'Astreinte de nuit à domicile' && '📞 '}
-                            {type === 'Déplacement astreinte' && '🚗 '}
-                            {type}
-                          </span>
-                        </div>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={val.checked}
+                              onChange={e => setMissionChecks(prev => ({
+                                ...prev,
+                                [type]: { ...prev[type], checked: e.target.checked }
+                              }))}
+                              className="w-5 h-5 rounded accent-[#004B93]"
+                            />
+                            <div className="flex flex-col">
+                              <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : isRequested ? 'text-amber-900' : 'text-slate-700'}`}>
+                                {type === 'Draps et ménage' && '🛏️ '}
+                                {type === 'Remise des clés' && '🔑 '}
+                                {type === 'Astreinte de nuit sur place' && '🏠 '}
+                                {type === 'Astreinte de nuit à domicile' && '📞 '}
+                                {type === 'Déplacement astreinte' && '🚗 '}
+                                {type}
+                              </span>
+                              {isRequested && !val.checked && (
+                                <span className="text-[10px] text-amber-700 font-bold uppercase mt-0.5 tracking-wider">⚠️ À assigner (Demandé)</span>
+                              )}
+                            </div>
+                          </div>
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
