@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Send, X, CheckCircle, AlertTriangle, Phone, UtensilsCrossed, Info } from 'lucide-react';
@@ -434,19 +434,20 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
   const goToStep2 = (e) => {
     e.preventDefault();
+    setErrorMsg('');
     if (!formData.dateDebut || !formData.dateFin) {
-      alert("Veuillez sélectionner des dates.");
+      triggerError("Veuillez sélectionner des dates.");
       return;
     }
     const start = new Date(formData.dateDebut);
     const end = new Date(formData.dateFin);
     if (start >= end) {
-      alert("La date de départ doit être après la date d'arrivée.");
+      triggerError("La date de départ doit être après la date d'arrivée.");
       return;
     }
     
     if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12) {
-      alert("Veuillez sélectionner au moins une chambre ou une salle de formation.");
+      triggerError("Veuillez sélectionner au moins une chambre ou une salle de formation.");
       return;
     }
     
@@ -456,11 +457,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       const occupantsCount = (details?.adultes || 0) + (details?.mineurs || 0);
       const capacite = CHAMBRES_INFO[chId].lits;
       if (occupantsCount === 0) {
-        alert(`Veuillez indiquer le nombre d'occupants pour la chambre ${chId}.`);
+        triggerError(`Veuillez indiquer le nombre d'occupants pour la chambre ${chId}.`);
         return;
       }
       if (occupantsCount > capacite) {
-        alert(`La capacité de la chambre ${chId} est dépassée (${occupantsCount} occupants pour ${capacite} lits).`);
+        triggerError(`La capacité de la chambre ${chId} est dépassée (${occupantsCount} occupants pour ${capacite} lits).`);
         return;
       }
       totalExpectedOccupants += occupantsCount;
@@ -491,6 +492,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   };
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const errorRef = useRef(null);
+
+  const triggerError = (msg) => {
+    setErrorMsg(msg);
+    errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -499,21 +506,21 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     
     if (isDevis) {
       if (!formData.nom || !formData.prenom || !formData.email || !formData.telephone || !formData.adressePostale) {
-        setErrorMsg("Veuillez remplir toutes les informations du demandeur.");
+        triggerError("Veuillez remplir toutes les informations du demandeur.");
         return;
       }
       if (!formData.dateDebut || !formData.dateFin) {
-        setErrorMsg("Veuillez sélectionner des dates.");
+        triggerError("Veuillez sélectionner des dates.");
         return;
       }
       const start = new Date(formData.dateDebut);
       const end = new Date(formData.dateFin);
       if (start >= end) {
-        setErrorMsg("La date de départ doit être après la date d'arrivée.");
+        triggerError("La date de départ doit être après la date d'arrivée.");
         return;
       }
       if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12) {
-        setErrorMsg("Veuillez sélectionner au moins une chambre ou une salle de formation.");
+        triggerError("Veuillez sélectionner au moins une chambre ou une salle de formation.");
         return;
       }
       if (formData.chambres.length > 0) {
@@ -521,12 +528,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         const totalMineurs = parseInt(formData.devisMineurs) || 0;
         const totalOccupants = totalAdults + totalMineurs;
         if (totalOccupants <= 0) {
-          setErrorMsg("Veuillez indiquer le nombre d'adultes et de mineurs.");
+          triggerError("Veuillez indiquer le nombre d'adultes et de mineurs.");
           return;
         }
         const totalCapacite = formData.chambres.reduce((acc, chId) => acc + CHAMBRES_INFO[chId].lits, 0);
         if (totalOccupants > totalCapacite) {
-          setErrorMsg(`La capacité totale des chambres sélectionnées est dépassée (${totalOccupants} occupants pour ${totalCapacite} lits maximum).`);
+          triggerError(`La capacité totale des chambres sélectionnées est dépassée (${totalOccupants} occupants pour ${totalCapacite} lits maximum).`);
           return;
         }
       }
@@ -534,13 +541,13 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       for (let occ of formData.occupants) {
         if (occ.estAdulte) {
           if (!occ.nom?.trim() || !occ.prenom?.trim()) {
-            setErrorMsg("Veuillez remplir les noms et prénoms de tous les adultes.");
+            triggerError("Veuillez remplir les noms et prénoms de tous les adultes.");
             return;
           }
         } else {
           // Nom et prénom optionnels pour les mineurs, mais l'âge est obligatoire
           if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 0 || occ.age >= 18) {
-            setErrorMsg("Veuillez indiquer un âge valide pour tous les mineurs (moins de 18 ans).");
+            triggerError("Veuillez indiquer un âge valide pour tous les mineurs (moins de 18 ans).");
             return;
           }
         }
@@ -567,8 +574,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         totalOccups = formData.occupants?.length || 0;
       }
       if (totalOccups < 5) {
-        setErrorMsg('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        triggerError('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
         return;
       }
     }
@@ -657,10 +663,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         setStep(1);
       } else {
         const errData = await res.json();
-        setErrorMsg(errData.error || "Une erreur est survenue lors de l'envoi.");
+        triggerError(errData.error || "Une erreur est survenue lors de l'envoi.");
       }
     } catch (err) {
-      setErrorMsg("Erreur réseau. Impossible de contacter le serveur.");
+      triggerError("Erreur réseau. Impossible de contacter le serveur.");
     } finally {
       setIsSubmitting(false);
     }
@@ -678,11 +684,13 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   return (
     <div className="w-full">
       <form onSubmit={isDevis ? handleSubmit : (step === 1 ? goToStep2 : handleSubmit)} className="space-y-6 relative">
-      {errorMsg && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-          <span className="block sm:inline font-bold">{errorMsg}</span>
-        </div>
-      )}
+      <div ref={errorRef} className="scroll-mt-24">
+        {errorMsg && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span className="block sm:inline font-bold">{errorMsg}</span>
+          </div>
+        )}
+      </div>
       {step === 1 && (
         <>
           {isDevis ? (
