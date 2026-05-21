@@ -1046,7 +1046,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               {formData.modeRestauration === 'global' ? (
                 <div className="bg-white rounded-2xl border-2 border-slate-100 p-6">
                    <p className="text-sm text-slate-600 mb-6">Sélectionnez les repas que vous souhaitez pour <strong>l'ensemble de votre séjour</strong>. Cette sélection s'appliquera automatiquement à tous les jours et pour tous les occupants.</p>
-                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
                        const isChecked = formData.repasGlobal[typeRepas];
                        return (
@@ -1064,19 +1064,19 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                             <div className={`w-6 h-6 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all mt-0.5 ${isChecked ? 'bg-muc-blue border-muc-blue text-white' : 'bg-white border-slate-300'}`}>
                               {isChecked && <CheckCircle size={14} />}
                             </div>
-                            <div className="flex-1">
-                              <span className={`block font-black text-sm mb-2 ${isChecked ? 'text-muc-blue' : 'text-slate-700'}`}>{tarifs.label}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className={`block font-black text-sm mb-2 truncate ${isChecked ? 'text-muc-blue' : 'text-slate-700'}`}>{tarifs.label}</span>
                               <div className="flex flex-col gap-1">
                                 <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
                                   <span className="text-xs font-bold text-slate-500">Adulte</span>
                                   <span className="text-xs font-black text-slate-700">{tarifs.ADULTE} €</span>
                                 </div>
                                 <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
-                                  <span className="text-xs font-bold text-slate-500">Enf. &lt;12</span>
+                                  <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Enf. &lt;12</span>
                                   <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_12} €</span>
                                 </div>
                                 <div className="flex justify-between items-center pb-1">
-                                  <span className="text-xs font-bold text-slate-500">Enf. &lt;5</span>
+                                  <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Enf. &lt;5</span>
                                   <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_5} €</span>
                                 </div>
                               </div>
@@ -1088,10 +1088,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 </div>
               ) : (
               <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 border-b border-slate-100 bg-slate-50">
+                <div className="hidden lg:grid grid-cols-4 gap-4 items-center p-4 border-b border-slate-100 bg-slate-50">
                   <div className="text-xs font-black uppercase text-slate-500 tracking-wider">Jour</div>
                   {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => (
-                    <div key={typeRepas} className="text-center text-xs font-black uppercase text-muc-blue tracking-wider">
+                    <div key={typeRepas} className="text-center text-xs font-black uppercase text-muc-blue tracking-wider truncate">
                       {tarifs.label}
                     </div>
                   ))}
@@ -1102,14 +1102,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   const dateStr = date.toISOString().split('T')[0];
                   const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
                   return (
-                    <div key={dateStr} className={`grid grid-cols-1 md:grid-cols-4 gap-4 items-start p-4 border-b border-slate-100 last:border-b-0`}>
-                      <div className="text-sm font-bold text-slate-700 capitalize md:mt-2">{jourLabel}</div>
+                    <div key={dateStr} className={`grid grid-cols-1 lg:grid-cols-4 gap-4 items-start p-4 border-b border-slate-100 last:border-b-0`}>
+                      <div className="text-sm font-bold text-slate-700 capitalize lg:mt-2 bg-slate-50 lg:bg-transparent p-2 lg:p-0 rounded-lg lg:rounded-none text-center lg:text-left">{jourLabel}</div>
                       {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
                         const repasData = formData.repas[dateStr]?.[typeRepas] || {};
                         return (
                           <div key={typeRepas} className="flex flex-col gap-2 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                            <div className="font-black text-muc-blue text-sm mb-1 lg:hidden text-center">{tarifs.label}</div>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-slate-600">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE}€)</span></span>
+                              <span className="font-bold text-slate-600 whitespace-nowrap">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE}€)</span></span>
                               <input
                                 type="number"
                                 min="0"
@@ -1121,7 +1122,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                               />
                             </div>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-slate-600">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12}€)</span></span>
+                              <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12}€)</span></span>
                               <input
                                 type="number"
                                 min="0"
@@ -1133,7 +1134,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                               />
                             </div>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-slate-600">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5}€)</span></span>
+                              <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5}€)</span></span>
                               <input
                                 type="number"
                                 min="0"
