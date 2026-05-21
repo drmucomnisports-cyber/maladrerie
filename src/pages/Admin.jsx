@@ -1590,7 +1590,8 @@ const Admin = () => {
                           <span className="text-sm font-bold text-slate-500">€</span>
                         </div>
                       </label>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
