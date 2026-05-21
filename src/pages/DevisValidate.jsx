@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, AlertTriangle, Loader2, Calendar, Users, CreditCard, Info, ShieldCheck, Mail, Phone, Home } from 'lucide-react';
 import { API_URL } from '../config';
@@ -462,8 +463,8 @@ const DevisValidate = () => {
           </form>
         )}
       </div>
-      {status === 'success' && (
-        <div className="fixed inset-0 w-screen h-screen z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+      {status === 'success' && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 w-screen h-screen">
           <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center relative">
             <div className="bg-green-100 p-5 rounded-full w-20 h-20 flex items-center justify-center mx-auto text-green-600 mb-5">
               <CheckCircle size={44} />
@@ -479,7 +480,8 @@ const DevisValidate = () => {
               Retour à l'accueil
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

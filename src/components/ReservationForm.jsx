@@ -537,10 +537,6 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             setErrorMsg("Veuillez remplir les noms et prénoms de tous les adultes.");
             return;
           }
-          if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 18) {
-            setErrorMsg("Veuillez indiquer un âge valide pour tous les adultes (18 ans ou plus).");
-            return;
-          }
         } else {
           // Nom et prénom optionnels pour les mineurs, mais l'âge est obligatoire
           if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 0 || occ.age >= 18) {
@@ -1196,7 +1192,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
       {/* Pop-up de Confirmation de Succès / Alerte avec avertissement de dernière minute */}
       {successMsg && ReactDOM.createPortal(
-        <div className="fixed inset-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 w-screen h-screen">
           <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100 flex flex-col items-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4 animate-bounce shrink-0">
               <CheckCircle size={40} />
