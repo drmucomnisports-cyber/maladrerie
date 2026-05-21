@@ -701,210 +701,80 @@ const Admin = () => {
         {activeTab === 'reservations' && (
           <div className="space-y-6">
             {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
-              <div key={res.id} className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col gap-6 relative overflow-hidden">
+              <div key={res.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-3 flex flex-col xl:flex-row xl:items-center justify-between gap-4 hover:bg-slate-50 transition-colors relative overflow-visible">
                 {/* Bandeau de couleur décoratif selon le statut */}
-                <div className={`absolute top-0 left-0 w-full h-2 ${
+                <div className={`absolute top-0 left-0 h-full w-1.5 rounded-l-xl ${
                   res.statut === 'EN_ATTENTE' ? 'bg-amber-400' :
                   res.statut === 'RESERVE' ? 'bg-muc-blue' :
                   res.statut === 'REFUSEE' ? 'bg-red-500' : 'bg-slate-200'
                 }`}></div>
 
-                {/* En-tête de la carte */}
-                <div className="flex flex-wrap md:flex-nowrap justify-between items-start border-b border-slate-100 pb-4 gap-4">
-                  <div className="flex items-center gap-4">
-                    <h3 className="text-2xl font-black text-slate-800">Réservation #{res.id}</h3>
-                    <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold shadow-sm">Créée le {new Date(res.createdAt).toLocaleDateString('fr-FR')}</span>
+                {/* Bloc 1: Client & Dates (Compact) */}
+                <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 pl-3 flex-1">
+                  <div className="flex flex-col w-48 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-slate-800 text-sm leading-tight">#{res.id}</span>
+                      <span className="font-bold text-slate-800 text-sm truncate leading-tight">{res.client?.nom || 'Client inconnu'}</span>
+                    </div>
+                    {res.client?.structure && <span className="text-xs text-slate-500 font-bold leading-tight truncate">{res.client?.structure}</span>}
+                    <div className="text-[10px] text-slate-400 mt-0.5 font-semibold">👤 {res.occupants ? res.occupants.length : 0} occupant(s)</div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm font-bold text-slate-500 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                      Validé par: <span className="text-slate-800">{res.validePar || '-'}</span>
+
+                  <div className="flex flex-col w-32 border-l border-slate-200 pl-4 shrink-0">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-0.5">Séjour</span>
+                    <span className="text-xs font-bold text-slate-700 leading-tight">{new Date(res.dateDebut).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})} ➔ {new Date(res.dateFin).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})}</span>
+                  </div>
+
+                  <div className="flex flex-col w-28 border-l border-slate-200 pl-4 shrink-0">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-0.5">Total</span>
+                    <span className="text-sm font-black text-muc-blue leading-tight">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : '-'}</span>
+                  </div>
+                  
+                  <div className="flex flex-col min-w-[112px] border-l border-slate-200 pl-4 shrink-0">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-0.5">Chambres</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {res.chambres.slice(0,3).map(id => (
+                        <span key={id} className="text-[10px] bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded uppercase">{CHAMBRES_NAMES[id] || `Ch.${id}`}</span>
+                      ))}
+                      {res.chambres.length > 3 && <span className="text-[10px] text-slate-500">+{res.chambres.length - 3}</span>}
                     </div>
                   </div>
                 </div>
 
-                {/* Les 3 Blocs Principaux */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Bloc 3: Options, Badges & Actions */}
+                <div className="flex flex-row flex-wrap items-center justify-end gap-2 shrink-0 z-10">
                   
-                  {/* Bloc 1: Client & Dates */}
-                  <div className="flex flex-col gap-4 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <h4 className="font-black text-muc-blue uppercase tracking-widest text-sm flex items-center gap-2 mb-2">
-                      <span className="bg-muc-blue/10 p-2 rounded-lg">👤</span> Informations Client
-                    </h4>
-                    <div className="space-y-1">
-                      <p className="font-black text-slate-800 text-xl">{res.client?.nom || 'Client inconnu'}</p>
-                      {res.client?.structure && <p className="text-sm text-slate-600 font-bold bg-white inline-block px-2 py-1 rounded border border-slate-200 mt-1">{res.client?.structure}</p>}
-                    </div>
-                    <div className="space-y-2 mt-2">
-                      <p className="text-sm text-slate-600 flex items-center gap-2 font-medium">
-                        <span className="text-slate-400">✉️</span> {res.client?.email || '-'}
-                      </p>
-                      <p className="text-sm text-slate-600 flex items-center gap-2 font-medium">
-                        <span className="text-slate-400">📞</span> {res.client?.telephone || '-'}
-                      </p>
-                    </div>
-                    <div className="mt-auto pt-4 border-t border-slate-200/60">
-                      <div className="flex items-center gap-3 text-slate-800 font-bold bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                        <Calendar size={20} className="text-muc-blue" />
-                        <div>
-                          <div className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">Période du séjour</div>
-                          <div className="text-sm">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')} au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bloc 2: Hébergement */}
-                  <div className="flex flex-col gap-4 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <h4 className="font-black text-muc-blue uppercase tracking-widest text-sm flex items-center gap-2 mb-2">
-                      <span className="bg-muc-blue/10 p-2 rounded-lg">🏠</span> Hébergement
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {res.chambres.map(id => (
-                        <span key={id} className="px-4 py-2 bg-white text-slate-800 text-sm font-black uppercase rounded-xl border-2 border-slate-200 shadow-sm">
-                          {CHAMBRES_NAMES[id] || `Chambre ${id}`}
-                        </span>
-                      ))}
-                    </div>
-                    {res.occupants && res.occupants.length > 0 ? (
-                      <div className="mt-4 pt-4 border-t border-slate-200/60 flex-1 overflow-y-auto max-h-48 pr-2">
-                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Occupants ({res.occupants.length})</p>
-                        <ul className="space-y-2">
-                          {res.occupants.map(o => (
-                            <li key={o.id} className="text-sm text-slate-700 font-bold flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-100">
-                              <div className="w-2 h-2 rounded-full bg-muc-blue"></div>
-                              {o.prenom} {o.nom}
-                              <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full ml-auto">
-                                {o.estAdulte ? 'Adulte' : `${o.age} ans`}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <div className="mt-4 pt-4 border-t border-slate-200/60 text-sm text-slate-400 italic font-medium">
-                        Aucun occupant renseigné.
-                      </div>
+                  {/* Badges d'Options ultra-compacts */}
+                  <div className="flex items-center gap-1.5 mr-2 bg-slate-100/50 px-2 py-1 rounded-lg border border-slate-100 h-9">
+                    {res.options?.litsFaits ? <span className="text-sm" title="Lits faits">🛏️</span> : null}
+                    {res.options?.lingeFourni ? <span className="text-sm" title="Linge fourni">🧴</span> : null}
+                    {res.options?.menage ? <span className="text-sm" title="Ménage de fin de séjour">🧹</span> : null}
+                    {(res.salles?.salle15 || res.salles?.salle12) ? <span className="text-sm" title="Salles de formation">💼</span> : null}
+                    {res.repas && Object.keys(res.repas).length > 0 ? <span className="text-sm" title="Restauration commandée">🍽️</span> : null}
+                    {(!res.options?.litsFaits && !res.options?.lingeFourni && !res.options?.menage && !(res.salles?.salle15 || res.salles?.salle12) && (!res.repas || Object.keys(res.repas).length === 0)) && (
+                      <span className="text-[10px] text-slate-400 italic">Aucune option</span>
                     )}
                   </div>
 
-                  {/* Bloc 3: Options et Services */}
-                  <div className="flex flex-col gap-4 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <h4 className="font-black text-muc-blue uppercase tracking-widest text-sm flex items-center gap-2 mb-2">
-                      <span className="bg-muc-blue/10 p-2 rounded-lg">✨</span> Options & Services
-                    </h4>
-                    <div className="flex flex-col gap-3 flex-1 overflow-y-auto max-h-64 pr-2">
-                      
-                      {/* Services de base */}
-                      {(res.options?.litsFaits || res.options?.lingeFourni || res.options?.menage) && (
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {res.options?.litsFaits && <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 shadow-sm"><span className="text-lg">🛏️</span><span className="text-xs font-black text-orange-700 uppercase tracking-wide">Lits faits</span></div>}
-                          {res.options?.lingeFourni && <div className="flex items-center gap-2 px-3 py-2 bg-teal-50 rounded-xl border border-teal-200 shadow-sm"><span className="text-lg">🧴</span><span className="text-xs font-black text-teal-700 uppercase tracking-wide">Linge</span></div>}
-                          {res.options?.menage && <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-xl border border-purple-200 shadow-sm"><span className="text-lg">🧹</span><span className="text-xs font-black text-purple-700 uppercase tracking-wide">Ménage</span></div>}
-                        </div>
-                      )}
-
-                      {/* Salles de formation */}
-                      {res.salles && (res.salles.salle15 || res.salles.salle12) && (
-                        <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 shadow-sm space-y-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">💼</span>
-                            <span className="text-sm font-black text-blue-800 uppercase tracking-wide">Salles de formation</span>
-                          </div>
-                          <div className="space-y-2">
-                            {res.salles.salle15 && (
-                              <div className="text-xs font-bold text-blue-900 bg-white p-2 rounded-lg shadow-sm border border-blue-100">
-                                <span className="uppercase text-blue-600 block mb-1">Salle 15 places</span>
-                                {res.salles.dateDebut15 ? `Du ${new Date(res.salles.dateDebut15).toLocaleDateString('fr-FR')} au ${new Date(res.salles.dateFin15).toLocaleDateString('fr-FR')}` : 'Dates non précisées'}
-                              </div>
-                            )}
-                            {res.salles.salle12 && (
-                              <div className="text-xs font-bold text-blue-900 bg-white p-2 rounded-lg shadow-sm border border-blue-100">
-                                <span className="uppercase text-blue-600 block mb-1">Salle 12 places</span>
-                                {res.salles.dateDebut12 ? `Du ${new Date(res.salles.dateDebut12).toLocaleDateString('fr-FR')} au ${new Date(res.salles.dateFin12).toLocaleDateString('fr-FR')}` : 'Dates non précisées'}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Restauration détaillée */}
-                      {res.repas && Object.keys(res.repas).length > 0 && (
-                        <div className="p-4 bg-green-50 rounded-xl border border-green-200 shadow-sm space-y-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">🍽️</span>
-                            <span className="text-sm font-black text-green-800 uppercase tracking-wide">Restauration</span>
-                          </div>
-                          <div className="space-y-2">
-                            {Object.entries(res.repas).map(([date, meals]) => {
-                              const hasMeals = meals.petitDejeuner > 0 || meals.dejeuner > 0 || meals.diner > 0;
-                              if (!hasMeals) return null;
-                              return (
-                                <div key={date} className="text-xs font-bold text-slate-700 bg-white p-2 rounded-lg shadow-sm border border-green-100 flex flex-col gap-1">
-                                  <span className="text-green-700 uppercase border-b border-green-50 pb-1 mb-1">
-                                    {new Date(date).toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric', month: 'short'})}
-                                  </span>
-                                  <div className="flex flex-wrap gap-2">
-                                    {meals.petitDejeuner > 0 && <span className="bg-green-50 px-2 py-0.5 rounded border border-green-100">{meals.petitDejeuner} Pt.Déj</span>}
-                                    {meals.dejeuner > 0 && <span className="bg-green-50 px-2 py-0.5 rounded border border-green-100">{meals.dejeuner} Déj</span>}
-                                    {meals.diner > 0 && <span className="bg-green-50 px-2 py-0.5 rounded border border-green-100">{meals.diner} Dîn</span>}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {!res.options?.litsFaits && !res.options?.lingeFourni && !res.options?.menage && !(res.salles?.salle15 || res.salles?.salle12) && (!res.repas || Object.keys(res.repas).length === 0) && (
-                        <div className="text-sm text-slate-400 italic font-medium mt-2">Aucune option souscrite.</div>
-                      )}
-                    </div>
+                  {/* Statuts paiement textuels compacts */}
+                  <div className="flex flex-col items-start mr-2 text-[9px] font-black uppercase tracking-wider bg-slate-50 px-2 py-1 rounded border border-slate-100 h-9 justify-center">
+                    <span className={`leading-none ${res.statutPaiement === 'PAYE' || res.statutPaiement === 'ACOMPTE_PAYE' ? 'text-green-600' : 'text-amber-500'}`}>Apt: {res.statutPaiement === 'PAYE' || res.statutPaiement === 'ACOMPTE_PAYE' ? '✓' : '✗'}</span>
+                    <span className={`leading-none my-0.5 ${res.statutPaiement === 'PAYE' ? 'text-green-600' : 'text-amber-500'}`}>Sld: {res.statutPaiement === 'PAYE' ? '✓' : '✗'}</span>
+                    <span className={`leading-none ${res.statutCaution === 'DEPOSEE' ? 'text-green-600' : 'text-amber-500'}`}>Cau: {res.statutCaution === 'DEPOSEE' ? '✓' : '✗'}</span>
                   </div>
 
-                </div>
-
-                {/* Footer de la carte: Finances & Actions Admin */}
-                <div className="pt-6 border-t border-slate-100 flex flex-wrap lg:flex-nowrap justify-between items-stretch gap-8">
-                  
-                  {/* Partie Finances */}
-                  <div className="w-full lg:w-1/3 flex flex-col justify-between gap-4 bg-white p-5 rounded-2xl border-2 border-slate-100 shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-6 -top-6 text-slate-100 opacity-50 transform rotate-12 pointer-events-none">
-                      <span className="text-9xl">€</span>
-                    </div>
-                    <div className="relative z-10">
-                      <div className="text-2xl font-black text-muc-blue mb-4 flex items-center justify-between">
-                        Tarif Total: <span className="bg-muc-blue text-white px-3 py-1 rounded-xl text-xl shadow-md">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</span>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <span className="text-slate-600 font-bold uppercase tracking-wider text-xs">Acompte (30%)</span>
-                          {res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? <span className="text-green-700 font-black bg-green-100 border border-green-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">✓ Payé</span> : <span className="text-amber-700 font-black bg-amber-100 border border-amber-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">Attente</span>}
-                        </div>
-                        <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <span className="text-slate-600 font-bold uppercase tracking-wider text-xs">Solde (70%)</span>
-                          {res.statutPaiement === 'PAYE' ? <span className="text-green-700 font-black bg-green-100 border border-green-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">✓ Payé</span> : <span className="text-amber-700 font-black bg-amber-100 border border-amber-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">Attente</span>}
-                        </div>
-                        <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <span className="text-slate-600 font-bold uppercase tracking-wider text-xs">Caution</span>
-                          {res.statutCaution === 'DEPOSEE' ? <span className="text-green-700 font-black bg-green-100 border border-green-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">✓ Déposée</span> : <span className="text-amber-700 font-black bg-amber-100 border border-amber-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">Attente</span>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Partie Statut */}
-                  <div className="w-full lg:w-1/3 flex flex-col gap-4">
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Statut du dossier</label>
+                  {/* Actions Administratives */}
+                  <div className="flex items-center gap-1.5 h-9">
                     <select
                       value={res.statut}
                       onChange={(e) => updateStatut(res.id, e.target.value)}
-                      className={`w-full text-lg font-black uppercase tracking-widest px-6 py-4 rounded-2xl outline-none border-2 cursor-pointer shadow-md transition-all appearance-none text-center ${
-                          res.statut === 'EN_ATTENTE' ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' :
-                          res.statut === 'RESERVE' ? 'border-muc-blue bg-muc-blue/10 text-muc-blue hover:bg-muc-blue/20' :
-                          res.statut === 'REFUSEE' ? 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100' : ''
+                      className={`h-full text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded outline-none border cursor-pointer shadow-sm appearance-none text-center ${
+                          res.statut === 'EN_ATTENTE' ? 'border-amber-300 bg-amber-50 text-amber-800' :
+                          res.statut === 'RESERVE' ? 'border-muc-blue bg-muc-blue/10 text-muc-blue' :
+                          res.statut === 'REFUSEE' ? 'border-red-300 bg-red-50 text-red-800' : ''
                         }`}
                     >
-                      <option value="EN_ATTENTE">En attente</option>
+                      <option value="EN_ATTENTE">Attente</option>
                       <option value="RESERVE">Réservé</option>
                       <option value="REFUSEE">Refusé</option>
                     </select>
@@ -915,58 +785,47 @@ const Admin = () => {
                         initializeMissionChecks(res);
                         setShowMissionModal(true);
                       }}
-                      className="mt-auto px-6 py-4 bg-slate-800 text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-md hover:bg-black transition-all flex items-center justify-between w-full"
+                      className="h-full px-2 py-1 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded shadow-sm hover:bg-black transition-all flex items-center gap-1"
                     >
-                      <span className="flex items-center gap-3"><span className="text-xl">🧑‍🔧</span> Missions</span>
-                      <span className="bg-white/20 px-3 py-1 rounded-full">{res.missions ? res.missions.length : 0}</span>
+                      <span>🧑‍🔧</span>
+                      <span className="bg-white/20 px-1 rounded-full">{res.missions ? res.missions.length : 0}</span>
                     </button>
-                  </div>
 
-                  {/* Actions Rapides */}
-                  <div className="w-full lg:w-1/3 flex flex-col gap-3 justify-end">
+                    {res.statut === 'EN_ATTENTE' && (
+                      <div className="flex gap-1 h-full">
+                        <button onClick={() => handleAction('accept', res.id)} className="px-2 bg-green-500 text-white text-[10px] font-black rounded shadow-sm hover:bg-green-600 transition-all flex items-center justify-center">✓</button>
+                        <button onClick={() => handleAction('reject', res.id)} className="px-2 bg-red-500 text-white text-[10px] font-black rounded shadow-sm hover:bg-red-600 transition-all flex items-center justify-center">✗</button>
+                      </div>
+                    )}
+
+                    {res.statut === 'RESERVE' && (
+                      <div className="flex items-center gap-1 h-full">
+                        {res.statutPaiement !== 'PAYE' && (
+                          <button onClick={() => triggerPaymentAction(res.id, 'solde')} title="Demander Solde" className="px-2 bg-muc-blue text-white text-[12px] font-black rounded shadow-sm hover:bg-blue-700 transition-all flex items-center justify-center h-full">💳</button>
+                        )}
+                        {res.statutCaution !== 'DEPOSEE' && res.statutCaution !== 'RESTITUEE' && (
+                          <button onClick={() => triggerPaymentAction(res.id, 'caution')} title="Demander Caution" className="px-2 bg-amber-500 text-white text-[12px] font-black rounded shadow-sm hover:bg-amber-600 transition-all flex items-center justify-center h-full">🛡️</button>
+                        )}
+                      </div>
+                    )}
                     
-                    <div className="flex flex-col gap-3">
-                      {res.statut === 'EN_ATTENTE' && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <button onClick={() => handleAction('accept', res.id)} className="px-4 py-3 bg-green-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-green-600 hover:-translate-y-0.5 transition-all">Accepter</button>
-                          <button onClick={() => handleAction('reject', res.id)} className="px-4 py-3 bg-red-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-red-600 hover:-translate-y-0.5 transition-all">Refuser</button>
-                        </div>
-                      )}
-                      
-                      {res.statut === 'RESERVE' && (
-                        <div className="flex flex-col gap-3">
-                          {res.statutPaiement !== 'PAYE' && (
-                            <button onClick={() => triggerPaymentAction(res.id, 'solde')} className="w-full px-4 py-3 bg-muc-blue text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-blue-700 hover:-translate-y-0.5 transition-all text-left flex items-center justify-between">
-                              Demander Solde <span className="opacity-60 text-lg">💳</span>
-                            </button>
-                          )}
-                          
-                          {res.statutCaution !== 'DEPOSEE' && res.statutCaution !== 'RESTITUEE' && (
-                            <button onClick={() => triggerPaymentAction(res.id, 'caution')} className="w-full px-4 py-3 bg-amber-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-amber-600 hover:-translate-y-0.5 transition-all text-left flex items-center justify-between">
-                              Demander Caution <span className="opacity-60 text-lg">🛡️</span>
-                            </button>
-                          )}
-                          
-                          {res.statutCaution === 'DEPOSEE' && (
-                            <div className="grid grid-cols-2 gap-3">
-                              <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="px-3 py-3 bg-red-50 text-red-600 border border-red-200 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-sm hover:bg-red-100 transition-all text-center">
-                                Annuler Caution
-                              </button>
-                              <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="px-3 py-3 bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-sm hover:bg-purple-100 transition-all text-center">
-                                Retenir Montant
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    {/* Options Actions */}
+                    <div className="relative group inline-block h-full">
+                      <button className="h-full px-2 bg-slate-100 text-slate-500 text-[12px] font-black rounded border border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center">⋮</button>
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 shadow-xl rounded-lg w-36 p-1.5 hidden group-hover:flex flex-col gap-1 z-[100]">
+                        {res.statut === 'RESERVE' && res.statutCaution === 'DEPOSEE' && (
+                          <>
+                            <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-50 rounded">Annuler Caution</button>
+                            <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-purple-600 hover:bg-purple-50 rounded">Retenir Caution</button>
+                          </>
+                        )}
+                        <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-green-700 hover:bg-green-50 rounded">Paiement Manuel</button>
+                        <button onClick={() => setDeleteModalId(res.id)} className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-red-500 hover:bg-red-50 rounded">Supprimer</button>
+                      </div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-slate-100">
-                      <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="px-3 py-2.5 bg-green-50 text-green-700 border-2 border-green-200 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-green-100 hover:border-green-300 transition-colors">
-                        Paiement Manuel
-                      </button>
-                      <button onClick={() => setDeleteModalId(res.id)} className="px-3 py-2.5 bg-slate-50 text-slate-500 border-2 border-slate-200 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors">
-                        Supprimer
+                  </div>
+                </div>
+              </div>upprimer
                       </button>
                     </div>
 

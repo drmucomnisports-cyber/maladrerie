@@ -241,104 +241,104 @@ const Home = () => {
           
           <div className="grid lg:grid-cols-3 gap-10 items-start">
             {/* Restauration (Haut Gauche) */}
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-[2.5rem] flex flex-col h-full hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group shadow-2xl" data-reveal="left">
-              <h3 className="text-3xl font-black mb-10 text-white flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-white/20 p-3 rounded-2xl text-white">
+            <div className="bg-muc-blue border-t-8 border-muc-yellow p-10 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="left">
+              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
                   <Utensils size={32} />
                 </div>
                 Restauration
               </h3>
-              <p className="text-blue-100 text-lg leading-relaxed mb-8">
+              <p className="text-white text-lg font-medium leading-relaxed mb-8">
                 Un service de repas de qualité adapté à vos séjours :
               </p>
               <ul className="space-y-8 text-lg">
                 <li className="flex items-start gap-5">
-                  <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform mt-1 shrink-0">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform mt-1 shrink-0">
                     <CheckCircle2 size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
                 </li>
                 <li className="flex items-start gap-5">
-                  <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform mt-1 shrink-0">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform mt-1 shrink-0">
                     <Info size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
                 </li>
               </ul>
             </div>
 
             {/* Pleine Nature (Haut Milieu) */}
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-[2.5rem] flex flex-col h-full hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group shadow-2xl" data-reveal="bottom">
-              <h3 className="text-3xl font-black mb-10 text-white flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-white/20 p-3 rounded-2xl text-white">
+            <div className="bg-muc-blue border-t-8 border-muc-yellow p-10 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="bottom">
+              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
                   <Mountain size={32} />
                 </div>
                 Pleine Nature
               </h3>
               <ul className="space-y-8 text-lg">
                 <li className="flex items-center gap-5">
-                  <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform">
                     <Waves size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Canoë-kayak</strong> : location et descentes sur le Tarn</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Canoë-kayak</strong> : location et descentes sur le Tarn</span>
                 </li>
                 <li className="flex items-center gap-5">
-                  <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform">
                     <CheckCircle2 size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Escalade & Via Ferrata</strong> : sites naturels d'exception</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Escalade & Via Ferrata</strong> : sites naturels d'exception</span>
                 </li>
                 <li className="flex items-center gap-5">
-                  <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform">
                     <Compass size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Spéléologie & Parapente</strong> : l'aventure totale</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Spéléologie & Parapente</strong> : l'aventure totale</span>
                 </li>
                 <li className="flex items-center gap-5">
-                  <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform">
                     <Bike size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">VTT & Randonnée</strong> : sentiers du PNR des Grands Causses</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">VTT & Randonnée</strong> : sentiers du PNR des Grands Causses</span>
                 </li>
               </ul>
             </div>
 
             {/* Pack Confort (Haut Droite) */}
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-[2.5rem] flex flex-col h-full hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group shadow-2xl" data-reveal="right">
-              <h3 className="text-3xl font-black mb-10 text-white flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-white/20 p-3 rounded-2xl text-white">
+            <div className="bg-muc-blue border-t-8 border-muc-yellow p-10 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="right">
+              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
                   <Sparkles size={32} />
                 </div>
                 Pack Confort
               </h3>
-              <p className="text-blue-100 text-lg leading-relaxed mb-10">
+              <p className="text-white text-lg font-medium leading-relaxed mb-10">
                 Construisez votre séjour « à la carte » :
               </p>
               <ul className="space-y-8 text-lg">
                 <li className="flex items-center gap-5">
-                   <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform">
+                   <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform">
                     <Bed size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Lits faits</strong> : confort immédiat à l'arrivée</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Lits faits</strong> : confort immédiat à l'arrivée</span>
                 </li>
                 <li className="flex items-center gap-5">
-                   <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform">
+                   <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform">
                     <Info size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Linge de toilette</strong> fourni à la demande</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Linge de toilette</strong> fourni à la demande</span>
                 </li>
                 <li className="flex items-center gap-5">
-                   <div className="text-white bg-white/20 p-1.5 rounded-lg group-hover:translate-x-2 transition-transform">
+                   <div className="bg-muc-yellow p-1.5 rounded-lg text-muc-blue group-hover:translate-x-2 transition-transform">
                     <Trash2 size={20} />
                   </div>
-                  <span className="text-blue-100 text-lg leading-relaxed"><strong className="text-white">Ménage inclus</strong> : partez l'esprit tranquille</span>
+                  <span className="text-white text-lg font-medium leading-relaxed"><strong className="text-white">Ménage inclus</strong> : partez l'esprit tranquille</span>
                 </li>
               </ul>
             </div>
           </div>
 
           {/* Salles de formation */}
-          <div className="mt-20 bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-[2.5rem] flex flex-col h-full hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group shadow-2xl" data-reveal="bottom">
+          <div className="mt-20 bg-white/10 backdrop-blur-md border border-white/20 p-10 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 relative overflow-hidden group" data-reveal="bottom">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none group-hover:scale-110 transition-transform duration-500"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
               <div className="space-y-6 lg:max-w-2xl">
