@@ -161,12 +161,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       const day = current.getDay(); // 0=dim, 1=lun, ..., 6=sam
       const isWeekend = (day === 5 || day === 6 || day === 0);
       const isHoliday = isVacancesScolairesZoneC(current);
-      if (!isWeekend && !isHoliday) {
-        return false;
+      if (isWeekend || isHoliday) {
+        return true;
       }
       current.setDate(current.getDate() + 1);
     }
-    return true;
+    return false;
   };
 
   const handleSalleToggle = (salleKey) => {
