@@ -36,14 +36,20 @@ const Admin = () => {
   const [finances, setFinances] = useState(null);
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [currentReservationForMission, setCurrentReservationForMission] = useState(null);
-  const [missionChecks, setMissionChecks] = useState({
-    'Préparation petit-déjeuner': { checked: false, montant: 30 },
-    'Draps et ménage': { checked: false, montant: 70 },
-    'Remise des clés': { checked: false, montant: 30 },
-    'Astreinte de nuit sur place': { checked: false, montant: 200 },
-    'Astreinte de nuit à domicile': { checked: false, montant: 100 },
-    'Déplacement astreinte': { checked: false, montant: 100 }
-  });
+  const [missionChecks, setMissionChecks] = useState({});
+
+  const initializeMissionChecks = (res) => {
+    const checks = {
+      'Préparation petit-déjeuner': { checked: false, montant: 30 },
+      'Remise des clés': { checked: false, montant: 30 },
+      'Astreinte de nuit sur place': { checked: false, montant: 200 },
+      'Astreinte de nuit à domicile': { checked: false, montant: 100 }
+    };
+    if (res?.options?.litsFaits) checks["Lits faits à l'arrivée"] = { checked: false, montant: 0, isOptionClient: true };
+    if (res?.options?.lingeFourni) checks["Linge de toilette fourni"] = { checked: false, montant: 0, isOptionClient: true };
+    if (res?.options?.menage) checks["Ménage de fin de séjour"] = { checked: false, montant: 0, isOptionClient: true };
+    setMissionChecks(checks);
+  };
   const [missionIntervenantId, setMissionIntervenantId] = useState('');
   const [isAssigningMissions, setIsAssigningMissions] = useState(false);
 
@@ -478,14 +484,9 @@ const Admin = () => {
         fetchFinances();
         showFeedback(`${selectedMissions.length} mission(s) assignée(s) et notification envoyée.`);
         // Reset
-        setMissionChecks({
-          'Préparation petit-déjeuner': { checked: false, montant: 30 },
-          'Draps et ménage': { checked: false, montant: 70 },
-          'Remise des clés': { checked: false, montant: 30 },
-          'Astreinte de nuit sur place': { checked: false, montant: 200 },
-          'Astreinte de nuit à domicile': { checked: false, montant: 100 },
-          'Déplacement astreinte': { checked: false, montant: 100 }
-        });
+        if (currentReservationForMission) {
+          initializeMissionChecks(currentReservationForMission);
+        }
         setMissionIntervenantId('');
       } else {
         const errData = await res.json();
@@ -655,9 +656,9 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F8F8] font-sans p-8">
-      <div className="max-w-7xl mx-auto relative">
+      <div className="w-full max-w-[96%] mx-auto relative">
         <div className="bg-[#F8F8F8] pb-8 border-b border-slate-200 shadow-sm mb-8">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full max-w-[96%] mx-auto">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h1 className="text-3xl font-black text-muc-blue tracking-tight uppercase">Dashboard</h1>
@@ -698,154 +699,289 @@ const Admin = () => {
         </div>
 
         {activeTab === 'reservations' && (
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
-                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
-                    <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="p-6">
-                        <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
-                        <div className="text-xs text-slate-500 mt-1">{res.client?.email || '-'}</div>
-                        <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
-                      </td>
-                      <td className="p-6">
-                        <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
-                        <div className="text-sm font-medium text-slate-700 mt-1">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
-                      </td>
-                      <td className="p-6">
-                        <div className="text-sm font-bold text-muc-blue">
-                          {res.chambres.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
+          <div className="space-y-6">
+            {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
+              <div key={res.id} className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col gap-6 relative overflow-hidden">
+                {/* Bandeau de couleur décoratif selon le statut */}
+                <div className={`absolute top-0 left-0 w-full h-2 ${
+                  res.statut === 'EN_ATTENTE' ? 'bg-amber-400' :
+                  res.statut === 'RESERVE' ? 'bg-muc-blue' :
+                  res.statut === 'REFUSEE' ? 'bg-red-500' : 'bg-slate-200'
+                }`}></div>
+
+                {/* En-tête de la carte */}
+                <div className="flex flex-wrap md:flex-nowrap justify-between items-start border-b border-slate-100 pb-4 gap-4">
+                  <div className="flex items-center gap-4">
+                    <h3 className="text-2xl font-black text-slate-800">Réservation #{res.id}</h3>
+                    <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold shadow-sm">Créée le {new Date(res.createdAt).toLocaleDateString('fr-FR')}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm font-bold text-slate-500 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                      Validé par: <span className="text-slate-800">{res.validePar || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Les 3 Blocs Principaux */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  
+                  {/* Bloc 1: Client & Dates */}
+                  <div className="flex flex-col gap-4 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <h4 className="font-black text-muc-blue uppercase tracking-widest text-sm flex items-center gap-2 mb-2">
+                      <span className="bg-muc-blue/10 p-2 rounded-lg">👤</span> Informations Client
+                    </h4>
+                    <div className="space-y-1">
+                      <p className="font-black text-slate-800 text-xl">{res.client?.nom || 'Client inconnu'}</p>
+                      {res.client?.structure && <p className="text-sm text-slate-600 font-bold bg-white inline-block px-2 py-1 rounded border border-slate-200 mt-1">{res.client?.structure}</p>}
+                    </div>
+                    <div className="space-y-2 mt-2">
+                      <p className="text-sm text-slate-600 flex items-center gap-2 font-medium">
+                        <span className="text-slate-400">✉️</span> {res.client?.email || '-'}
+                      </p>
+                      <p className="text-sm text-slate-600 flex items-center gap-2 font-medium">
+                        <span className="text-slate-400">📞</span> {res.client?.telephone || '-'}
+                      </p>
+                    </div>
+                    <div className="mt-auto pt-4 border-t border-slate-200/60">
+                      <div className="flex items-center gap-3 text-slate-800 font-bold bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                        <Calendar size={20} className="text-muc-blue" />
+                        <div>
+                          <div className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">Période du séjour</div>
+                          <div className="text-sm">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')} au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
                         </div>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {res.options?.litsFaits && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🛏️ Lits faits</span>}
-                          {res.options?.lingeFourni && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧴 Linge</span>}
-                          {res.options?.menage && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧹 Ménage</span>}
-                          {(res.salles?.salle15 || res.salles?.salle12) && <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-blue-200">💼 Salle(s)</span>}
-                          {res.repas && Object.keys(res.repas).length > 0 && <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-green-200">🍽️ Repas</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloc 2: Hébergement */}
+                  <div className="flex flex-col gap-4 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <h4 className="font-black text-muc-blue uppercase tracking-widest text-sm flex items-center gap-2 mb-2">
+                      <span className="bg-muc-blue/10 p-2 rounded-lg">🏠</span> Hébergement
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {res.chambres.map(id => (
+                        <span key={id} className="px-4 py-2 bg-white text-slate-800 text-sm font-black uppercase rounded-xl border-2 border-slate-200 shadow-sm">
+                          {CHAMBRES_NAMES[id] || `Chambre ${id}`}
+                        </span>
+                      ))}
+                    </div>
+                    {res.occupants && res.occupants.length > 0 ? (
+                      <div className="mt-4 pt-4 border-t border-slate-200/60 flex-1 overflow-y-auto max-h-48 pr-2">
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Occupants ({res.occupants.length})</p>
+                        <ul className="space-y-2">
+                          {res.occupants.map(o => (
+                            <li key={o.id} className="text-sm text-slate-700 font-bold flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-100">
+                              <div className="w-2 h-2 rounded-full bg-muc-blue"></div>
+                              {o.prenom} {o.nom}
+                              <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full ml-auto">
+                                {o.estAdulte ? 'Adulte' : `${o.age} ans`}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="mt-4 pt-4 border-t border-slate-200/60 text-sm text-slate-400 italic font-medium">
+                        Aucun occupant renseigné.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bloc 3: Options et Services */}
+                  <div className="flex flex-col gap-4 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <h4 className="font-black text-muc-blue uppercase tracking-widest text-sm flex items-center gap-2 mb-2">
+                      <span className="bg-muc-blue/10 p-2 rounded-lg">✨</span> Options & Services
+                    </h4>
+                    <div className="flex flex-col gap-3 flex-1 overflow-y-auto max-h-64 pr-2">
+                      
+                      {/* Services de base */}
+                      {(res.options?.litsFaits || res.options?.lingeFourni || res.options?.menage) && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {res.options?.litsFaits && <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 shadow-sm"><span className="text-lg">🛏️</span><span className="text-xs font-black text-orange-700 uppercase tracking-wide">Lits faits</span></div>}
+                          {res.options?.lingeFourni && <div className="flex items-center gap-2 px-3 py-2 bg-teal-50 rounded-xl border border-teal-200 shadow-sm"><span className="text-lg">🧴</span><span className="text-xs font-black text-teal-700 uppercase tracking-wide">Linge</span></div>}
+                          {res.options?.menage && <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-xl border border-purple-200 shadow-sm"><span className="text-lg">🧹</span><span className="text-xs font-black text-purple-700 uppercase tracking-wide">Ménage</span></div>}
                         </div>
-                      </td>
-                      <td className="p-6">
-                        <div className="text-sm font-black text-slate-800">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</div>
-                        <div className="flex flex-col gap-1 mt-2">
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-slate-500 font-bold uppercase">Acompte (30%)</span>
-                            {res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold">✓ Payé</span>
-                            ) : (
-                              <span className="text-amber-600 font-bold">En attente</span>
+                      )}
+
+                      {/* Salles de formation */}
+                      {res.salles && (res.salles.salle15 || res.salles.salle12) && (
+                        <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 shadow-sm space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">💼</span>
+                            <span className="text-sm font-black text-blue-800 uppercase tracking-wide">Salles de formation</span>
+                          </div>
+                          <div className="space-y-2">
+                            {res.salles.salle15 && (
+                              <div className="text-xs font-bold text-blue-900 bg-white p-2 rounded-lg shadow-sm border border-blue-100">
+                                <span className="uppercase text-blue-600 block mb-1">Salle 15 places</span>
+                                {res.salles.dateDebut15 ? `Du ${new Date(res.salles.dateDebut15).toLocaleDateString('fr-FR')} au ${new Date(res.salles.dateFin15).toLocaleDateString('fr-FR')}` : 'Dates non précisées'}
+                              </div>
+                            )}
+                            {res.salles.salle12 && (
+                              <div className="text-xs font-bold text-blue-900 bg-white p-2 rounded-lg shadow-sm border border-blue-100">
+                                <span className="uppercase text-blue-600 block mb-1">Salle 12 places</span>
+                                {res.salles.dateDebut12 ? `Du ${new Date(res.salles.dateDebut12).toLocaleDateString('fr-FR')} au ${new Date(res.salles.dateFin12).toLocaleDateString('fr-FR')}` : 'Dates non précisées'}
+                              </div>
                             )}
                           </div>
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-slate-500 font-bold uppercase">Solde (70%)</span>
-                            {res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold">✓ Payé</span>
-                            ) : (
-                              <span className="text-amber-600 font-bold">En attente</span>
-                            )}
+                        </div>
+                      )}
+
+                      {/* Restauration détaillée */}
+                      {res.repas && Object.keys(res.repas).length > 0 && (
+                        <div className="p-4 bg-green-50 rounded-xl border border-green-200 shadow-sm space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🍽️</span>
+                            <span className="text-sm font-black text-green-800 uppercase tracking-wide">Restauration</span>
                           </div>
-                          <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
-                            <span className="text-slate-500 font-bold uppercase">Caution</span>
-                            {res.statutCaution === 'DEPOSEE' ? (
-                              <span className="text-green-600 font-bold">✓ Déposée</span>
-                            ) : (
-                              <span className="text-amber-600 font-bold">En attente</span>
-                            )}
+                          <div className="space-y-2">
+                            {Object.entries(res.repas).map(([date, meals]) => {
+                              const hasMeals = meals.petitDejeuner > 0 || meals.dejeuner > 0 || meals.diner > 0;
+                              if (!hasMeals) return null;
+                              return (
+                                <div key={date} className="text-xs font-bold text-slate-700 bg-white p-2 rounded-lg shadow-sm border border-green-100 flex flex-col gap-1">
+                                  <span className="text-green-700 uppercase border-b border-green-50 pb-1 mb-1">
+                                    {new Date(date).toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric', month: 'short'})}
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {meals.petitDejeuner > 0 && <span className="bg-green-50 px-2 py-0.5 rounded border border-green-100">{meals.petitDejeuner} Pt.Déj</span>}
+                                    {meals.dejeuner > 0 && <span className="bg-green-50 px-2 py-0.5 rounded border border-green-100">{meals.dejeuner} Déj</span>}
+                                    {meals.diner > 0 && <span className="bg-green-50 px-2 py-0.5 rounded border border-green-100">{meals.diner} Dîn</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </td>
-                      <td className="p-6">
-                        <div className="space-y-3">
-                          <select
-                            value={res.statut}
-                            onChange={(e) => updateStatut(res.id, e.target.value)}
-                            className={`w-full text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg outline-none border-2 cursor-pointer ${res.statut === 'EN_ATTENTE' ? 'border-amber-200 bg-amber-50 text-amber-700' :
-                                res.statut === 'RESERVE' ? 'border-muc-blue/20 bg-muc-blue/10 text-muc-blue' :
-                                  res.statut === 'REFUSEE' ? 'border-red-200 bg-red-50 text-red-700' : ''
-                              }`}
-                          >
-                            <option value="EN_ATTENTE">En attente</option>
-                            <option value="RESERVE">Réservé</option>
-                            <option value="REFUSEE">Refusé</option>
-                          </select>
-                          <button
-                            onClick={() => {
-                              setCurrentReservationForMission(res);
-                              setShowMissionModal(true);
-                            }}
-                            className="w-full text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-lg outline-none border border-slate-200 bg-white text-slate-600 hover:border-muc-blue hover:text-muc-blue transition-colors flex justify-between items-center shadow-sm"
-                          >
-                            <span>Missions</span>
-                            <span className="bg-slate-100 px-2 py-0.5 rounded-full text-slate-500">{res.missions ? res.missions.length : 0}</span>
-                          </button>
+                      )}
+
+                      {!res.options?.litsFaits && !res.options?.lingeFourni && !res.options?.menage && !(res.salles?.salle15 || res.salles?.salle12) && (!res.repas || Object.keys(res.repas).length === 0) && (
+                        <div className="text-sm text-slate-400 italic font-medium mt-2">Aucune option souscrite.</div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer de la carte: Finances & Actions Admin */}
+                <div className="pt-6 border-t border-slate-100 flex flex-wrap lg:flex-nowrap justify-between items-stretch gap-8">
+                  
+                  {/* Partie Finances */}
+                  <div className="w-full lg:w-1/3 flex flex-col justify-between gap-4 bg-white p-5 rounded-2xl border-2 border-slate-100 shadow-sm relative overflow-hidden">
+                    <div className="absolute -right-6 -top-6 text-slate-100 opacity-50 transform rotate-12 pointer-events-none">
+                      <span className="text-9xl">€</span>
+                    </div>
+                    <div className="relative z-10">
+                      <div className="text-2xl font-black text-muc-blue mb-4 flex items-center justify-between">
+                        Tarif Total: <span className="bg-muc-blue text-white px-3 py-1 rounded-xl text-xl shadow-md">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-slate-600 font-bold uppercase tracking-wider text-xs">Acompte (30%)</span>
+                          {res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? <span className="text-green-700 font-black bg-green-100 border border-green-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">✓ Payé</span> : <span className="text-amber-700 font-black bg-amber-100 border border-amber-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">Attente</span>}
                         </div>
-                      </td>
-                      <td className="p-6">
-                        <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full inline-block">{res.validePar || '-'}</div>
-                      </td>
-                      <td className="p-6 text-right">
-                        <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
-                      </td>
-                      <td className="p-6 text-right">
-                        <div className="flex justify-end gap-2 flex-wrap max-w-[200px] ml-auto">
-                          {res.statut === 'EN_ATTENTE' && (
-                            <>
-                              <button onClick={() => handleAction('accept', res.id)} className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600 transition-colors">Accepter</button>
-                              <button onClick={() => handleAction('reject', res.id)} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded hover:bg-red-600 transition-colors">Refuser</button>
-                            </>
+                        <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-slate-600 font-bold uppercase tracking-wider text-xs">Solde (70%)</span>
+                          {res.statutPaiement === 'PAYE' ? <span className="text-green-700 font-black bg-green-100 border border-green-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">✓ Payé</span> : <span className="text-amber-700 font-black bg-amber-100 border border-amber-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">Attente</span>}
+                        </div>
+                        <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-slate-600 font-bold uppercase tracking-wider text-xs">Caution</span>
+                          {res.statutCaution === 'DEPOSEE' ? <span className="text-green-700 font-black bg-green-100 border border-green-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">✓ Déposée</span> : <span className="text-amber-700 font-black bg-amber-100 border border-amber-200 px-3 py-1 rounded-md text-xs uppercase tracking-widest shadow-sm">Attente</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Partie Statut */}
+                  <div className="w-full lg:w-1/3 flex flex-col gap-4">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Statut du dossier</label>
+                    <select
+                      value={res.statut}
+                      onChange={(e) => updateStatut(res.id, e.target.value)}
+                      className={`w-full text-lg font-black uppercase tracking-widest px-6 py-4 rounded-2xl outline-none border-2 cursor-pointer shadow-md transition-all appearance-none text-center ${
+                          res.statut === 'EN_ATTENTE' ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' :
+                          res.statut === 'RESERVE' ? 'border-muc-blue bg-muc-blue/10 text-muc-blue hover:bg-muc-blue/20' :
+                          res.statut === 'REFUSEE' ? 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100' : ''
+                        }`}
+                    >
+                      <option value="EN_ATTENTE">En attente</option>
+                      <option value="RESERVE">Réservé</option>
+                      <option value="REFUSEE">Refusé</option>
+                    </select>
+                    
+                    <button
+                      onClick={() => {
+                        setCurrentReservationForMission(res);
+                        initializeMissionChecks(res);
+                        setShowMissionModal(true);
+                      }}
+                      className="mt-auto px-6 py-4 bg-slate-800 text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-md hover:bg-black transition-all flex items-center justify-between w-full"
+                    >
+                      <span className="flex items-center gap-3"><span className="text-xl">🧑‍🔧</span> Missions</span>
+                      <span className="bg-white/20 px-3 py-1 rounded-full">{res.missions ? res.missions.length : 0}</span>
+                    </button>
+                  </div>
+
+                  {/* Actions Rapides */}
+                  <div className="w-full lg:w-1/3 flex flex-col gap-3 justify-end">
+                    
+                    <div className="flex flex-col gap-3">
+                      {res.statut === 'EN_ATTENTE' && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <button onClick={() => handleAction('accept', res.id)} className="px-4 py-3 bg-green-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-green-600 hover:-translate-y-0.5 transition-all">Accepter</button>
+                          <button onClick={() => handleAction('reject', res.id)} className="px-4 py-3 bg-red-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-red-600 hover:-translate-y-0.5 transition-all">Refuser</button>
+                        </div>
+                      )}
+                      
+                      {res.statut === 'RESERVE' && (
+                        <div className="flex flex-col gap-3">
+                          {res.statutPaiement !== 'PAYE' && (
+                            <button onClick={() => triggerPaymentAction(res.id, 'solde')} className="w-full px-4 py-3 bg-muc-blue text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-blue-700 hover:-translate-y-0.5 transition-all text-left flex items-center justify-between">
+                              Demander Solde <span className="opacity-60 text-lg">💳</span>
+                            </button>
                           )}
-                          {res.statut === 'RESERVE' && (
-                            <div className="flex gap-2 w-full justify-end flex-wrap">
-                              {res.statutPaiement !== 'PAYE' && (
-                                <button onClick={() => triggerPaymentAction(res.id, 'solde')} className="px-3 py-1.5 bg-muc-blue/10 text-muc-blue text-xs font-bold rounded hover:bg-muc-blue hover:text-white transition-colors" title="Demander le solde">
-                                  Demander Solde
-                                </button>
-                              )}
-                              {res.statutCaution !== 'DEPOSEE' && res.statutCaution !== 'RESTITUEE' && (
-                                <button onClick={() => triggerPaymentAction(res.id, 'caution')} className="px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-bold rounded hover:bg-amber-600 hover:text-white transition-colors" title="Demander la caution">
-                                  Demander Caution
-                                </button>
-                              )}
-                              {res.statutCaution === 'DEPOSEE' && (
-                                <>
-                                  <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-bold rounded hover:bg-red-600 hover:text-white transition-colors" title="Annuler la caution">
-                                    Annuler Caution
-                                  </button>
-                                  <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded hover:bg-purple-600 hover:text-white transition-colors" title="Retenir un montant partiel">
-                                    Retenir montant
-                                  </button>
-                                </>
-                              )}
+                          
+                          {res.statutCaution !== 'DEPOSEE' && res.statutCaution !== 'RESTITUEE' && (
+                            <button onClick={() => triggerPaymentAction(res.id, 'caution')} className="w-full px-4 py-3 bg-amber-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:bg-amber-600 hover:-translate-y-0.5 transition-all text-left flex items-center justify-between">
+                              Demander Caution <span className="opacity-60 text-lg">🛡️</span>
+                            </button>
+                          )}
+                          
+                          {res.statutCaution === 'DEPOSEE' && (
+                            <div className="grid grid-cols-2 gap-3">
+                              <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="px-3 py-3 bg-red-50 text-red-600 border border-red-200 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-sm hover:bg-red-100 transition-all text-center">
+                                Annuler Caution
+                              </button>
+                              <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="px-3 py-3 bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-sm hover:bg-purple-100 transition-all text-center">
+                                Retenir Montant
+                              </button>
                             </div>
                           )}
-                          <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded hover:bg-green-600 hover:text-white transition-colors w-full" title="Enregistrer un paiement manuel">
-                            Enregistrer Paiement
-                          </button>
-                          <button onClick={() => setDeleteModalId(res.id)} className="px-3 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded hover:bg-red-500 hover:text-white transition-colors w-full mt-2">Supprimer</button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {reservations.length === 0 && !loading && (
-                    <tr>
-                      <td colSpan="6" className="p-8 text-center text-slate-500 font-medium">Aucune réservation trouvée</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-slate-100">
+                      <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="px-3 py-2.5 bg-green-50 text-green-700 border-2 border-green-200 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-green-100 hover:border-green-300 transition-colors">
+                        Paiement Manuel
+                      </button>
+                      <button onClick={() => setDeleteModalId(res.id)} className="px-3 py-2.5 bg-slate-50 text-slate-500 border-2 border-slate-200 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors">
+                        Supprimer
+                      </button>
+                    </div>
+
+                  </div>
+
+                </div>
+              </div>
+            ))}
+            
+            {reservations.length === 0 && !loading && (
+              <div className="bg-white p-16 rounded-3xl shadow-sm border border-slate-200 text-center flex flex-col items-center justify-center gap-4">
+                <span className="text-6xl opacity-30">📁</span>
+                <p className="text-slate-500 font-bold text-xl uppercase tracking-widest">Aucune réservation trouvée</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1539,18 +1675,17 @@ const Admin = () => {
                   <div className="space-y-3">
                     {Object.entries(missionChecks).map(([type, val]) => {
                       let isRequested = false;
-                      if (type === 'Draps et ménage' && currentReservationForMission?.options && (currentReservationForMission.options.litsFaits || currentReservationForMission.options.lingeFourni || currentReservationForMission.options.menage)) {
-                        isRequested = true;
-                      }
                       if (type === 'Préparation petit-déjeuner' && currentReservationForMission?.repas && Object.values(currentReservationForMission.repas).some(r => r.PETIT_DEJ)) {
                         isRequested = true;
                       }
+                      const isOptionClient = val.isOptionClient;
 
                       return (
-                        <label key={type} className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                          val.checked ? 'border-muc-blue bg-muc-blue/5' : 
-                          isRequested ? 'border-amber-300 bg-amber-50 hover:border-amber-400 shadow-sm' : 
-                          'border-slate-200 bg-white hover:border-slate-300'
+                        <label key={type} className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                          isOptionClient ? 'bg-amber-50 border-2 border-amber-200 border-l-4 border-l-amber-500 hover:border-amber-300' :
+                          val.checked ? 'border-2 border-muc-blue bg-muc-blue/5' : 
+                          isRequested ? 'border-2 border-amber-300 bg-amber-50 hover:border-amber-400 shadow-sm' : 
+                          'border-2 border-slate-200 bg-white hover:border-slate-300'
                         }`}>
                           <div className="flex items-center gap-3">
                             <input
@@ -1563,15 +1698,21 @@ const Admin = () => {
                               className="w-5 h-5 rounded accent-[#004B93]"
                             />
                             <div className="flex flex-col">
-                              <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : isRequested ? 'text-amber-900' : 'text-slate-700'}`}>
-                                {type === 'Draps et ménage' && '🛏️ '}
-                                {type === 'Remise des clés' && '🔑 '}
-                                {type === 'Astreinte de nuit sur place' && '🏠 '}
-                                {type === 'Astreinte de nuit à domicile' && '📞 '}
-                                {type === 'Déplacement astreinte' && '🚗 '}
-                                {type}
-                              </span>
-                              {isRequested && !val.checked && (
+                              <div className="flex items-center">
+                                <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : isRequested || isOptionClient ? 'text-amber-900' : 'text-slate-700'}`}>
+                                  {type === 'Lits faits à l\'arrivée' && '🛏️ '}
+                                  {type === 'Linge de toilette fourni' && '🧴 '}
+                                  {type === 'Ménage de fin de séjour' && '🧹 '}
+                                  {type === 'Remise des clés' && '🔑 '}
+                                  {type === 'Astreinte de nuit sur place' && '🏠 '}
+                                  {type === 'Astreinte de nuit à domicile' && '📞 '}
+                                  {type}
+                                </span>
+                                {isOptionClient && (
+                                  <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-semibold rounded">Option client</span>
+                                )}
+                              </div>
+                              {isRequested && !val.checked && !isOptionClient && (
                                 <span className="text-[10px] text-amber-700 font-bold uppercase mt-0.5 tracking-wider">⚠️ À assigner (Demandé)</span>
                               )}
                             </div>

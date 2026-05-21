@@ -40,7 +40,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       salle12: false
     },
     occupants: [],
-    repas: {}
+    repas: {},
+    modeRestauration: 'global',
+    repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }
   });
 
   // Grille tarifaire restauration
@@ -320,6 +322,32 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     return new Date() <= jeudiPrecedent;
   };
 
+  // Génère la liste des dates du séjour (pour le sélecteur de repas)
+  const getDatesSejour = () => {
+    if (!formData.dateDebut || !formData.dateFin) return [];
+    const dates = [];
+    let current = new Date(formData.dateDebut);
+    const end = new Date(formData.dateFin);
+    while (current < end) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const getComputedRepas = () => {
+    if (formData.modeRestauration === 'global') {
+      const dates = getDatesSejour();
+      const computed = {};
+      dates.forEach(d => {
+        const dateStr = d.toISOString().split('T')[0];
+        computed[dateStr] = { ...formData.repasGlobal };
+      });
+      return computed;
+    }
+    return formData.repas || {};
+  };
+
   const calculerTotalRepas = () => {
     let total = 0;
     
@@ -352,7 +380,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
     }
 
-    Object.values(formData.repas || {}).forEach(dayRepas => {
+    Object.values(getComputedRepas()).forEach(dayRepas => {
       Object.entries(dayRepas).forEach(([typeRepas, isChecked]) => {
         if (isChecked) {
           const tarifs = TARIFS_REPAS[typeRepas];
@@ -363,19 +391,6 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       });
     });
     return Math.round(total * 100) / 100;
-  };
-
-  // Génère la liste des dates du séjour (pour le sélecteur de repas)
-  const getDatesSejour = () => {
-    if (!formData.dateDebut || !formData.dateFin) return [];
-    const dates = [];
-    let current = new Date(formData.dateDebut);
-    const end = new Date(formData.dateFin);
-    while (current < end) {
-      dates.push(new Date(current));
-      current.setDate(current.getDate() + 1);
-    }
-    return dates;
   };
 
   const toggleRepasJour = (dateStr, typeRepas) => {
@@ -510,15 +525,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         newOccupants.push({ nom: '', prenom: '', estAdulte: false, age: '', nationalite: true });
       }
     }
-    const hasRepasChecked = Object.values(formData.repas).some(day => day.PETIT_DEJ || day.DEJEUNER || day.DINER);
+    const computedRepas = getComputedRepas();
+    const hasRepasChecked = Object.values(computedRepas).some(day => day.PETIT_DEJ || day.DEJEUNER || day.DINER);
     if (hasRepasChecked) {
-      if (totalExpectedOccupants < 5) {
-        triggerError('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
-        return;
-      }
-      const hasLunchOrDinner = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
-      if (!hasLunchOrDinner) {
-        triggerError("Veuillez sélectionner au moins un déjeuner ou un dîner sur une journée pour valider la restauration.");
+      const hasLunchOrDinner = Object.values(computedRepas).some(day => day.DEJEUNER || day.DINER);
+      if (totalExpectedOccupants < 5 || !hasLunchOrDinner) {
+        triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
         return;
       }
     }
@@ -593,8 +605,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
     }
 
+    const computedRepas = getComputedRepas();
     // Vérification minimum 5 personnes pour les repas
-    const hasRepasCommandes = Object.values(formData.repas || {}).some(dayRepas => dayRepas.PETIT_DEJ || dayRepas.DEJEUNER || dayRepas.DINER);
+    const hasRepasCommandes = Object.values(computedRepas).some(dayRepas => dayRepas.PETIT_DEJ || dayRepas.DEJEUNER || dayRepas.DINER);
 
     if (hasRepasCommandes) {
       let totalOccups = 0;
@@ -605,14 +618,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       } else {
         totalOccups = formData.occupants?.length || 0;
       }
-      if (totalOccups < 5) {
-        triggerError('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
-        return;
-      }
       
-      const hasLunchOrDinner = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
-      if (!hasLunchOrDinner) {
-        triggerError("Veuillez sélectionner au moins un déjeuner ou un dîner sur une journée pour valider la restauration.");
+      const hasLunchOrDinner = Object.values(computedRepas).some(day => day.DEJEUNER || day.DINER);
+      if (totalOccups < 5 || !hasLunchOrDinner) {
+        triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
         return;
       }
     }
@@ -642,7 +651,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         prixTotal: prixTotalGlobal,
         prixHebergement,
         totalRepas,
-        repas: formData.repas,
+        repas: computedRepas,
         promoCode: promoApplied?.code,
         adminEmail: adminUser?.email,
         adminName: adminUser?.nom
@@ -652,7 +661,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         prixTotal: prixTotalGlobal,
         prixHebergement,
         totalRepas,
-        repas: formData.repas,
+        repas: computedRepas,
         promoCode: promoApplied?.code,
         adminEmail: adminUser?.email,
         adminName: adminUser?.nom
@@ -697,7 +706,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false}, occupants: [], repas: {} });
+        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false } });
         setStep(1);
       } else {
         const errData = await res.json();
@@ -778,7 +787,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             </div>
           )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <div className="space-y-1">
           <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée (à partir de 17h)</label>
           <input required type="date" name="dateDebut" value={formData.dateDebut} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" />
@@ -963,9 +972,65 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 </div>
               </div>
 
-              {/* En-tête du tableau */}
+              {/* MODE DE RESTAURATION */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6 mt-6">
+                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-slate-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="modeRestauration"
+                    value="global"
+                    checked={formData.modeRestauration === 'global'}
+                    onChange={() => setFormData(prev => ({ ...prev, modeRestauration: 'global' }))}
+                    className="accent-muc-blue w-4 h-4"
+                  />
+                  <span className="text-sm font-bold text-slate-700">Formule globale</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-slate-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="modeRestauration"
+                    value="carte"
+                    checked={formData.modeRestauration === 'carte'}
+                    onChange={() => setFormData(prev => ({ ...prev, modeRestauration: 'carte' }))}
+                    className="accent-muc-blue w-4 h-4"
+                  />
+                  <span className="text-sm font-bold text-slate-700">À la carte (jour par jour)</span>
+                </label>
+              </div>
+
+              {formData.modeRestauration === 'global' ? (
+                <div className="bg-white rounded-2xl border-2 border-slate-100 p-6">
+                   <p className="text-sm text-slate-600 mb-6">Sélectionnez les repas que vous souhaitez pour <strong>l'ensemble de votre séjour</strong>. Cette sélection s'appliquera automatiquement à tous les jours et pour tous les occupants.</p>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
+                       const isChecked = formData.repasGlobal[typeRepas];
+                       return (
+                         <label key={typeRepas} className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${isChecked ? 'border-muc-blue bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}>
+                           <input
+                             type="checkbox"
+                             checked={isChecked}
+                             disabled={nombreTotalOccupants < 5}
+                             onChange={() => setFormData(prev => ({
+                               ...prev,
+                               repasGlobal: { ...prev.repasGlobal, [typeRepas]: !prev.repasGlobal[typeRepas] }
+                             }))}
+                             className="hidden"
+                           />
+                           <div className={`w-6 h-6 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-muc-blue border-muc-blue text-white' : 'bg-white border-slate-300'}`}>
+                             {isChecked && <CheckCircle size={14} />}
+                           </div>
+                           <div>
+                             <span className={`block font-bold text-sm ${isChecked ? 'text-muc-blue' : 'text-slate-700'}`}>{tarifs.label}</span>
+                             <span className="text-xs text-slate-500">Ex: Adulte {tarifs.ADULTE}€</span>
+                           </div>
+                         </label>
+                       );
+                     })}
+                   </div>
+                </div>
+              ) : (
               <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
-                <div className="grid grid-cols-4 gap-0 bg-slate-100 border-b-2 border-slate-200 px-4 py-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 border-b border-slate-100">
                   <div className="text-xs font-black uppercase text-slate-500 tracking-wider flex items-center">Jour</div>
                   {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => (
                     <div key={typeRepas} className="text-center">
@@ -999,7 +1064,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
                   const isEven = idx % 2 === 0;
                   return (
-                    <div key={dateStr} className={`grid grid-cols-4 gap-0 items-center px-4 py-3 border-b border-slate-100 last:border-b-0 ${isEven ? 'bg-white' : 'bg-slate-50/50'}`}>
+                    <div key={dateStr} className={`grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 border-b border-slate-100 last:border-b-0`}>
                       <div className="text-sm font-bold text-slate-700 capitalize">{jourLabel}</div>
                       {Object.entries(TARIFS_REPAS).map(([typeRepas]) => {
                         const isChecked = formData.repas[dateStr]?.[typeRepas] || false;
@@ -1024,6 +1089,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   );
                 })}
               </div>
+              )}
 
               {calculerTotalRepas() > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex justify-between items-center">
