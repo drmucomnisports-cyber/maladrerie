@@ -338,29 +338,16 @@ const Home = () => {
           </div>
 
           {/* Salles de formation */}
-          <div className="bg-white p-10 rounded-[2.5rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-transform duration-300 border border-slate-100">
-            <h3 className="text-3xl font-black mb-10 text-[#004B93] flex items-center gap-4 uppercase tracking-tight">
-              <div className="bg-[#FDB913]/20 p-3 rounded-2xl text-[#FDB913]">
-                <Presentation size={32} />
-              </div>
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-lg">
+            <h3 className="text-2xl font-bold mb-6 text-[#004B93] flex items-center gap-3 uppercase">
+              <Presentation size={28} className="text-[#FDB913]" />
               Espace Travail & Séminaires
             </h3>
-            <p className="text-slate-700 text-lg leading-relaxed font-medium mb-6">
-              Des salles équipées pour vos réunions professionnelles.
-            </p>
-            <ul className="space-y-4">
-              <li className="flex items-center gap-4">
-                <span className="text-[#FDB913] font-bold text-xl">✓</span>
-                <span className="text-slate-700 text-lg leading-relaxed font-medium">Salles de 15 et 12 personnes</span>
-              </li>
-              <li className="flex items-center gap-4">
-                <span className="text-[#FDB913] font-bold text-xl">✓</span>
-                <span className="text-slate-700 text-lg leading-relaxed font-medium">Écran numérique & Vidéoprojecteur</span>
-              </li>
-              <li className="flex items-center gap-4">
-                <span className="text-[#FDB913] font-bold text-xl">✓</span>
-                <span className="text-slate-700 text-lg leading-relaxed font-medium">Accessible week-end & vacances</span>
-              </li>
+            <p className="text-gray-600 mb-6">Des salles équipées pour vos réunions professionnelles.</p>
+            <ul className="space-y-3 text-gray-700">
+              <li>✓ Salles de 15 et 12 personnes</li>
+              <li>✓ Écran numérique & Vidéoprojecteur</li>
+              <li>✓ Accessible week-end & vacances</li>
             </ul>
           </div>
         </div>
