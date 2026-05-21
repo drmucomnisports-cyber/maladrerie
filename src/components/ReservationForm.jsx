@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Send, X, CheckCircle, AlertTriangle, Phone, UtensilsCrossed, Info } from 'lucide-react';
 import { API_URL } from '../config';
@@ -658,13 +659,6 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
         setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false}, occupants: [], repas: {} });
         setStep(1);
-
-        // Redirection automatique vers le dashboard admin après création d'un devis
-        if (isDevis) {
-          setTimeout(() => {
-            navigate('/admin');
-          }, 2000);
-        }
       } else {
         const errData = await res.json();
         setErrorMsg(errData.error || "Une erreur est survenue lors de l'envoi.");
@@ -677,6 +671,13 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   };
 
   const datesValidesSalles = areDatesValidForSalles();
+  
+  let nombreTotalOccupants = 0;
+  if (isDevis) {
+    nombreTotalOccupants = (parseInt(formData.devisAdultes) || 0) + (parseInt(formData.devisMineurs) || 0);
+  } else {
+    nombreTotalOccupants = Object.values(formData.chambresDetails || {}).reduce((acc, curr) => acc + parseInt(curr.adultes || 0) + parseInt(curr.mineurs || 0), 0) || formData.occupants?.length || 0;
+  }
 
   return (
     <div className="w-full">
@@ -701,7 +702,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Structure, entreprise ou association</label>
+                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Structure</label>
                 <input type="text" name="structure" value={formData.structure} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: MUC OMNISPORTS" />
               </div>
             </>
@@ -712,7 +713,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: Jean Dupont" />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Structure, entreprise ou association (optionnel)</label>
+                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Structure (optionnel)</label>
                 <input type="text" name="structure" value={formData.structure} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: MUC OMNISPORTS" />
               </div>
             </>
@@ -941,7 +942,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                   min="0"
                                   value={formData.repas[dateStr]?.[typeRepas]?.[cat] || ''}
                                   onChange={e => handleRepasChange(dateStr, typeRepas, cat, e.target.value)}
-                                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm text-center font-bold"
+                                  disabled={nombreTotalOccupants < 5}
+                                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm text-center font-bold disabled:bg-slate-100 disabled:opacity-50"
                                   placeholder="0"
                                 />
                               </div>
@@ -1101,22 +1103,24 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-muc-yellow bg-white outline-none text-sm transition-all" 
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Âge <span className="text-red-500">*</span></label>
-                          <input 
-                            required 
-                            type="number" 
-                            min="0" 
-                            max={occ.estAdulte ? "120" : "17"} 
-                            placeholder="Âge" 
-                            value={occ.age} 
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? '' : parseInt(e.target.value);
-                              handleOccupantChange(idx, 'age', val);
-                            }} 
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-muc-yellow bg-white outline-none text-sm transition-all" 
-                          />
-                        </div>
+                        {!occ.estAdulte && (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Âge <span className="text-red-500">*</span></label>
+                            <input 
+                              required 
+                              type="number" 
+                              min="0" 
+                              max="17" 
+                              placeholder="Âge" 
+                              value={occ.age} 
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                handleOccupantChange(idx, 'age', val);
+                              }} 
+                              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-muc-yellow bg-white outline-none text-sm transition-all" 
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-2 border-t border-dashed border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1191,8 +1195,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       </form>
 
       {/* Pop-up de Confirmation de Succès / Alerte avec avertissement de dernière minute */}
-      {successMsg && (
-        <div className="fixed inset-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      {successMsg && ReactDOM.createPortal(
+        <div className="fixed inset-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100 flex flex-col items-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4 animate-bounce shrink-0">
               <CheckCircle size={40} />
@@ -1235,7 +1239,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               D'accord
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

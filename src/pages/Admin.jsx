@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { API_URL } from '../config';
@@ -29,7 +30,6 @@ const Admin = () => {
 
   const showFeedback = (msg, type = 'success') => {
     setAdminFeedback({ msg, type });
-    setTimeout(() => setAdminFeedback(null), 5000);
   };
 
   // Finances & Missions
@@ -1790,8 +1790,8 @@ const Admin = () => {
         </div>
       )}
 
-      {adminFeedback && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 w-screen h-screen">
+      {adminFeedback && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 w-screen h-screen">
           <div className={`bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-100`}>
             <div className={`mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center ${adminFeedback.type === 'error' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
               {adminFeedback.type === 'error' ? <AlertTriangle size={36} /> : <CheckCircle size={36} />}
@@ -1804,7 +1804,8 @@ const Admin = () => {
               D'accord
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

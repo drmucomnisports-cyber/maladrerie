@@ -107,10 +107,6 @@ const DevisValidate = () => {
           setErrorMsg(`Veuillez renseigner le nom et le prénom pour l'adulte n°${i + 1}.`);
           return;
         }
-        if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 18) {
-          setErrorMsg(`Veuillez indiquer un âge valide (18 ans ou plus) pour l'adulte n°${i + 1}.`);
-          return;
-        }
       } else {
         if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 0 || occ.age >= 18) {
           setErrorMsg(`Veuillez indiquer un âge valide (moins de 18 ans) pour le mineur n°${i + 1}.`);
@@ -385,22 +381,24 @@ const DevisValidate = () => {
                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#004B93] focus:ring-1 focus:ring-[#004B93] bg-white outline-none text-sm transition-all" 
                               />
                             </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Âge <span className="text-red-500">*</span></label>
-                              <input 
-                                required 
-                                type="number" 
-                                min="0" 
-                                max={occ.estAdulte ? "120" : "17"} 
-                                placeholder="Âge" 
-                                value={occ.age} 
-                                onChange={(e) => {
-                                  const val = e.target.value === '' ? '' : parseInt(e.target.value);
-                                  handleOccupantChange(idx, 'age', val);
-                                }} 
-                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#004B93] focus:ring-1 focus:ring-[#004B93] bg-white outline-none text-sm transition-all" 
-                              />
-                            </div>
+                            {!occ.estAdulte && (
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Âge <span className="text-red-500">*</span></label>
+                                <input 
+                                  required 
+                                  type="number" 
+                                  min="0" 
+                                  max="17" 
+                                  placeholder="Âge" 
+                                  value={occ.age} 
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                    handleOccupantChange(idx, 'age', val);
+                                  }} 
+                                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#004B93] focus:ring-1 focus:ring-[#004B93] bg-white outline-none text-sm transition-all" 
+                                />
+                              </div>
+                            )}
                           </div>
 
                           <div className="pt-2 border-t border-dashed border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
