@@ -338,17 +338,46 @@ const Home = () => {
           </div>
 
           {/* Salles de formation */}
-          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-lg">
-            <h3 className="text-2xl font-bold mb-6 text-[#004B93] flex items-center gap-3 uppercase">
-              <Presentation size={28} className="text-[#FDB913]" />
-              Espace Travail & Séminaires
-            </h3>
-            <p className="text-gray-600 mb-6">Des salles équipées pour vos réunions professionnelles.</p>
-            <ul className="space-y-3 text-gray-700">
-              <li>✓ Salles de 15 et 12 personnes</li>
-              <li>✓ Écran numérique & Vidéoprojecteur</li>
-              <li>✓ Accessible week-end & vacances</li>
-            </ul>
+          <div className="mt-20 bg-white text-slate-900 p-10 md:p-16 rounded-[2.5rem] shadow-2xl relative overflow-hidden border-b-8 border-muc-yellow" data-reveal="bottom">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-muc-blue/5 rounded-full -mr-32 -mt-32 pointer-events-none"></div>
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
+              <div className="space-y-6 lg:max-w-2xl">
+                <div className="bg-muc-blue text-white inline-block px-4 py-1 font-black text-sm uppercase tracking-widest skew-x-[-15deg]">
+                  <span className="inline-block skew-x-[15deg]">Espace Travail & Séminaires</span>
+                </div>
+                <h3 className="text-3xl md:text-4xl font-black text-muc-blue uppercase tracking-tight">Location de Salles de Formation</h3>
+                <p className="text-lg text-slate-600 font-medium leading-relaxed">
+                  Nous mettons à votre disposition <strong className="text-muc-blue font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-muc-blue font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
+                  <div className="space-y-2">
+                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Presentation size={18} className="text-muc-yellow" /> Équipement complet
+                    </p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Calendar size={18} className="text-muc-yellow" /> Conditions d'accès
+                    </p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-muc-blue text-white p-8 rounded-[2rem] text-center shrink-0 lg:w-80 shadow-lg flex flex-col justify-center border-t-4 border-muc-yellow">
+                <p className="text-xs uppercase font-black tracking-widest text-muc-yellow mb-4">Tarifs de location</p>
+                <div className="space-y-6">
+                  <div>
+                    <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="text-xs text-blue-200 mt-1 block">si réservé avec le gîte</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-4">
+                    <span className="block text-4xl font-black text-white">150 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="text-xs text-blue-200 mt-1 block">en location seule</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
