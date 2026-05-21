@@ -292,7 +292,7 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
   try {
     const reservation = await prisma.reservation.findUnique({
       where: { id: parseInt(reservationId) },
-      include: { client: true }
+      include: { client: true, occupants: true }
     });
     
     if (!reservation) return;
@@ -305,18 +305,39 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
     if (!validStatuses.includes(reservation.statut) && !validPayStatuses.includes(reservation.statutPaiement)) {
       return;
     }
+
+    let nbAdultes = 0;
+    let nbMineurs12 = 0;
+    let nbMineurs5 = 0;
+
+    if (reservation.occupants && reservation.occupants.length > 0) {
+      reservation.occupants.forEach(occ => {
+        if (occ.estAdulte) {
+          nbAdultes++;
+        } else {
+          const age = parseInt(occ.age);
+          if (!isNaN(age) && age < 5) nbMineurs5++;
+          else nbMineurs12++;
+        }
+      });
+    } else if (reservation.chambresDetails) {
+      Object.values(reservation.chambresDetails).forEach(ch => {
+        nbAdultes += parseInt(ch.adultes || 0);
+        nbMineurs12 += parseInt(ch.enfants || ch.mineurs || 0);
+      });
+    }
     
     let mealDetailsHTML = '<ul>';
     Object.entries(reservation.repas).forEach(([dateStr, dayRepas]) => {
       mealDetailsHTML += `<li><strong>${new Date(dateStr).toLocaleDateString('fr-FR')}</strong>:`;
       if (dayRepas.PETIT_DEJ) {
-        mealDetailsHTML += ` Petit-déj: ${dayRepas.PETIT_DEJ.ADULTE || 0} Adultes, ${dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0} Enfants < 12 ans, ${dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0} Enfants < 5 ans.`;
+        mealDetailsHTML += ` Petit-déj: ${nbAdultes} Adultes, ${nbMineurs12 + nbMineurs5} Enfants.`;
       }
       if (dayRepas.DEJEUNER) {
-        mealDetailsHTML += ` Déjeuner: ${dayRepas.DEJEUNER.ADULTE || 0} Adultes, ${dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0} Enfants < 12 ans, ${dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0} Enfants < 5 ans.`;
+        mealDetailsHTML += ` Déjeuner: ${nbAdultes} Adultes, ${nbMineurs12 + nbMineurs5} Enfants.`;
       }
       if (dayRepas.DINER) {
-        mealDetailsHTML += ` Dîner: ${dayRepas.DINER.ADULTE || 0} Adultes, ${dayRepas.DINER.ENFANT_MOINS_12 || 0} Enfants < 12 ans, ${dayRepas.DINER.ENFANT_MOINS_5 || 0} Enfants < 5 ans.`;
+        mealDetailsHTML += ` Dîner: ${nbAdultes} Adultes, ${nbMineurs12 + nbMineurs5} Enfants.`;
       }
       mealDetailsHTML += `</li>`;
     });
@@ -1043,27 +1064,40 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
           let totalDEJ = { qte: 0, total: 0 };
           let totalDIN = { qte: 0, total: 0 };
 
+          let nbAdultes = 0;
+          let nbMineurs12 = 0;
+          let nbMineurs5 = 0;
+
+          if (occupants && occupants.length > 0) {
+            occupants.forEach(occ => {
+              const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+              if (estAdulte) {
+                nbAdultes++;
+              } else {
+                const age = parseInt(occ.age);
+                if (!isNaN(age) && age < 5) nbMineurs5++;
+                else nbMineurs12++;
+              }
+            });
+          } else if (chambresDetails) {
+            Object.values(chambresDetails).forEach(ch => {
+              nbAdultes += parseInt(ch.adultes || 0);
+              nbMineurs12 += parseInt(ch.enfants || ch.mineurs || 0);
+            });
+          }
+
           Object.values(repas).forEach(dayRepas => {
             if (dayRepas.PETIT_DEJ) {
-              const a = parseInt(dayRepas.PETIT_DEJ.ADULTE || 0);
-              const e12 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0);
-              const e5 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0);
-              totalPDJ.qte += (a + e12 + e5);
-              totalPDJ.total += (a * 6) + (e12 * 5) + (e5 * 4);
+              totalPDJ.qte += (nbAdultes + nbMineurs12 + nbMineurs5);
+              totalPDJ.total += (nbAdultes * 6) + (nbMineurs12 * 5) + (nbMineurs5 * 4);
             }
             if (dayRepas.DEJEUNER) {
-              const a = parseInt(dayRepas.DEJEUNER.ADULTE || 0);
-              const e12 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0);
-              const e5 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0);
-              totalDEJ.qte += (a + e12 + e5);
-              totalDEJ.total += (a * 11.5) + (e12 * 9.5) + (e5 * 8);
+              totalDEJ.qte += (nbAdultes + nbMineurs12 + nbMineurs5);
+              totalDEJ.total += (nbAdultes * 11.5) + (nbMineurs12 * 9.5) + (nbMineurs5 * 8);
             }
             if (dayRepas.DINER) {
-              const a = parseInt(dayRepas.DINER.ADULTE || 0);
-              const e12 = parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0);
-              const e5 = parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0);
-              totalDIN.qte += (a + e12 + e5);
-              totalDIN.total += (a * 14) + (e12 * 12) + (e5 * 10);
+              totalDIN.qte += (nbAdultes + nbMineurs12 + nbMineurs5);
+              totalDIN.total += (nbAdultes * 14) + (nbMineurs12 * 12) + (nbMineurs5 * 10);
             }
           });
 

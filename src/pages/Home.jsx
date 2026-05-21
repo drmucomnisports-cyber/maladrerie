@@ -240,116 +240,146 @@ const Home = () => {
           </div>
           
           <div className="grid lg:grid-cols-3 gap-10 items-start">
-            {/* Liste des activités */}
-            <div className="bg-[#004B93] border-t-8 border-[#FDB913] p-8 rounded-[2rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-all duration-300" data-reveal="left">
-              <h3 className="text-2xl font-bold text-[#FDB913] mb-4 flex items-center gap-3">
-                <Mountain size={28} className="text-[#FDB913]" />
+            {/* Liste des activit├®s */}
+            <div className="bg-white/10 backdrop-blur-md p-10 rounded-[2.5rem] border-t-8 border-muc-yellow hover-lift shadow-2xl" data-reveal="left">
+              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
+                  <Mountain size={32} />
+                </div>
                 Pleine Nature
               </h3>
-              <ul className="space-y-6 text-lg mt-4 text-white">
-                <li className="flex items-center gap-4 group">
-                  <Waves className="text-[#FDB913] transform group-hover:rotate-12 transition-transform shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Canoë-kayak</strong> : location et descentes sur le Tarn</span>
+              <ul className="space-y-8 text-lg">
+                <li className="flex items-center gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <Waves className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Cano├½-kayak</strong> : location et descentes sur le Tarn</span>
                 </li>
-                <li className="flex items-center gap-4 group">
-                  <CheckCircle2 className="text-[#FDB913] transform group-hover:rotate-12 transition-transform shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Escalade & Via Ferrata</strong> : sites naturels d'exception</span>
+                <li className="flex items-center gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <CheckCircle2 className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Escalade & Via Ferrata</strong> : sites naturels d'exception</span>
                 </li>
-                <li className="flex items-center gap-4 group">
-                  <Compass className="text-[#FDB913] transform group-hover:rotate-12 transition-transform shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Spéléologie & Parapente</strong> : l'aventure totale</span>
+                <li className="flex items-center gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <Compass className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Sp├®l├®ologie & Parapente</strong> : l'aventure totale</span>
                 </li>
-                <li className="flex items-center gap-4 group">
-                  <Bike className="text-[#FDB913] transform group-hover:rotate-12 transition-transform shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>VTT & Randonnée</strong> : sentiers du PNR des Grands Causses</span>
+                <li className="flex items-center gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <Bike className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>VTT & Randonn├®e</strong> : sentiers du PNR des Grands Causses</span>
                 </li>
-              </ul>
-            </div>
-
-            {/* Pack Confort (Carte Centrale Contrastée) */}
-            <div className="bg-[#004B93] border-t-8 border-[#FDB913] p-8 rounded-[2rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-all duration-300" data-reveal="bottom">
-              <h3 className="text-2xl font-bold text-[#FDB913] mb-4 flex items-center gap-3">
-                <Sparkles size={28} className="text-[#FDB913]" />
-                Pack Confort
-              </h3>
-              <p className="text-white/90 mb-6 text-lg leading-relaxed">
-                Construisez votre séjour « à la carte » :
-              </p>
-              <ul className="space-y-6 text-lg text-white">
-                <li className="flex items-center gap-4 group">
-                  <Bed className="text-[#FDB913] transform group-hover:rotate-12 transition-transform shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Lits faits</strong> : confort immédiat à l'arrivée</span>
-                </li>
-                <li className="flex items-center gap-4 group">
-                  <Info className="text-[#FDB913] transform group-hover:rotate-12 transition-transform shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Linge de toilette</strong> fourni à la demande</span>
-                </li>
-                <li className="flex items-center gap-4 group">
-                  <Trash2 className="text-[#FDB913] transform group-hover:rotate-12 transition-transform shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Ménage inclus</strong> : partez l'esprit tranquille</span>
+                <li className="flex items-center gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <GraduationCap className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Scolaires & D├®couverte</strong> : accueil de classes de d├®couvertes et voyages scolaires (+6 ans)</span>
                 </li>
               </ul>
             </div>
 
             {/* Restauration */}
-            <div className="bg-[#004B93] border-t-8 border-[#FDB913] p-8 rounded-[2rem] flex flex-col h-full shadow-2xl hover:-translate-y-2 transition-all duration-300" data-reveal="right">
-              <h3 className="text-2xl font-bold text-[#FDB913] mb-4 flex items-center gap-3">
-                <Utensils size={28} className="text-[#FDB913]" />
+            <div className="bg-white/10 backdrop-blur-md p-10 rounded-[2.5rem] border-t-8 border-muc-yellow hover-lift shadow-2xl" data-reveal="bottom">
+              <h3 className="text-3xl font-black mb-10 text-muc-yellow flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-muc-yellow/20 p-3 rounded-2xl text-muc-yellow">
+                  <Utensils size={32} />
+                </div>
                 Restauration
               </h3>
-              <p className="text-white/90 mb-6 text-lg leading-relaxed">
-                Un service de repas adapté à vos séjours :
+              <p className="text-blue-100 mb-8 text-lg leading-relaxed font-medium">
+                Un service de repas de qualit├® adapt├® ├á vos s├®jours :
               </p>
-              <ul className="space-y-6 text-lg text-white">
-                <li className="flex items-start gap-4 group">
-                  <CheckCircle2 className="text-[#FDB913] transform group-hover:rotate-12 transition-transform mt-1 shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
+              <ul className="space-y-8 text-lg">
+                <li className="flex items-start gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
+                    <CheckCircle2 className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Alimentation saine</strong> : menus ├®labor├®s en privil├®giant les produits bruts, locaux et ├á 63 % bio.</span>
                 </li>
-                <li className="flex items-start gap-4 group">
-                  <Info className="text-[#FDB913] transform group-hover:rotate-12 transition-transform mt-1 shrink-0" size={24} />
-                  <span className="text-white/90 leading-relaxed"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
+                <li className="flex items-start gap-5 group">
+                  <div className="bg-muc-yellow p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
+                    <Info className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Services optionnels */}
+            <div className="bg-white/10 backdrop-blur-md p-10 rounded-[2.5rem] border-t-8 border-white hover-lift shadow-2xl" data-reveal="right">
+              <h3 className="text-3xl font-black mb-10 text-white flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-white/20 p-3 rounded-2xl text-white">
+                  <Sparkles size={32} />
+                </div>
+                Pack Confort
+              </h3>
+              <p className="text-blue-100 mb-10 text-lg leading-relaxed font-medium">
+                Construisez votre s├®jour ┬½ ├á la carte ┬╗ :
+              </p>
+              <ul className="space-y-8 text-lg">
+                <li className="flex items-center gap-5 group">
+                   <div className="bg-white p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <Bed className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Lits faits</strong> : confort imm├®diat ├á l'arriv├®e</span>
+                </li>
+                <li className="flex items-center gap-5 group">
+                   <div className="bg-white p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <Info className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>Linge de toilette</strong> fourni ├á la demande</span>
+                </li>
+                <li className="flex items-center gap-5 group">
+                   <div className="bg-white p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform">
+                    <Trash2 className="text-muc-blue" size={20} />
+                  </div>
+                  <span className="font-medium tracking-tight"><strong>M├®nage inclus</strong> : partez l'esprit tranquille</span>
                 </li>
               </ul>
             </div>
           </div>
 
           {/* Salles de formation */}
-          <div className="mt-20 bg-white/10 backdrop-blur-md border border-white/20 p-10 md:p-16 rounded-[2.5rem] hover:-translate-y-2 transition-all duration-300 shadow-2xl relative overflow-hidden group" data-reveal="bottom">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none group-hover:scale-110 transition-transform"></div>
+          <div className="mt-20 bg-white text-slate-900 p-10 md:p-16 rounded-[2.5rem] shadow-2xl relative overflow-hidden border-b-8 border-muc-yellow" data-reveal="bottom">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-muc-blue/5 rounded-full -mr-32 -mt-32 pointer-events-none"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
               <div className="space-y-6 lg:max-w-2xl">
-                <div className="bg-white/20 text-white inline-block px-4 py-1 font-bold text-sm uppercase tracking-widest skew-x-[-15deg]">
-                  <span className="inline-block skew-x-[15deg]">Espace Travail & Séminaires</span>
+                <div className="bg-muc-blue text-white inline-block px-4 py-1 font-black text-sm uppercase tracking-widest skew-x-[-15deg]">
+                  <span className="inline-block skew-x-[15deg]">Espace Travail & S├®minaires</span>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4 uppercase tracking-tight">Location de Salles de Formation</h3>
-                <p className="text-blue-100 text-lg font-medium leading-relaxed">
-                  Nous mettons à votre disposition <strong className="text-white font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-white font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
+                <h3 className="text-3xl md:text-4xl font-black text-muc-blue uppercase tracking-tight">Location de Salles de Formation</h3>
+                <p className="text-lg text-slate-600 font-medium leading-relaxed">
+                  Nous mettons ├á votre disposition <strong className="text-muc-blue font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-muc-blue font-black">15 et 12 personnes</strong>. Parfaitement adapt├®es pour vos r├®unions, s├®minaires ou sessions de travail.
                 </p>
-                <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-white/20">
+                <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
                   <div className="space-y-2">
-                    <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
-                      <Presentation size={18} className="text-white" /> Équipement complet
+                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Presentation size={18} className="text-muc-yellow" /> ├ëquipement complet
                     </p>
-                    <p className="text-blue-100 text-sm font-medium leading-relaxed">Tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo.</p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Tables, chaises, ├®cran num├®rique ou vid├®oprojecteur, WC et lavabo.</p>
                   </div>
                   <div className="space-y-2">
-                    <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
-                      <Calendar size={18} className="text-white" /> Conditions d'accès
+                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Calendar size={18} className="text-muc-yellow" /> Conditions d'acc├¿s
                     </p>
-                    <p className="text-blue-100 text-sm font-medium leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Disponibles uniquement les week-ends (d├¿s le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-white/10 border border-white/20 text-white p-8 rounded-[2rem] text-center shrink-0 lg:w-80 shadow-lg flex flex-col justify-center">
-                <p className="text-xs uppercase font-black tracking-widest text-blue-100 mb-4">Tarifs de location</p>
-                <div className="space-y-6 text-blue-100">
+              <div className="bg-muc-blue text-white p-8 rounded-[2rem] text-center shrink-0 lg:w-80 shadow-lg flex flex-col justify-center border-t-4 border-muc-yellow">
+                <p className="text-xs uppercase font-black tracking-widest text-muc-yellow mb-4">Tarifs de location</p>
+                <div className="space-y-6">
                   <div>
-                    <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
-                    <span className="text-xs text-blue-100 mt-1 block">si réservé avec le gîte</span>
+                    <span className="block text-4xl font-black text-white">100 Ôé¼ <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="text-xs text-blue-200 mt-1 block">si r├®serv├® avec le g├«te</span>
                   </div>
                   <div className="border-t border-white/10 pt-4">
-                    <span className="block text-4xl font-black text-white">150 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
-                    <span className="text-xs text-blue-100 mt-1 block">en location seule</span>
+                    <span className="block text-4xl font-black text-white">150 Ôé¼ <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="text-xs text-blue-200 mt-1 block">en location seule</span>
                   </div>
                 </div>
               </div>

@@ -320,17 +320,46 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     return new Date() <= jeudiPrecedent;
   };
 
-  // Calcule le total des repas commandés
   const calculerTotalRepas = () => {
     let total = 0;
-    Object.values(formData.repas).forEach(dayRepas => {
-      Object.entries(dayRepas).forEach(([typeRepas, categories]) => {
-        const tarifs = TARIFS_REPAS[typeRepas];
-        if (!tarifs) return;
-        Object.entries(categories).forEach(([categorie, qty]) => {
-          const prix = tarifs[categorie] || 0;
-          total += prix * (parseInt(qty) || 0);
+    
+    // Compter le nombre d'adultes et de mineurs
+    let nbAdultes = 0;
+    let nbMineurs12 = 0;
+    let nbMineurs5 = 0;
+
+    if (isDevis) {
+      nbAdultes = parseInt(formData.devisAdultes) || 0;
+      nbMineurs12 = parseInt(formData.devisMineurs) || 0;
+    } else {
+      // Si on a les occupants (étape 2), on utilise les âges exacts
+      if (formData.occupants && formData.occupants.length > 0) {
+        formData.occupants.forEach(occ => {
+          if (occ.estAdulte) {
+            nbAdultes++;
+          } else {
+            const age = parseInt(occ.age);
+            if (!isNaN(age) && age < 5) nbMineurs5++;
+            else nbMineurs12++; // Par défaut ou < 12
+          }
         });
+      } else {
+        // Étape 1 : on n'a que chambresDetails
+        Object.values(formData.chambresDetails || {}).forEach(ch => {
+          nbAdultes += parseInt(ch.adultes) || 0;
+          nbMineurs12 += parseInt(ch.mineurs) || 0;
+        });
+      }
+    }
+
+    Object.values(formData.repas || {}).forEach(dayRepas => {
+      Object.entries(dayRepas).forEach(([typeRepas, isChecked]) => {
+        if (isChecked) {
+          const tarifs = TARIFS_REPAS[typeRepas];
+          if (tarifs) {
+            total += (tarifs.ADULTE * nbAdultes) + (tarifs.ENFANT_MOINS_12 * nbMineurs12) + (tarifs.ENFANT_MOINS_5 * nbMineurs5);
+          }
+        }
       });
     });
     return Math.round(total * 100) / 100;
@@ -340,9 +369,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   const getDatesSejour = () => {
     if (!formData.dateDebut || !formData.dateFin) return [];
     const dates = [];
-    const start = new Date(formData.dateDebut);
+    let current = new Date(formData.dateDebut);
     const end = new Date(formData.dateFin);
-    const current = new Date(start);
     while (current < end) {
       dates.push(new Date(current));
       current.setDate(current.getDate() + 1);
@@ -350,12 +378,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     return dates;
   };
 
-  const handleRepasChange = (dateStr, typeRepas, categorie, value) => {
+  const toggleRepasJour = (dateStr, typeRepas) => {
     setFormData(prev => {
       const newRepas = { ...prev.repas };
       if (!newRepas[dateStr]) newRepas[dateStr] = {};
-      if (!newRepas[dateStr][typeRepas]) newRepas[dateStr][typeRepas] = {};
-      newRepas[dateStr][typeRepas][categorie] = parseInt(value) || 0;
+      newRepas[dateStr][typeRepas] = !newRepas[dateStr][typeRepas];
       return { ...prev, repas: newRepas };
     });
   };
@@ -483,6 +510,18 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         newOccupants.push({ nom: '', prenom: '', estAdulte: false, age: '', nationalite: true });
       }
     }
+    const hasRepasChecked = Object.values(formData.repas).some(day => day.PETIT_DEJ || day.DEJEUNER || day.DINER);
+    if (hasRepasChecked) {
+      if (totalExpectedOccupants < 5) {
+        triggerError('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
+        return;
+      }
+      const hasMinMeals = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
+      if (!hasMinMeals) {
+        triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
+        return;
+      }
+    }
     
     setFormData(prev => ({ ...prev, occupants: newOccupants }));
     setStep(2);
@@ -576,6 +615,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       if (totalOccups < 5) {
         triggerError('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
         return;
+      }
+      
+      const hasRepasChecked = Object.values(formData.repas).some(day => day.PETIT_DEJ || day.DEJEUNER || day.DINER);
+      if (hasRepasChecked) {
+        const hasMinMeals = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
+        if (!hasMinMeals) {
+          triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
+          return;
+        }
       }
     }
 
@@ -933,28 +981,28 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                     <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
                       <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight">{jourLabel}</h4>
                     </div>
-                    <div className="p-4 space-y-3">
-                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => (
-                        <div key={typeRepas} className="p-3 rounded-xl bg-slate-50/50 border border-slate-100">
-                          <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">{tarifs.label}</p>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[['ADULTE', `Adulte (${tarifs.ADULTE}€)`], ['ENFANT_MOINS_12', `<12 ans (${tarifs.ENFANT_MOINS_12}€)`], ['ENFANT_MOINS_5', `<5 ans (${tarifs.ENFANT_MOINS_5}€)`]].map(([cat, label]) => (
-                              <div key={cat}>
-                                <label className="text-[10px] font-bold text-slate-500 block mb-1 truncate" title={label}>{label}</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={formData.repas[dateStr]?.[typeRepas]?.[cat] || ''}
-                                  onChange={e => handleRepasChange(dateStr, typeRepas, cat, e.target.value)}
-                                  disabled={nombreTotalOccupants < 5}
-                                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm text-center font-bold disabled:bg-slate-100 disabled:opacity-50"
-                                  placeholder="0"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="p-4 flex flex-col md:flex-row gap-3">
+                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
+                        const isChecked = formData.repas[dateStr]?.[typeRepas] || false;
+                        return (
+                          <button
+                            key={typeRepas}
+                            type="button"
+                            onClick={() => toggleRepasJour(dateStr, typeRepas)}
+                            disabled={nombreTotalOccupants < 5}
+                            className={`flex-1 p-3 rounded-xl border-2 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                              isChecked
+                                ? 'bg-muc-blue border-muc-blue text-white shadow-md scale-[1.02]'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-muc-blue hover:text-muc-blue disabled:opacity-50 disabled:hover:scale-100 disabled:hover:border-slate-200'
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded flex items-center justify-center border-2 ${isChecked ? 'border-white bg-white/20' : 'border-slate-300'}`}>
+                              {isChecked && <CheckCircle size={14} className="text-white" />}
+                            </div>
+                            {tarifs.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 );
