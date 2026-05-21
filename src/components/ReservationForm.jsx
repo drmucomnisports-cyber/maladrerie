@@ -339,9 +339,45 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     if (formData.modeRestauration === 'global') {
       const dates = getDatesSejour();
       const computed = {};
+      
+      let nbAdultes = 0;
+      let nbMineurs12 = 0;
+      let nbMineurs5 = 0;
+
+      if (isDevis) {
+        nbAdultes = parseInt(formData.devisAdultes) || 0;
+        nbMineurs12 = parseInt(formData.devisMineurs) || 0;
+      } else {
+        if (formData.occupants && formData.occupants.length > 0) {
+          formData.occupants.forEach(occ => {
+            if (occ.estAdulte) {
+              nbAdultes++;
+            } else {
+              const age = parseInt(occ.age);
+              if (!isNaN(age) && age < 5) nbMineurs5++;
+              else nbMineurs12++;
+            }
+          });
+        } else {
+          Object.values(formData.chambresDetails || {}).forEach(ch => {
+            nbAdultes += parseInt(ch.adultes) || 0;
+            nbMineurs12 += parseInt(ch.mineurs) || 0;
+          });
+        }
+      }
+
       dates.forEach(d => {
         const dateStr = d.toISOString().split('T')[0];
-        computed[dateStr] = { ...formData.repasGlobal };
+        computed[dateStr] = {};
+        Object.keys(formData.repasGlobal).forEach(type => {
+          if (formData.repasGlobal[type]) {
+            computed[dateStr][type] = {
+              ADULTE: nbAdultes,
+              ENFANT_MOINS_12: nbMineurs12,
+              ENFANT_MOINS_5: nbMineurs5
+            };
+          }
+        });
       });
       return computed;
     }
@@ -350,54 +386,36 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
   const calculerTotalRepas = () => {
     let total = 0;
-    
-    // Compter le nombre d'adultes et de mineurs
-    let nbAdultes = 0;
-    let nbMineurs12 = 0;
-    let nbMineurs5 = 0;
-
-    if (isDevis) {
-      nbAdultes = parseInt(formData.devisAdultes) || 0;
-      nbMineurs12 = parseInt(formData.devisMineurs) || 0;
-    } else {
-      // Si on a les occupants (étape 2), on utilise les âges exacts
-      if (formData.occupants && formData.occupants.length > 0) {
-        formData.occupants.forEach(occ => {
-          if (occ.estAdulte) {
-            nbAdultes++;
-          } else {
-            const age = parseInt(occ.age);
-            if (!isNaN(age) && age < 5) nbMineurs5++;
-            else nbMineurs12++; // Par défaut ou < 12
-          }
-        });
-      } else {
-        // Étape 1 : on n'a que chambresDetails
-        Object.values(formData.chambresDetails || {}).forEach(ch => {
-          nbAdultes += parseInt(ch.adultes) || 0;
-          nbMineurs12 += parseInt(ch.mineurs) || 0;
-        });
-      }
-    }
-
     Object.values(getComputedRepas()).forEach(dayRepas => {
-      Object.entries(dayRepas).forEach(([typeRepas, isChecked]) => {
-        if (isChecked) {
-          const tarifs = TARIFS_REPAS[typeRepas];
-          if (tarifs) {
-            total += (tarifs.ADULTE * nbAdultes) + (tarifs.ENFANT_MOINS_12 * nbMineurs12) + (tarifs.ENFANT_MOINS_5 * nbMineurs5);
-          }
+      Object.entries(dayRepas).forEach(([typeRepas, counts]) => {
+        const tarifs = TARIFS_REPAS[typeRepas];
+        if (tarifs && counts && typeof counts === 'object') {
+          total += (tarifs.ADULTE * (parseInt(counts.ADULTE) || 0)) + 
+                   (tarifs.ENFANT_MOINS_12 * (parseInt(counts.ENFANT_MOINS_12) || 0)) + 
+                   (tarifs.ENFANT_MOINS_5 * (parseInt(counts.ENFANT_MOINS_5) || 0));
         }
       });
     });
     return Math.round(total * 100) / 100;
   };
 
-  const toggleRepasJour = (dateStr, typeRepas) => {
+  const handleRepasCarteChange = (dateStr, typeRepas, typeOccupant, value) => {
     setFormData(prev => {
       const newRepas = { ...prev.repas };
       if (!newRepas[dateStr]) newRepas[dateStr] = {};
-      newRepas[dateStr][typeRepas] = !newRepas[dateStr][typeRepas];
+      if (!newRepas[dateStr][typeRepas]) newRepas[dateStr][typeRepas] = { ADULTE: 0, ENFANT_MOINS_12: 0, ENFANT_MOINS_5: 0 };
+      
+      newRepas[dateStr][typeRepas][typeOccupant] = parseInt(value) || 0;
+      
+      // Nettoyage si tous les compteurs d'un repas sont à 0
+      const totalRepasCount = (newRepas[dateStr][typeRepas].ADULTE || 0) + (newRepas[dateStr][typeRepas].ENFANT_MOINS_12 || 0) + (newRepas[dateStr][typeRepas].ENFANT_MOINS_5 || 0);
+      if (totalRepasCount === 0) {
+          delete newRepas[dateStr][typeRepas];
+      }
+      if (Object.keys(newRepas[dateStr]).length === 0) {
+          delete newRepas[dateStr];
+      }
+      
       return { ...prev, repas: newRepas };
     });
   };
@@ -526,11 +544,35 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
     }
     const computedRepas = getComputedRepas();
-    const hasRepasChecked = Object.values(computedRepas).some(day => day.PETIT_DEJ || day.DEJEUNER || day.DINER);
+    const hasRepasChecked = Object.keys(computedRepas).some(date => Object.keys(computedRepas[date]).length > 0);
     if (hasRepasChecked) {
-      const hasLunchOrDinner = Object.values(computedRepas).some(day => day.DEJEUNER || day.DINER);
-      if (totalExpectedOccupants < 5 || !hasLunchOrDinner) {
+      let maxLunchOrDinner = 0;
+      let invalidService = false;
+      
+      Object.values(computedRepas).forEach(dayRepas => {
+        let lunchCount = 0;
+        if (dayRepas.DEJEUNER) {
+          lunchCount = (parseInt(dayRepas.DEJEUNER.ADULTE) || 0) + (parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12) || 0) + (parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5) || 0);
+          if (lunchCount > 0 && lunchCount < 5) invalidService = true;
+        }
+        
+        let dinnerCount = 0;
+        if (dayRepas.DINER) {
+          dinnerCount = (parseInt(dayRepas.DINER.ADULTE) || 0) + (parseInt(dayRepas.DINER.ENFANT_MOINS_12) || 0) + (parseInt(dayRepas.DINER.ENFANT_MOINS_5) || 0);
+          if (dinnerCount > 0 && dinnerCount < 5) invalidService = true;
+        }
+        
+        if (lunchCount > maxLunchOrDinner) maxLunchOrDinner = lunchCount;
+        if (dinnerCount > maxLunchOrDinner) maxLunchOrDinner = dinnerCount;
+      });
+
+      if (maxLunchOrDinner < 5) {
         triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
+        return;
+      }
+      
+      if (invalidService) {
+        triggerError("Il n'est pas possible de commander pour moins de 5 personnes par repas. Veuillez renseigner au moins 5 repas pour chaque service sélectionné.");
         return;
       }
     }
@@ -606,21 +648,24 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     }
 
     const computedRepas = getComputedRepas();
-    // Vérification minimum 5 personnes pour les repas
-    const hasRepasCommandes = Object.values(computedRepas).some(dayRepas => dayRepas.PETIT_DEJ || dayRepas.DEJEUNER || dayRepas.DINER);
+    const hasRepasCommandes = Object.keys(computedRepas).some(date => Object.keys(computedRepas[date]).length > 0);
 
     if (hasRepasCommandes) {
-      let totalOccups = 0;
-      if (isDevis) {
-        const totalAdults = parseInt(formData.devisAdultes) || 0;
-        const totalMineurs = parseInt(formData.devisMineurs) || 0;
-        totalOccups = totalAdults + totalMineurs;
-      } else {
-        totalOccups = formData.occupants?.length || 0;
-      }
-      
-      const hasLunchOrDinner = Object.values(computedRepas).some(day => day.DEJEUNER || day.DINER);
-      if (totalOccups < 5 || !hasLunchOrDinner) {
+      let maxLunchOrDinner = 0;
+      Object.values(computedRepas).forEach(dayRepas => {
+        let lunchCount = 0;
+        if (dayRepas.DEJEUNER) {
+          lunchCount = (parseInt(dayRepas.DEJEUNER.ADULTE) || 0) + (parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12) || 0) + (parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5) || 0);
+        }
+        let dinnerCount = 0;
+        if (dayRepas.DINER) {
+          dinnerCount = (parseInt(dayRepas.DINER.ADULTE) || 0) + (parseInt(dayRepas.DINER.ENFANT_MOINS_12) || 0) + (parseInt(dayRepas.DINER.ENFANT_MOINS_5) || 0);
+        }
+        if (lunchCount > maxLunchOrDinner) maxLunchOrDinner = lunchCount;
+        if (dinnerCount > maxLunchOrDinner) maxLunchOrDinner = dinnerCount;
+      });
+
+      if (maxLunchOrDinner < 5) {
         triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
         return;
       }
@@ -1005,55 +1050,49 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
                        const isChecked = formData.repasGlobal[typeRepas];
                        return (
-                         <label key={typeRepas} className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${isChecked ? 'border-muc-blue bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}>
-                           <input
-                             type="checkbox"
-                             checked={isChecked}
-                             disabled={nombreTotalOccupants < 5}
-                             onChange={() => setFormData(prev => ({
-                               ...prev,
-                               repasGlobal: { ...prev.repasGlobal, [typeRepas]: !prev.repasGlobal[typeRepas] }
-                             }))}
-                             className="hidden"
-                           />
-                           <div className={`w-6 h-6 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-muc-blue border-muc-blue text-white' : 'bg-white border-slate-300'}`}>
-                             {isChecked && <CheckCircle size={14} />}
-                           </div>
-                           <div>
-                             <span className={`block font-bold text-sm ${isChecked ? 'text-muc-blue' : 'text-slate-700'}`}>{tarifs.label}</span>
-                             <span className="text-xs text-slate-500">Ex: Adulte {tarifs.ADULTE}€</span>
-                           </div>
-                         </label>
+                          <label key={typeRepas} className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${isChecked ? 'border-muc-blue bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={nombreTotalOccupants < 5}
+                              onChange={() => setFormData(prev => ({
+                                ...prev,
+                                repasGlobal: { ...prev.repasGlobal, [typeRepas]: !prev.repasGlobal[typeRepas] }
+                              }))}
+                              className="hidden"
+                            />
+                            <div className={`w-6 h-6 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all mt-0.5 ${isChecked ? 'bg-muc-blue border-muc-blue text-white' : 'bg-white border-slate-300'}`}>
+                              {isChecked && <CheckCircle size={14} />}
+                            </div>
+                            <div className="flex-1">
+                              <span className={`block font-black text-sm mb-2 ${isChecked ? 'text-muc-blue' : 'text-slate-700'}`}>{tarifs.label}</span>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
+                                  <span className="text-xs font-bold text-slate-500">Adulte</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ADULTE} €</span>
+                                </div>
+                                <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
+                                  <span className="text-xs font-bold text-slate-500">Enf. &lt;12</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_12} €</span>
+                                </div>
+                                <div className="flex justify-between items-center pb-1">
+                                  <span className="text-xs font-bold text-slate-500">Enf. &lt;5</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_5} €</span>
+                                </div>
+                              </div>
+                            </div>
+                          </label>
                        );
                      })}
                    </div>
                 </div>
               ) : (
               <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 border-b border-slate-100">
-                  <div className="text-xs font-black uppercase text-slate-500 tracking-wider flex items-center">Jour</div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 border-b border-slate-100 bg-slate-50">
+                  <div className="text-xs font-black uppercase text-slate-500 tracking-wider">Jour</div>
                   {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => (
-                    <div key={typeRepas} className="text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const dates = getDatesSejour();
-                          const allChecked = dates.every(d => formData.repas[d.toISOString().split('T')[0]]?.[typeRepas]);
-                          setFormData(prev => {
-                            const newRepas = { ...prev.repas };
-                            dates.forEach(d => {
-                              const ds = d.toISOString().split('T')[0];
-                              if (!newRepas[ds]) newRepas[ds] = {};
-                              newRepas[ds][typeRepas] = !allChecked;
-                            });
-                            return { ...prev, repas: newRepas };
-                          });
-                        }}
-                        disabled={nombreTotalOccupants < 5}
-                        className="text-xs font-black uppercase text-muc-blue tracking-wider hover:text-blue-700 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {tarifs.label}
-                      </button>
+                    <div key={typeRepas} className="text-center text-xs font-black uppercase text-muc-blue tracking-wider">
+                      {tarifs.label}
                     </div>
                   ))}
                 </div>
@@ -1062,26 +1101,49 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 {getDatesSejour().map((date, idx) => {
                   const dateStr = date.toISOString().split('T')[0];
                   const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-                  const isEven = idx % 2 === 0;
                   return (
-                    <div key={dateStr} className={`grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 border-b border-slate-100 last:border-b-0`}>
-                      <div className="text-sm font-bold text-slate-700 capitalize">{jourLabel}</div>
-                      {Object.entries(TARIFS_REPAS).map(([typeRepas]) => {
-                        const isChecked = formData.repas[dateStr]?.[typeRepas] || false;
+                    <div key={dateStr} className={`grid grid-cols-1 md:grid-cols-4 gap-4 items-start p-4 border-b border-slate-100 last:border-b-0`}>
+                      <div className="text-sm font-bold text-slate-700 capitalize md:mt-2">{jourLabel}</div>
+                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
+                        const repasData = formData.repas[dateStr]?.[typeRepas] || {};
                         return (
-                          <div key={typeRepas} className="flex justify-center">
-                            <button
-                              type="button"
-                              onClick={() => toggleRepasJour(dateStr, typeRepas)}
-                              disabled={nombreTotalOccupants < 5}
-                              className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all ${
-                                isChecked
-                                  ? 'bg-muc-blue border-muc-blue text-white shadow-md scale-105'
-                                  : 'bg-white border-slate-200 text-slate-300 hover:border-muc-blue hover:text-muc-blue disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-300'
-                              }`}
-                            >
-                              {isChecked ? <CheckCircle size={18} /> : <span className="text-lg">·</span>}
-                            </button>
+                          <div key={typeRepas} className="flex flex-col gap-2 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-600">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE}€)</span></span>
+                              <input
+                                type="number"
+                                min="0"
+                                disabled={nombreTotalOccupants < 5}
+                                value={repasData.ADULTE || ''}
+                                onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ADULTE', e.target.value)}
+                                className="w-14 p-1 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-600">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12}€)</span></span>
+                              <input
+                                type="number"
+                                min="0"
+                                disabled={nombreTotalOccupants < 5}
+                                value={repasData.ENFANT_MOINS_12 || ''}
+                                onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_12', e.target.value)}
+                                className="w-14 p-1 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-600">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5}€)</span></span>
+                              <input
+                                type="number"
+                                min="0"
+                                disabled={nombreTotalOccupants < 5}
+                                value={repasData.ENFANT_MOINS_5 || ''}
+                                onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_5', e.target.value)}
+                                className="w-14 p-1 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white"
+                                placeholder="0"
+                              />
+                            </div>
                           </div>
                         );
                       })}
