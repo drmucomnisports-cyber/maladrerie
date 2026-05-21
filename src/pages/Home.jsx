@@ -311,70 +311,70 @@ const Home = () => {
             </div>
 
             {/* Restauration */}
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-10 rounded-[2.5rem] hover:-translate-y-2 transition-all duration-300 shadow-2xl border-t-8 border-t-muc-blue" data-reveal="right">
-              <h3 className="text-3xl font-black mb-10 text-white flex items-center gap-4 uppercase tracking-tight">
-                <div className="bg-muc-blue/20 p-3 rounded-2xl text-muc-blue">
-                  <Utensils size={32} />
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-10 rounded-[2.5rem] hover:-translate-y-2 transition-all duration-300 shadow-2xl relative overflow-hidden group" data-reveal="right">
+              <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-4 uppercase tracking-tight">
+                <div className="bg-white/20 p-3 rounded-2xl text-white">
+                  <Utensils size={28} />
                 </div>
                 Restauration
               </h3>
               <p className="text-blue-100 mb-8 text-lg leading-relaxed font-medium">
                 Un service de repas adapté à vos séjours :
               </p>
-              <ul className="space-y-8 text-lg">
+              <ul className="space-y-8 text-lg text-blue-100">
                 <li className="flex items-start gap-5 group">
-                  <div className="bg-muc-blue p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
+                  <div className="bg-white/20 p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
                     <CheckCircle2 className="text-white" size={20} />
                   </div>
-                  <span className="font-medium tracking-tight text-blue-100"><strong>Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
+                  <span className="font-medium tracking-tight"><strong>Alimentation saine</strong> : menus élaborés en privilégiant les produits bruts, locaux et à 63 % bio.</span>
                 </li>
                 <li className="flex items-start gap-5 group">
-                  <div className="bg-muc-blue p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
+                  <div className="bg-white/20 p-1.5 rounded-lg transform group-hover:rotate-12 transition-transform mt-1 shrink-0">
                     <Info className="text-white" size={20} />
                   </div>
-                  <span className="font-medium tracking-tight text-blue-100"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
+                  <span className="font-medium tracking-tight"><strong>Menus en ligne</strong> : repas consultables directement sur le site de la cantine de la Ville de Millau.</span>
                 </li>
               </ul>
             </div>
           </div>
 
           {/* Salles de formation */}
-          <div className="mt-20 bg-white text-slate-900 p-10 md:p-16 rounded-[2.5rem] shadow-2xl relative overflow-hidden border-b-8 border-muc-yellow" data-reveal="bottom">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-muc-blue/5 rounded-full -mr-32 -mt-32 pointer-events-none"></div>
+          <div className="mt-20 bg-white/10 backdrop-blur-md border border-white/20 p-10 md:p-16 rounded-[2.5rem] hover:-translate-y-2 transition-all duration-300 shadow-2xl relative overflow-hidden group" data-reveal="bottom">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none group-hover:scale-110 transition-transform"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
               <div className="space-y-6 lg:max-w-2xl">
-                <div className="bg-muc-blue text-white inline-block px-4 py-1 font-black text-sm uppercase tracking-widest skew-x-[-15deg]">
+                <div className="bg-white/20 text-white inline-block px-4 py-1 font-bold text-sm uppercase tracking-widest skew-x-[-15deg]">
                   <span className="inline-block skew-x-[15deg]">Espace Travail & Séminaires</span>
                 </div>
-                <h3 className="text-3xl md:text-4xl font-black text-muc-blue uppercase tracking-tight">Location de Salles de Formation</h3>
-                <p className="text-lg text-slate-600 font-medium leading-relaxed">
-                  Nous mettons à votre disposition <strong className="text-muc-blue font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-muc-blue font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
+                <h3 className="text-2xl font-bold text-white mb-4 uppercase tracking-tight">Location de Salles de Formation</h3>
+                <p className="text-blue-100 text-lg font-medium leading-relaxed">
+                  Nous mettons à votre disposition <strong className="text-white font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-white font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
                 </p>
-                <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
+                <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-white/20">
                   <div className="space-y-2">
-                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
-                      <Presentation size={18} className="text-muc-yellow" /> Équipement complet
+                    <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Presentation size={18} className="text-white" /> Équipement complet
                     </p>
-                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo.</p>
+                    <p className="text-blue-100 text-sm font-medium leading-relaxed">Tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo.</p>
                   </div>
                   <div className="space-y-2">
-                    <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
-                      <Calendar size={18} className="text-muc-yellow" /> Conditions d'accès
+                    <p className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
+                      <Calendar size={18} className="text-white" /> Conditions d'accès
                     </p>
-                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
+                    <p className="text-blue-100 text-sm font-medium leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-muc-blue text-white p-8 rounded-[2rem] text-center shrink-0 lg:w-80 shadow-lg flex flex-col justify-center border-t-4 border-muc-yellow">
-                <p className="text-xs uppercase font-black tracking-widest text-muc-yellow mb-4">Tarifs de location</p>
-                <div className="space-y-6">
+              <div className="bg-white/10 border border-white/20 text-white p-8 rounded-[2rem] text-center shrink-0 lg:w-80 shadow-lg flex flex-col justify-center">
+                <p className="text-xs uppercase font-black tracking-widest text-blue-100 mb-4">Tarifs de location</p>
+                <div className="space-y-6 text-blue-100">
                   <div>
                     <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
-                    <span className="text-xs text-blue-200 mt-1 block">si réservé avec le gîte</span>
+                    <span className="text-xs text-blue-100 mt-1 block">si réservé avec le gîte</span>
                   </div>
                   <div className="border-t border-white/10 pt-4">
                     <span className="block text-4xl font-black text-white">150 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
-                    <span className="text-xs text-blue-200 mt-1 block">en location seule</span>
+                    <span className="text-xs text-blue-100 mt-1 block">en location seule</span>
                   </div>
                 </div>
               </div>
