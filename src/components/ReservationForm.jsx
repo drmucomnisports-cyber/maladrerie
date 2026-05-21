@@ -516,9 +516,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         triggerError('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
         return;
       }
-      const hasMinMeals = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
-      if (!hasMinMeals) {
-        triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
+      const hasLunchOrDinner = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
+      if (!hasLunchOrDinner) {
+        triggerError("Veuillez sélectionner au moins un déjeuner ou un dîner sur une journée pour valider la restauration.");
         return;
       }
     }
@@ -594,16 +594,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     }
 
     // Vérification minimum 5 personnes pour les repas
-    let isRepasCommandes = false;
-    Object.values(formData.repas || {}).forEach(dayRepas => {
-      Object.values(dayRepas).forEach(categories => {
-        Object.values(categories).forEach(qty => {
-          if (parseInt(qty) > 0) isRepasCommandes = true;
-        });
-      });
-    });
+    const hasRepasCommandes = Object.values(formData.repas || {}).some(dayRepas => dayRepas.PETIT_DEJ || dayRepas.DEJEUNER || dayRepas.DINER);
 
-    if (isRepasCommandes) {
+    if (hasRepasCommandes) {
       let totalOccups = 0;
       if (isDevis) {
         const totalAdults = parseInt(formData.devisAdultes) || 0;
@@ -617,13 +610,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         return;
       }
       
-      const hasRepasChecked = Object.values(formData.repas).some(day => day.PETIT_DEJ || day.DEJEUNER || day.DINER);
-      if (hasRepasChecked) {
-        const hasMinMeals = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
-        if (!hasMinMeals) {
-          triggerError("L'ouverture du service de restauration nécessite la commande d'un minimum de 5 repas (déjeuners ou dîners) sur une même journée.");
-          return;
-        }
+      const hasLunchOrDinner = Object.values(formData.repas).some(day => day.DEJEUNER || day.DINER);
+      if (!hasLunchOrDinner) {
+        triggerError("Veuillez sélectionner au moins un déjeuner ou un dîner sur une journée pour valider la restauration.");
+        return;
       }
     }
 
@@ -973,40 +963,67 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 </div>
               </div>
 
-              {getDatesSejour().map(date => {
-                const dateStr = date.toISOString().split('T')[0];
-                const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-                return (
-                  <div key={dateStr} className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
-                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
-                      <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight">{jourLabel}</h4>
+              {/* En-tête du tableau */}
+              <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
+                <div className="grid grid-cols-4 gap-0 bg-slate-100 border-b-2 border-slate-200 px-4 py-3">
+                  <div className="text-xs font-black uppercase text-slate-500 tracking-wider flex items-center">Jour</div>
+                  {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => (
+                    <div key={typeRepas} className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const dates = getDatesSejour();
+                          const allChecked = dates.every(d => formData.repas[d.toISOString().split('T')[0]]?.[typeRepas]);
+                          setFormData(prev => {
+                            const newRepas = { ...prev.repas };
+                            dates.forEach(d => {
+                              const ds = d.toISOString().split('T')[0];
+                              if (!newRepas[ds]) newRepas[ds] = {};
+                              newRepas[ds][typeRepas] = !allChecked;
+                            });
+                            return { ...prev, repas: newRepas };
+                          });
+                        }}
+                        disabled={nombreTotalOccupants < 5}
+                        className="text-xs font-black uppercase text-muc-blue tracking-wider hover:text-blue-700 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {tarifs.label}
+                      </button>
                     </div>
-                    <div className="p-4 flex flex-col md:flex-row gap-3">
-                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
+                  ))}
+                </div>
+
+                {/* Lignes jour par jour */}
+                {getDatesSejour().map((date, idx) => {
+                  const dateStr = date.toISOString().split('T')[0];
+                  const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+                  const isEven = idx % 2 === 0;
+                  return (
+                    <div key={dateStr} className={`grid grid-cols-4 gap-0 items-center px-4 py-3 border-b border-slate-100 last:border-b-0 ${isEven ? 'bg-white' : 'bg-slate-50/50'}`}>
+                      <div className="text-sm font-bold text-slate-700 capitalize">{jourLabel}</div>
+                      {Object.entries(TARIFS_REPAS).map(([typeRepas]) => {
                         const isChecked = formData.repas[dateStr]?.[typeRepas] || false;
                         return (
-                          <button
-                            key={typeRepas}
-                            type="button"
-                            onClick={() => toggleRepasJour(dateStr, typeRepas)}
-                            disabled={nombreTotalOccupants < 5}
-                            className={`flex-1 p-3 rounded-xl border-2 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                              isChecked
-                                ? 'bg-muc-blue border-muc-blue text-white shadow-md scale-[1.02]'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-muc-blue hover:text-muc-blue disabled:opacity-50 disabled:hover:scale-100 disabled:hover:border-slate-200'
-                            }`}
-                          >
-                            <div className={`w-5 h-5 rounded flex items-center justify-center border-2 ${isChecked ? 'border-white bg-white/20' : 'border-slate-300'}`}>
-                              {isChecked && <CheckCircle size={14} className="text-white" />}
-                            </div>
-                            {tarifs.label}
-                          </button>
+                          <div key={typeRepas} className="flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleRepasJour(dateStr, typeRepas)}
+                              disabled={nombreTotalOccupants < 5}
+                              className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all ${
+                                isChecked
+                                  ? 'bg-muc-blue border-muc-blue text-white shadow-md scale-105'
+                                  : 'bg-white border-slate-200 text-slate-300 hover:border-muc-blue hover:text-muc-blue disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-300'
+                              }`}
+                            >
+                              {isChecked ? <CheckCircle size={18} /> : <span className="text-lg">·</span>}
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
 
               {calculerTotalRepas() > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex justify-between items-center">
