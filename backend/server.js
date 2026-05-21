@@ -402,6 +402,79 @@ app.get('/api/reservations', async (req, res) => {
   }
 });
 
+// --- HELPER : Générer la section Options, Repas et Salles pour les e-mails ---
+function generateOptionsHTML(options, repas, salles) {
+  let html = `<div style="margin-top: 30px; margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px;">
+    <h3 style="color: #004B93; margin-top: 0; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #FDB913; padding-bottom: 8px; display: inline-block;">Options et Services sélectionnés</h3>`;
+  
+  let hasOptions = false;
+
+  // Repas
+  if (repas && Object.keys(repas).length > 0) {
+    let repasDetails = [];
+    Object.entries(repas).forEach(([dateStr, meals]) => {
+      let selectedMeals = [];
+      if (meals.PETIT_DEJ) selectedMeals.push("Petit-déjeuner");
+      if (meals.DEJEUNER) selectedMeals.push("Déjeuner");
+      if (meals.DINER) selectedMeals.push("Dîner");
+      if (selectedMeals.length > 0) {
+        const dateObj = new Date(dateStr);
+        const dateLabel = isNaN(dateObj.getTime()) ? dateStr : dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+        repasDetails.push(`<li style="margin-bottom: 5px;"><strong style="text-transform: capitalize;">${dateLabel} :</strong> ${selectedMeals.join(', ')}</li>`);
+      }
+    });
+    if (repasDetails.length > 0) {
+      hasOptions = true;
+      html += `
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">🍽️ Restauration</h4>
+        <ul style="margin: 0; padding-left: 20px; color: #555;">
+          ${repasDetails.join('')}
+        </ul>
+      `;
+    }
+  }
+
+  // Salles
+  if (salles) {
+    let sallesSelected = [];
+    if (salles.salle15) sallesSelected.push("Salle de formation 15 places");
+    if (salles.salle12) sallesSelected.push("Salle de formation 12 places");
+    if (sallesSelected.length > 0) {
+      hasOptions = true;
+      html += `
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">💼 Salles de formation</h4>
+        <ul style="margin: 0; padding-left: 20px; color: #555;">
+          ${sallesSelected.map(s => `<li style="margin-bottom: 5px;">${s}</li>`).join('')}
+        </ul>
+      `;
+    }
+  }
+
+  // Options Confort
+  if (options) {
+    let optionsSelected = [];
+    if (options.litsFaits) optionsSelected.push("Lits faits à l'arrivée");
+    if (options.lingeFourni) optionsSelected.push("Linge de toilette fourni");
+    if (options.menage) optionsSelected.push("Ménage fin de séjour");
+    if (optionsSelected.length > 0) {
+      hasOptions = true;
+      html += `
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">🛏️ Options de confort</h4>
+        <ul style="margin: 0; padding-left: 20px; color: #555;">
+          ${optionsSelected.map(o => `<li style="margin-bottom: 5px;">${o}</li>`).join('')}
+        </ul>
+      `;
+    }
+  }
+
+  if (!hasOptions) {
+    html += `<p style="margin: 0; color: #777; font-style: italic;">Aucune option sélectionnée.</p>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
 app.post('/api/reservations', async (req, res) => {
   const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, structure } = req.body;
 
@@ -482,7 +555,7 @@ app.post('/api/reservations', async (req, res) => {
     });
 
     let intervenantsHTML = '';
-    if (availableIntervenants.length > 0) {
+    if (availableIntervenants && availableIntervenants.length > 0) {
       intervenantsHTML = `
         <div style="margin-top: 20px; padding: 15px; background-color: #e8f5e9; border-left: 4px solid #28a745; border-radius: 4px;">
           <h3 style="color: #155724; margin-top: 0; font-size: 16px;">✅ Intervenants disponibles sur cette période :</h3>
@@ -528,17 +601,7 @@ app.post('/api/reservations', async (req, res) => {
       `;
     }
 
-    let optionsHTML = '';
-    if (options && Object.keys(options).some(k => options[k])) {
-      optionsHTML = `
-        <p><strong>Options :</strong></p>
-        <ul>
-          ${options.litsFaits ? '<li>Lits faits à l\'arrivée</li>' : ''}
-          ${options.lingeFourni ? '<li>Linge de toilette fourni</li>' : ''}
-          ${options.menage ? '<li>Ménage fin de séjour</li>' : ''}
-        </ul>
-      `;
-    }
+    const optionsHTML = generateOptionsHTML(options, reservation.repas, reservation.salles);
 
     const adminEmails = ['david.roujet@mucomnisports.fr', 'philippe.morereau@mucomnisports.fr'];
     console.log(`Tentative d'envoi d'alerte admin à: ${adminEmails.join(', ')}`);
@@ -644,6 +707,7 @@ app.post('/api/reservations', async (req, res) => {
                   <td style="padding: 40px; color: #333333; line-height: 1.6;">
                     <h2 style="color: #004B93; margin-top: 0;">Bonjour ${nom},</h2>
                     <p>Nous avons bien reçu votre demande de réservation pour la période du <strong>${new Date(dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
+                    ${generateOptionsHTML(options, req.body.repas, req.body.salles)}
                     <p>Notre équipe va étudier votre demande et vous répondra dans les plus brefs délais pour vous confirmer la disponibilité et vous envoyer les instructions de paiement.</p>
                     <p style="margin-top: 30px;">À très bientôt,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
                   </td>
@@ -780,6 +844,8 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
                         ${existingReservation.occupants.map(occ => `<li>${occ.nom} ${occ.prenom} - ${occ.estAdulte ? 'Adulte' : `Mineur (${occ.age} ans)`}</li>`).join('')}
                       </ul>
                     ` : ''}
+
+                    ${generateOptionsHTML(existingReservation.options, existingReservation.repas, existingReservation.salles)}
 
                     ${paymentLink ? `
                       <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
