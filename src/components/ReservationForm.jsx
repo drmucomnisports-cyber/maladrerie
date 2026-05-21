@@ -550,6 +550,32 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
     }
 
+    // Vérification minimum 5 personnes pour les repas
+    let isRepasCommandes = false;
+    Object.values(formData.repas || {}).forEach(dayRepas => {
+      Object.values(dayRepas).forEach(categories => {
+        Object.values(categories).forEach(qty => {
+          if (parseInt(qty) > 0) isRepasCommandes = true;
+        });
+      });
+    });
+
+    if (isRepasCommandes) {
+      let totalOccups = 0;
+      if (isDevis) {
+        const totalAdults = parseInt(formData.devisAdultes) || 0;
+        const totalMineurs = parseInt(formData.devisMineurs) || 0;
+        totalOccups = totalAdults + totalMineurs;
+      } else {
+        totalOccups = formData.occupants?.length || 0;
+      }
+      if (totalOccups < 5) {
+        setErrorMsg('Un minimum de 5 personnes est requis pour pouvoir commander des repas.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       // Map mineurs to enfants in non-devis mode to maintain backend compatibility
@@ -889,7 +915,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
                   <div className="text-xs text-blue-800 leading-relaxed">
                     <p className="font-bold mb-1">Service de restauration — Cuisine Centrale de la Ville de Millau</p>
-                    <p>Menus consultables sur le site de la cantine de la Ville de Millau (63% bio, circuit court, producteurs locaux). Les repas sont <strong>livrés le matin avant 10h</strong> (le vendredi pour les week-ends), en bacs inox. Ni pique-nique ni panier repas.</p>
+                    <p>Menus consultables sur le site de la cantine de la Ville de Millau (63% bio, circuit court, producteurs locaux). Les repas sont <strong>livrés le matin avant 10h</strong> (le vendredi pour les week-ends), en bacs inox. Ni pique-nique ni panier repas. <strong className="text-blue-900 block mt-2">⚠️ Un minimum de 5 personnes est requis pour pouvoir commander des repas.</strong></p>
                   </div>
                 </div>
               </div>

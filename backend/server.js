@@ -184,7 +184,7 @@ const getMissionDetail = (m, dateDebut, dateFin) => {
 const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 8, 5: 6, 6: 5 };
 const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Chambre 4", 5: "Chambre 5", 6: "Chambre 6" };
 
-const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, options, promoCode) => {
+const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, options, promoCode, repas, salles) => {
   const start = new Date(dateDebut);
   const end = new Date(dateFin);
   const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
@@ -193,6 +193,7 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
   let total = 0;
   let totalAdultes = 0;
 
+  // Chambres
   chambres.forEach(chId => {
     const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
     const nbAdultes = parseInt(details.adultes || 0);
@@ -207,7 +208,33 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
     total += nbAdultes * (tarifPers * 0.04) * nuits;
   });
 
-  // Suppression de l'ancienne ligne de taxe hardcodée
+  // Salles de formation
+  if (salles) {
+    const prixSalle = chambres.length > 0 ? 100 : 150;
+    if (salles.salle15) total += prixSalle * nuits;
+    if (salles.salle12) total += prixSalle * nuits;
+  }
+
+  // Repas
+  if (repas) {
+    Object.values(repas).forEach(dayRepas => {
+      if (dayRepas.PETIT_DEJ) {
+        total += (parseInt(dayRepas.PETIT_DEJ.ADULTE || 0) * 6);
+        total += (parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0) * 5);
+        total += (parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0) * 4);
+      }
+      if (dayRepas.DEJEUNER) {
+        total += (parseInt(dayRepas.DEJEUNER.ADULTE || 0) * 11.5);
+        total += (parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0) * 9.5);
+        total += (parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0) * 8);
+      }
+      if (dayRepas.DINER) {
+        total += (parseInt(dayRepas.DINER.ADULTE || 0) * 14);
+        total += (parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0) * 12);
+        total += (parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0) * 10);
+      }
+    });
+  }
 
   // Options
   const totalPersonnes = Object.values(chambresDetails || {}).reduce((acc, curr) => acc + parseInt(curr.adultes || 0) + parseInt(curr.enfants || 0), 0);
@@ -297,7 +324,7 @@ app.post('/api/reservations', async (req, res) => {
   const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, structure } = req.body;
 
   // Recalculer le prix côté serveur pour sécurité
-  const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, req.body.promoCode);
+  const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, req.body.promoCode, req.body.repas, req.body.salles);
   const prixTotal = backendPrixTotal; // Alias de sécurité pour éviter les ReferenceError
 
 
@@ -773,7 +800,7 @@ app.get('/api/reservations/:id/reject', checkAuth, async (req, res) => {
 
 // Créer un devis
 app.post('/api/admin/devis', checkAuth, async (req, res) => {
-  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, promoCode, structure } = req.body;
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, promoCode, structure, repas, salles } = req.body;
 
   try {
     const now = new Date();
@@ -795,7 +822,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
     const resolvedAdminTel = admin ? (admin.telephone || '04 99 58 35 35') : '04 99 58 35 35';
 
     // 2. Calculer le montant
-    const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, promoCode);
+    const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, promoCode, repas, salles);
     
     let totalAdultes = 0;
     let totalMineurs = 0;
@@ -905,21 +932,107 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       adminTel: resolvedAdminTel,
       chambres: chambres.map(id => CHAMBRES_NAMES[id] || `Chambre ${id}`),
       nuits,
-      detailsLignes: chambres.map(chId => {
-        const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
-        const nbAdultes = parseInt(details.adultes || 0);
-        const nbMineurs = parseInt(details.enfants || 0);
-        const occupantsCount = nbAdultes + nbMineurs;
-        const capacite = CHAMBRES_CAPACITE[chId] || 5;
-        const tarifPers = occupantsCount >= capacite ? 22 : 25;
-        return {
-          designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} (${nbAdultes} ad. + ${nbMineurs} enf.)`,
-          nbPersonnes: occupantsCount,
-          tarifParPersonne: tarifPers,
-          nuits: nuits,
-          total: occupantsCount * tarifPers * nuits
-        };
-      }),
+      detailsLignes: (() => {
+        const lignes = chambres.map(chId => {
+          const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
+          const nbAdultes = parseInt(details.adultes || 0);
+          const nbMineurs = parseInt(details.enfants || 0);
+          const occupantsCount = nbAdultes + nbMineurs;
+          const capacite = CHAMBRES_CAPACITE[chId] || 5;
+          const tarifPers = occupantsCount >= capacite ? 22 : 25;
+          return {
+            designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} (${nbAdultes} ad. + ${nbMineurs} enf.)`,
+            nbPersonnes: occupantsCount,
+            tarifParPersonne: tarifPers,
+            nuits: nuits,
+            total: occupantsCount * tarifPers * nuits
+          };
+        });
+
+        // Ajouter les salles
+        if (salles) {
+          const prixSalle = chambres.length > 0 ? 100 : 150;
+          if (salles.salle15) {
+            lignes.push({
+              designation: `Location Salle 15 personnes`,
+              nbPersonnes: 1,
+              tarifParPersonne: prixSalle,
+              nuits: nuits,
+              total: prixSalle * nuits
+            });
+          }
+          if (salles.salle12) {
+            lignes.push({
+              designation: `Location Salle 12 personnes`,
+              nbPersonnes: 1,
+              tarifParPersonne: prixSalle,
+              nuits: nuits,
+              total: prixSalle * nuits
+            });
+          }
+        }
+
+        // Ajouter les repas
+        if (repas) {
+          let totalPDJ = { qte: 0, total: 0 };
+          let totalDEJ = { qte: 0, total: 0 };
+          let totalDIN = { qte: 0, total: 0 };
+
+          Object.values(repas).forEach(dayRepas => {
+            if (dayRepas.PETIT_DEJ) {
+              const a = parseInt(dayRepas.PETIT_DEJ.ADULTE || 0);
+              const e12 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0);
+              const e5 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0);
+              totalPDJ.qte += (a + e12 + e5);
+              totalPDJ.total += (a * 6) + (e12 * 5) + (e5 * 4);
+            }
+            if (dayRepas.DEJEUNER) {
+              const a = parseInt(dayRepas.DEJEUNER.ADULTE || 0);
+              const e12 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0);
+              const e5 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0);
+              totalDEJ.qte += (a + e12 + e5);
+              totalDEJ.total += (a * 11.5) + (e12 * 9.5) + (e5 * 8);
+            }
+            if (dayRepas.DINER) {
+              const a = parseInt(dayRepas.DINER.ADULTE || 0);
+              const e12 = parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0);
+              const e5 = parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0);
+              totalDIN.qte += (a + e12 + e5);
+              totalDIN.total += (a * 14) + (e12 * 12) + (e5 * 10);
+            }
+          });
+
+          if (totalPDJ.qte > 0) {
+            lignes.push({
+              designation: 'Petits-déjeuners',
+              nbPersonnes: totalPDJ.qte,
+              tarifParPersonne: totalPDJ.total / totalPDJ.qte,
+              nuits: 1,
+              total: totalPDJ.total
+            });
+          }
+          if (totalDEJ.qte > 0) {
+            lignes.push({
+              designation: 'Déjeuners',
+              nbPersonnes: totalDEJ.qte,
+              tarifParPersonne: totalDEJ.total / totalDEJ.qte,
+              nuits: 1,
+              total: totalDEJ.total
+            });
+          }
+          if (totalDIN.qte > 0) {
+            lignes.push({
+              designation: 'Dîners',
+              nbPersonnes: totalDIN.qte,
+              tarifParPersonne: totalDIN.total / totalDIN.qte,
+              nuits: 1,
+              total: totalDIN.total
+            });
+          }
+        }
+
+        return lignes;
+      })(),
       taxeSejourDetails: {
         adultes: totalAdultes,
         taux: 0.04,

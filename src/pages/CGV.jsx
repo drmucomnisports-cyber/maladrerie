@@ -80,6 +80,7 @@ const CGV = () => {
             <p>Pour toute commande de repas, les conditions suivantes s'appliquent :</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
               <li>Les commandes de repas doivent être transmises au plus tard le jeudi pour la semaine suivante.</li>
+              <li>La commande de repas est soumise à un minimum de 5 personnes par réservation.</li>
               <li>La commande n'est validée qu'à réception du paiement intégral des repas (100 %) en plus des 30 % d'arrhes de l'hébergement.</li>
               <li>Les repas sont livrés le matin avant 10h (le vendredi pour les week-ends), conditionnés en bacs inox. Ils comprennent une entrée, un plat et un dessert.</li>
               <li>Il n'est pas proposé de paniers repas ni de pique-niques.</li>

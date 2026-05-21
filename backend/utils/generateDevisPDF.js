@@ -84,9 +84,28 @@ async function generateDevisPDF(data) {
             let y = tableTop + 28;
             doc.fillColor('#000000').font('Helvetica').fontSize(8.5);
             
-            // Lignes Hébergement
+            const checkPageBreak = (spaceNeeded = 18) => {
+                if (y + spaceNeeded > 700) {
+                    doc.addPage();
+                    y = 50;
+                    
+                    doc.rect(leftCol, y, 512, 20).fill('#004B93');
+                    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(8);
+                    doc.text('DÉSIGNATION', colDesig, y + 6, { width: 210 });
+                    doc.text('NB PERS.', colPers, y + 6, { width: 60, align: 'center' });
+                    doc.text('PRIX', colPU, y + 6, { width: 75, align: 'center' });
+                    doc.text('NB NUITS', colNuits, y + 6, { width: 60, align: 'center' });
+                    doc.text('TOTAL (€)', colTotal, y + 6, { align: 'right', width: colTotalW });
+                    
+                    y += 28;
+                    doc.fillColor('#000000').font('Helvetica').fontSize(8.5);
+                }
+            };
+            
+            // Lignes Hébergement et Prestations
             if (data.detailsLignes && data.detailsLignes.length > 0) {
                 data.detailsLignes.forEach((ligne, idx) => {
+                    checkPageBreak(18);
                     // Alternate row background for readability
                     if (idx % 2 === 0) {
                         doc.rect(leftCol, y - 4, 512, 18).fill('#F8F9FA');
@@ -94,20 +113,22 @@ async function generateDevisPDF(data) {
                     }
                     doc.text(ligne.designation, colDesig, y, { width: 210 });
                     doc.text(ligne.nbPersonnes.toString(), colPers, y, { width: 60, align: 'center' });
-                    doc.text(`${ligne.tarifParPersonne.toFixed(2)} €`, colPU, y, { width: 75, align: 'center' });
+                    doc.text(`${(ligne.tarifParPersonne || 0).toFixed(2)} €`, colPU, y, { width: 75, align: 'center' });
                     doc.text(ligne.nuits.toString(), colNuits, y, { width: 60, align: 'center' });
-                    doc.font('Helvetica-Bold').text(ligne.total.toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
+                    doc.font('Helvetica-Bold').text((ligne.total || 0).toFixed(2), colTotal, y, { align: 'right', width: colTotalW });
                     doc.font('Helvetica');
                     y += 18;
                 });
             } else {
                 // Fallback
+                checkPageBreak(18);
                 doc.text('Hébergement du séjour', colDesig, y);
                 doc.text(data.prixSejour?.toFixed(2) || '0.00', colTotal, y, { align: 'right', width: colTotalW });
                 y += 18;
             }
 
             // Séparateur
+            checkPageBreak(10);
             y += 2;
             doc.strokeColor('#DDDDDD').moveTo(leftCol, y).lineTo(leftCol + 512, y).stroke();
             y += 8;
@@ -115,6 +136,7 @@ async function generateDevisPDF(data) {
             // Options
             if (data.options && data.options.length > 0) {
                 data.options.forEach(opt => {
+                    checkPageBreak(18);
                     doc.text(opt.nom, colDesig, y, { width: 210 });
                     doc.text(opt.qte.toString(), colPers, y, { width: 60, align: 'center' });
                     doc.text(`${opt.pu.toFixed(2)} €`, colPU, y, { width: 75, align: 'center' });
@@ -126,6 +148,7 @@ async function generateDevisPDF(data) {
 
             // Taxe de séjour
             if (data.taxeSejourDetails) {
+                checkPageBreak(18);
                 const tsd = data.taxeSejourDetails;
                 const puTaxe = (tsd.base * tsd.taux).toFixed(2);
                 
@@ -155,6 +178,7 @@ async function generateDevisPDF(data) {
              y += 10;
 
              // Box Total
+             checkPageBreak(120);
              const totalBoxY = y - 5;
              doc.rect(leftCol + 280, totalBoxY, 232, 85).fill('#F8F9FA');
              doc.fillColor('#000000');
@@ -175,7 +199,8 @@ async function generateDevisPDF(data) {
             // Temporarily reduce bottom margin to prevent automatic premature page break
             doc.page.margins.bottom = 10;
 
-            y = 570;
+            checkPageBreak(150);
+            y = Math.max(570, y + 40);
             doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666');
             doc.text("Ce devis est établi sous réserve de disponibilité au moment de la signature.", leftCol, y);
             doc.text("Le paiement de l'acompte valide définitivement la réservation.", leftCol, y + 12);
