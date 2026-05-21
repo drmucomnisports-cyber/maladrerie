@@ -703,39 +703,41 @@ const Admin = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
+                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
                     <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4">
+                      <td className="p-6">
                         <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
-                        <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
+                        <div className="text-xs text-slate-500 mt-1">{res.client?.email || '-'}</div>
                         <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-6">
                         <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
-                        <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
+                        <div className="text-sm font-medium text-slate-700 mt-1">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-6">
                         <div className="text-sm font-bold text-muc-blue">
                           {res.chambres.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {res.options?.litsFaits && <span className="mr-2">🛏️ Lits faits</span>}
-                          {res.options?.lingeFourni && <span className="mr-2">🧴 Linge</span>}
-                          {res.options?.menage && <span>🧹 Ménage</span>}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {res.options?.litsFaits && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🛏️ Lits faits</span>}
+                          {res.options?.lingeFourni && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧴 Linge</span>}
+                          {res.options?.menage && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧹 Ménage</span>}
+                          {(res.salles?.salle15 || res.salles?.salle12) && <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-blue-200">💼 Salle(s)</span>}
+                          {res.repas && Object.keys(res.repas).length > 0 && <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-green-200">🍽️ Repas</span>}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-6">
                         <div className="text-sm font-black text-slate-800">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</div>
                         <div className="flex flex-col gap-1 mt-2">
                           <div className="flex items-center justify-between text-[10px]">
@@ -764,12 +766,12 @@ const Admin = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
-                        <div className="space-y-2">
+                      <td className="p-6">
+                        <div className="space-y-3">
                           <select
                             value={res.statut}
                             onChange={(e) => updateStatut(res.id, e.target.value)}
-                            className={`w-full text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg outline-none border-2 cursor-pointer ${res.statut === 'EN_ATTENTE' ? 'border-amber-200 bg-amber-50 text-amber-700' :
+                            className={`w-full text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg outline-none border-2 cursor-pointer ${res.statut === 'EN_ATTENTE' ? 'border-amber-200 bg-amber-50 text-amber-700' :
                                 res.statut === 'RESERVE' ? 'border-muc-blue/20 bg-muc-blue/10 text-muc-blue' :
                                   res.statut === 'REFUSEE' ? 'border-red-200 bg-red-50 text-red-700' : ''
                               }`}
@@ -783,20 +785,20 @@ const Admin = () => {
                               setCurrentReservationForMission(res);
                               setShowMissionModal(true);
                             }}
-                            className="w-full text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 rounded-lg outline-none border border-slate-200 bg-white text-slate-600 hover:border-muc-blue hover:text-muc-blue transition-colors flex justify-between items-center"
+                            className="w-full text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-lg outline-none border border-slate-200 bg-white text-slate-600 hover:border-muc-blue hover:text-muc-blue transition-colors flex justify-between items-center shadow-sm"
                           >
                             <span>Missions</span>
-                            <span className="bg-slate-100 px-1.5 rounded-full text-slate-500">{res.missions ? res.missions.length : 0}</span>
+                            <span className="bg-slate-100 px-2 py-0.5 rounded-full text-slate-500">{res.missions ? res.missions.length : 0}</span>
                           </button>
                         </div>
                       </td>
-                      <td className="p-4">
-                        <div className="text-xs font-bold text-slate-600">{res.validePar || '-'}</div>
+                      <td className="p-6">
+                        <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full inline-block">{res.validePar || '-'}</div>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-6 text-right">
                         <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-6 text-right">
                         <div className="flex justify-end gap-2 flex-wrap max-w-[200px] ml-auto">
                           {res.statut === 'EN_ATTENTE' && (
                             <>
@@ -874,14 +876,14 @@ const Admin = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prospect</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Expire le</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Prospect</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Expire le</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
+                      <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -893,34 +895,41 @@ const Admin = () => {
                       return res.statut?.includes('DEVIS') && matchesSearch;
                     }).map((res) => (
                       <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                        <td className="p-4">
+                        <td className="p-6">
                           <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
-                          <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
+                          <div className="text-xs text-slate-500 mt-1">{res.client?.email || '-'}</div>
                           <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-6">
                           <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
                             <Calendar size={14} className="text-muc-blue" />
                             Du {new Date(res.dateDebut).toLocaleDateString()}
                           </div>
-                          <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                          <div className="text-sm font-bold text-slate-700 flex items-center gap-2 mt-1">
                             <Calendar size={14} className="text-muc-blue" />
                             Au {new Date(res.dateFin).toLocaleDateString()}
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-6">
                           <div className="flex flex-wrap gap-1">
                             {res.chambres?.map(id => (
-                              <span key={id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase">
+                              <span key={id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase border border-slate-200">
                                 {CHAMBRES_NAMES[id] || `Ch. ${id}`}
                               </span>
                             ))}
                           </div>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {res.options?.litsFaits && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🛏️ Lits faits</span>}
+                            {res.options?.lingeFourni && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧴 Linge</span>}
+                            {res.options?.menage && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-orange-200">🧹 Ménage</span>}
+                            {(res.salles?.salle15 || res.salles?.salle12) && <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-blue-200">💼 Salle(s)</span>}
+                            {res.repas && Object.keys(res.repas).length > 0 && <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded-md tracking-wider border border-green-200">🍽️ Repas</span>}
+                          </div>
                         </td>
-                        <td className="p-4">
-                          <div className="font-black text-muc-blue">{res.prixTotal}€</div>
+                        <td className="p-6">
+                          <div className="font-black text-muc-blue text-lg">{res.prixTotal}€</div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-6">
                           <div className="flex flex-col gap-1">
                             <div className="text-xs font-bold text-slate-600 flex items-center gap-2">
                               <Clock size={14} className="text-slate-400" />
@@ -931,16 +940,16 @@ const Admin = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                        <td className="p-6">
+                          <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'
                             }`}>
                             {res.statut === 'DEVIS_EN_ATTENTE' ? 'En attente' : 'Expiré'}
                           </span>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-6 text-right">
                           <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-6 text-right">
                           <div className="flex justify-end gap-2">
                             {res.statut === 'DEVIS_EN_ATTENTE' && (
                               <button
