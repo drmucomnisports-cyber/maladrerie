@@ -1046,7 +1046,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               {formData.modeRestauration === 'global' ? (
                 <div className="bg-white rounded-2xl border-2 border-slate-100 p-6">
                    <p className="text-sm text-slate-600 mb-6">Sélectionnez les repas que vous souhaitez pour <strong>l'ensemble de votre séjour</strong>. Cette sélection s'appliquera automatiquement à tous les jours et pour tous les occupants.</p>
-                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                   <div className="flex flex-col gap-4">
                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
                        const isChecked = formData.repasGlobal[typeRepas];
                        return (
@@ -1088,69 +1088,66 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 </div>
               ) : (
               <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
-                <div className="hidden lg:grid grid-cols-4 gap-4 items-center p-4 border-b border-slate-100 bg-slate-50">
-                  <div className="text-xs font-black uppercase text-slate-500 tracking-wider">Jour</div>
-                  {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => (
-                    <div key={typeRepas} className="text-center text-xs font-black uppercase text-muc-blue tracking-wider truncate">
-                      {tarifs.label}
-                    </div>
-                  ))}
+                <div className="flex flex-col gap-0">
+                  {/* Lignes jour par jour */}
+                  {getDatesSejour().map((date, idx) => {
+                    const dateStr = date.toISOString().split('T')[0];
+                    const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+                    return (
+                      <div key={dateStr} className={`flex flex-col gap-4 p-5 border-b border-slate-100 last:border-b-0`}>
+                        <div className="text-sm font-bold text-slate-700 capitalize bg-slate-50 p-2.5 rounded-lg text-center border border-slate-100 shadow-sm">{jourLabel}</div>
+                        <div className="flex flex-col gap-3">
+                          {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
+                            const repasData = formData.repas[dateStr]?.[typeRepas] || {};
+                            return (
+                              <div key={typeRepas} className="flex flex-col gap-2 bg-slate-50/50 p-3.5 rounded-xl border border-slate-100 shadow-sm hover:border-slate-200 transition-colors">
+                                <div className="font-black text-muc-blue text-sm mb-1.5 text-center">{tarifs.label}</div>
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE}€)</span></span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      disabled={nombreTotalOccupants < 5}
+                                      value={repasData.ADULTE || ''}
+                                      onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ADULTE', e.target.value)}
+                                      className="w-16 p-1.5 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white shadow-inner"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12}€)</span></span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      disabled={nombreTotalOccupants < 5}
+                                      value={repasData.ENFANT_MOINS_12 || ''}
+                                      onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_12', e.target.value)}
+                                      className="w-16 p-1.5 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white shadow-inner"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5}€)</span></span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      disabled={nombreTotalOccupants < 5}
+                                      value={repasData.ENFANT_MOINS_5 || ''}
+                                      onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_5', e.target.value)}
+                                      className="w-16 p-1.5 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white shadow-inner"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-
-                {/* Lignes jour par jour */}
-                {getDatesSejour().map((date, idx) => {
-                  const dateStr = date.toISOString().split('T')[0];
-                  const jourLabel = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-                  return (
-                    <div key={dateStr} className={`grid grid-cols-1 lg:grid-cols-4 gap-4 items-start p-4 border-b border-slate-100 last:border-b-0`}>
-                      <div className="text-sm font-bold text-slate-700 capitalize lg:mt-2 bg-slate-50 lg:bg-transparent p-2 lg:p-0 rounded-lg lg:rounded-none text-center lg:text-left">{jourLabel}</div>
-                      {Object.entries(TARIFS_REPAS).map(([typeRepas, tarifs]) => {
-                        const repasData = formData.repas[dateStr]?.[typeRepas] || {};
-                        return (
-                          <div key={typeRepas} className="flex flex-col gap-2 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                            <div className="font-black text-muc-blue text-sm mb-1 lg:hidden text-center">{tarifs.label}</div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-slate-600 whitespace-nowrap">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE}€)</span></span>
-                              <input
-                                type="number"
-                                min="0"
-                                disabled={nombreTotalOccupants < 5}
-                                value={repasData.ADULTE || ''}
-                                onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ADULTE', e.target.value)}
-                                className="w-14 p-1 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white"
-                                placeholder="0"
-                              />
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12}€)</span></span>
-                              <input
-                                type="number"
-                                min="0"
-                                disabled={nombreTotalOccupants < 5}
-                                value={repasData.ENFANT_MOINS_12 || ''}
-                                onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_12', e.target.value)}
-                                className="w-14 p-1 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white"
-                                placeholder="0"
-                              />
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5}€)</span></span>
-                              <input
-                                type="number"
-                                min="0"
-                                disabled={nombreTotalOccupants < 5}
-                                value={repasData.ENFANT_MOINS_5 || ''}
-                                onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_5', e.target.value)}
-                                className="w-14 p-1 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white"
-                                placeholder="0"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
               </div>
               )}
 
