@@ -819,7 +819,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
+              name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
               description: `Client: ${existingReservation.client.nom}\nDu ${new Date(existingReservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(existingReservation.dateFin).toLocaleDateString('fr-FR')}\n${existingReservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`,
             },
             unit_amount: Math.round(montantAcompte * 100), // En centimes
@@ -908,7 +908,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
 
                     ${paymentLink ? `
                       <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
-                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'acompte (30%) :</p>
+                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'Acompte (30% H�bergement + 100% Repas) :</p>
                         <table width="100%" cellpadding="0" cellspacing="0" border="0">
                           <tr>
                             <td align="center">
@@ -1259,6 +1259,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
         return { nom: optNom, pu: optPrix, qte: qte, total: optPrix * qte };
       }) : [],
       prixTotal: backendPrixTotal,
+      montantAcompte: Math.round((Math.max(0, backendPrixTotal - calculerTotalRepasServeur(repas)) * 0.3 + calculerTotalRepasServeur(repas)) * 100) / 100,
       promoMontant: 0,
       codePromo: promoCode
     });
@@ -1458,7 +1459,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
+            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
             description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres?.length || 0} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
@@ -1570,7 +1571,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
+            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
             description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
@@ -1650,7 +1651,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1 style="color: #28a745;">Devis validé !</h1>
         <p>Votre demande a été confirmée.</p>
-        <p>Pour finaliser votre réservation, veuillez procéder au paiement de l'acompte (30%).</p>
+        <p>Pour finaliser votre réservation, veuillez procéder au paiement de l'Acompte (30% H�bergement + 100% Repas).</p>
         <div style="margin-top: 30px;">
           <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block;">Payer l'acompte en ligne</a>
         </div>
@@ -2207,7 +2208,7 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     const prochainsPaiements = reservationsEnAttente.map(r => ({
       reservationId: r.id,
       dateDebut: r.dateDebut,
-      typeAttendu: r.statutPaiement === 'EN_ATTENTE' ? 'ACOMPTE (30%)' : 'SOLDE (70%)',
+      typeAttendu: r.statutPaiement === 'EN_ATTENTE' ? 'Acompte (30% H�bergement + 100% Repas)' : 'SOLDE (70%)',
       montant: r.statutPaiement === 'EN_ATTENTE' ? r.montantAcompte : r.montantSolde
     })).sort((a, b) => new Date(a.dateDebut) - new Date(b.dateDebut));
 
@@ -2263,7 +2264,7 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
+            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
             description: `Client: ${reservation.client.nom}\nSéjour: du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),

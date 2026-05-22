@@ -180,20 +180,25 @@ async function generateDevisPDF(data) {
              // Box Total
              checkPageBreak(120);
              const totalBoxY = y - 5;
-             doc.rect(leftCol + 280, totalBoxY, 232, 85).fill('#F8F9FA');
+             doc.rect(leftCol + 280, totalBoxY, 232, 95).fill('#F8F9FA');
              doc.fillColor('#000000');
              
              y += 5;
              doc.fontSize(12).font('Helvetica-Bold').fillColor('#004B93').text('TOTAL TTC', leftCol + 290, y);
              doc.text(`${data.prixTotal.toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
              
-             y += 25;
-             doc.fontSize(10).font('Helvetica-Bold').fillColor('#000000').text('Dont Acompte (30%) :', leftCol + 290, y);
-             doc.text(`${(data.prixTotal * 0.3).toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
+             y += 20;
+             doc.fontSize(9).font('Helvetica-Bold').fillColor('#000000').text('Dont Acompte à régler :', leftCol + 290, y);
+             let acompteVal = data.montantAcompte ? data.montantAcompte : (data.prixTotal * 0.3);
+             doc.text(`${acompteVal.toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
+             
+             y += 12;
+             doc.fontSize(8).font('Helvetica').fillColor('#555555').text(`(30% Hébergement/Salles + 100% Repas)`, leftCol + 290, y);
              
              y += 15;
-             doc.fontSize(10).font('Helvetica').text('Solde à régler :', leftCol + 290, y);
-             doc.text(`${(data.prixTotal * 0.7).toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
+             doc.fontSize(10).font('Helvetica').fillColor('#000000').text('Solde à régler :', leftCol + 290, y);
+             let soldeVal = data.prixTotal - acompteVal;
+             doc.text(`${soldeVal.toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
 
             // --- MENTIONS LÉGALES & SIGNATURE ---
             // Temporarily reduce bottom margin to prevent automatic premature page break
