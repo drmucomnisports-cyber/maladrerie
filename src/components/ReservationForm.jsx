@@ -789,6 +789,18 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
         setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false } });
         setStep(1);
+        
+        if (onCreated) {
+          onCreated();
+        }
+
+        setTimeout(() => {
+          if (isDevis || isAdmin) {
+            navigate('/admin');
+          } else {
+            navigate('/');
+          }
+        }, 3000);
       } else {
         const errData = await res.json();
         triggerError(errData.error || "Une erreur est survenue lors de l'envoi.");
