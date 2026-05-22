@@ -177,18 +177,17 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     const start = new Date(startStr);
     const end = new Date(endStr);
     if (start >= end) return false;
-    
     const current = new Date(start);
     while (current < end) {
       const day = current.getDay(); // 0=dim, 1=lun, ..., 6=sam
       const isWeekend = (day === 5 || day === 6 || day === 0);
       const isHoliday = isVacancesScolairesZoneC(current);
-      if (isWeekend || isHoliday) {
-        return true;
+      if (!isWeekend && !isHoliday) {
+        return false;
       }
       current.setDate(current.getDate() + 1);
     }
-    return false;
+    return true;
   };
 
   const handleSalleToggle = (salleKey) => {
