@@ -1427,6 +1427,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   navigate('/admin');
                 } else {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
+                  navigate('/');
                 }
               }} 
               className="bg-[#004B93] text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-800 transition-colors w-full uppercase tracking-wider"
