@@ -37,7 +37,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     },
     salles: {
       salle15: false,
-      salle12: false
+      salle12: false,
+      dateDebut: '',
+      dateFin: ''
     },
     occupants: [],
     repas: {},
@@ -84,6 +86,22 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       setDevisWarningRooms([]);
     }
   }, [formData.dateDebut, formData.dateFin, events, formData.chambres]);
+
+  useEffect(() => {
+    setFormData(prev => {
+      if (prev.dateDebut && prev.dateFin && !prev.salles.dateDebut && !prev.salles.dateFin) {
+        return {
+          ...prev,
+          salles: {
+            ...prev.salles,
+            dateDebut: prev.dateDebut,
+            dateFin: prev.dateFin
+          }
+        };
+      }
+      return prev;
+    });
+  }, [formData.dateDebut, formData.dateFin]);
 
   const [unavailableRooms, setUnavailableRooms] = useState([]);
 
@@ -152,10 +170,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     );
   };
 
-  const areDatesValidForSalles = () => {
-    if (!formData.dateDebut || !formData.dateFin) return false;
-    const start = new Date(formData.dateDebut);
-    const end = new Date(formData.dateFin);
+  const areDatesValidForSalles = (checkSpecificDates = false) => {
+    const startStr = checkSpecificDates ? (formData.salles?.dateDebut || formData.dateDebut) : formData.dateDebut;
+    const endStr = checkSpecificDates ? (formData.salles?.dateFin || formData.dateFin) : formData.dateFin;
+    if (!startStr || !endStr) return false;
+    const start = new Date(startStr);
+    const end = new Date(endStr);
     if (start >= end) return false;
     
     const current = new Date(start);
@@ -248,6 +268,23 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     return list;
   };
 
+  const calculerTotalSalles = () => {
+    if (!formData.salles?.salle15 && !formData.salles?.salle12) return 0;
+    const startStr = formData.salles?.dateDebut || formData.dateDebut;
+    const endStr = formData.salles?.dateFin || formData.dateFin;
+    if (!startStr || !endStr) return 0;
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    const nuitsSalles = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    
+    const aDesChambres = formData.chambres.length > 0;
+    const tarifSalleParJour = aDesChambres ? 100 : 150;
+    let total = 0;
+    if (formData.salles?.salle15) total += tarifSalleParJour * nuitsSalles;
+    if (formData.salles?.salle12) total += tarifSalleParJour * nuitsSalles;
+    return total;
+  };
+
   const calculerPrix = () => {
     if (!formData.dateDebut || !formData.dateFin) return 0;
     const start = new Date(formData.dateDebut);
@@ -286,16 +323,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     if (formData.options.menage) total += formData.chambres.length * 50;
 
     // Calcul du prix des salles de formation
-    let totalSalles = 0;
-    const aDesChambres = formData.chambres.length > 0;
-    const tarifSalleParJour = aDesChambres ? 100 : 150;
-    if (formData.salles?.salle15) {
-      totalSalles += tarifSalleParJour * nuits;
-    }
-    if (formData.salles?.salle12) {
-      totalSalles += tarifSalleParJour * nuits;
-    }
-    total += totalSalles;
+    total += calculerTotalSalles();
 
     // Appliquer Promo
     if (promoApplied) {
@@ -511,6 +539,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       return;
     }
     
+    if ((formData.salles?.salle15 || formData.salles?.salle12) && !areDatesValidForSalles(true)) {
+      triggerError("Les dates spécifiques sélectionnées pour la salle de formation ne sont pas valides (uniquement WE ou vacances).");
+      return;
+    }
+    
     let totalExpectedOccupants = 0;
     for (let chId of formData.chambres) {
       const details = formData.chambresDetails[chId];
@@ -614,6 +647,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
       if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12) {
         triggerError("Veuillez sélectionner au moins une chambre ou une salle de formation.");
+        return;
+      }
+      if ((formData.salles?.salle15 || formData.salles?.salle12) && !areDatesValidForSalles(true)) {
+        triggerError("Les dates spécifiques sélectionnées pour la salle de formation ne sont pas valides (uniquement WE ou vacances).");
         return;
       }
       if (formData.chambres.length > 0) {
@@ -751,7 +788,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false } });
+        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false } });
         setStep(1);
       } else {
         const errData = await res.json();
@@ -904,7 +941,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <>
+            <div className="grid grid-cols-2 gap-4">
             {/* Salle 15 personnes */}
             <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.salle15 ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
                  onClick={() => handleSalleToggle('salle15')}>
@@ -937,6 +975,26 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               </div>
             </div>
           </div>
+          
+          {(formData.salles?.salle15 || formData.salles?.salle12) && (
+            <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-3 block">Dates de réservation pour la salle</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée Salle</label>
+                  <input type="date" name="salleDateDebut" value={formData.salles?.dateDebut || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateDebut: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Départ Salle</label>
+                  <input type="date" name="salleDateFin" value={formData.salles?.dateFin || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateFin: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
+                </div>
+              </div>
+              {!areDatesValidForSalles(true) && (
+                 <p className="text-xs text-red-500 font-bold mt-2">Les dates sélectionnées pour la salle ne sont pas valides (week-ends et vacances de la zone C uniquement).</p>
+              )}
+            </div>
+          )}
+        </>
         )}
       </div>
 
@@ -1203,8 +1261,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center text-sm text-slate-700">
                 <span className="font-medium">Hébergement</span>
-                <span className="font-bold">{calculerPrix().toFixed(2)} €</span>
+                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
+              {calculerTotalSalles() > 0 && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">Salles de formation</span>
+                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                </div>
+              )}
               {calculerTotalRepas() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Restauration</span>
@@ -1355,8 +1419,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="space-y-2 mb-3">
               <div className="flex justify-between items-center text-sm text-slate-700">
                 <span className="font-medium">Hébergement</span>
-                <span className="font-bold">{calculerPrix().toFixed(2)} €</span>
+                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
+              {calculerTotalSalles() > 0 && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">Salles de formation</span>
+                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                </div>
+              )}
               {calculerTotalRepas() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Restauration</span>

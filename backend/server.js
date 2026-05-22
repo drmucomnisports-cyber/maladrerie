@@ -212,9 +212,15 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
 
   // Salles de formation
   if (salles) {
+    let nuitsSalles = nuits;
+    if (salles.dateDebut && salles.dateFin) {
+      const startS = new Date(salles.dateDebut);
+      const endS = new Date(salles.dateFin);
+      nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+    }
     const prixSalle = chambres.length > 0 ? 100 : 150;
-    if (salles.salle15) total += prixSalle * nuits;
-    if (salles.salle12) total += prixSalle * nuits;
+    if (salles.salle15) total += prixSalle * nuitsSalles;
+    if (salles.salle12) total += prixSalle * nuitsSalles;
   }
 
   // Repas
@@ -417,13 +423,30 @@ function generateOptionsHTML(options, repas, salles) {
     let repasDetails = [];
     Object.entries(repas).forEach(([dateStr, meals]) => {
       let selectedMeals = [];
-      if (meals.PETIT_DEJ) selectedMeals.push("Petit-déjeuner");
-      if (meals.DEJEUNER) selectedMeals.push("Déjeuner");
-      if (meals.DINER) selectedMeals.push("Dîner");
+      const addMealDetail = (type, label) => {
+        if (!meals[type]) return;
+        const a = parseInt(meals[type].ADULTE || 0);
+        const e12 = parseInt(meals[type].ENFANT_MOINS_12 || 0);
+        const e5 = parseInt(meals[type].ENFANT_MOINS_5 || 0);
+        if (a > 0 || e12 > 0 || e5 > 0) {
+          let parts = [];
+          if (a > 0) parts.push(`${a} Adulte${a > 1 ? 's' : ''}`);
+          if (e12 > 0) parts.push(`${e12} Enfant${e12 > 1 ? 's' : ''} (-12 ans)`);
+          if (e5 > 0) parts.push(`${e5} Enfant${e5 > 1 ? 's' : ''} (-5 ans)`);
+          selectedMeals.push(`${label} (${parts.join(', ')})`);
+        } else {
+          selectedMeals.push(label);
+        }
+      };
+      
+      addMealDetail('PETIT_DEJ', 'Petit-déjeuner');
+      addMealDetail('DEJEUNER', 'Déjeuner');
+      addMealDetail('DINER', 'Dîner');
+
       if (selectedMeals.length > 0) {
         const dateObj = new Date(dateStr);
         const dateLabel = isNaN(dateObj.getTime()) ? dateStr : dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-        repasDetails.push(`<li style="margin-bottom: 5px;"><strong style="text-transform: capitalize;">${dateLabel} :</strong> ${selectedMeals.join(', ')}</li>`);
+        repasDetails.push(`<li style="margin-bottom: 5px;"><strong style="text-transform: capitalize;">${dateLabel} :</strong><br/><span style="margin-left: 10px; display: inline-block;">- ${selectedMeals.join('<br/>- ')}</span></li>`);
       }
     });
     if (repasDetails.length > 0) {
@@ -444,8 +467,12 @@ function generateOptionsHTML(options, repas, salles) {
     if (salles.salle12) sallesSelected.push("Salle de formation 12 places");
     if (sallesSelected.length > 0) {
       hasOptions = true;
+      let dateString = "";
+      if (salles.dateDebut && salles.dateFin) {
+         dateString = ` (du ${new Date(salles.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} au ${new Date(salles.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })})`;
+      }
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">💼 Salles de formation</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">💼 Salles de formation${dateString}</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${sallesSelected.map(s => `<li style="margin-bottom: 5px;">${s}</li>`).join('')}
         </ul>
@@ -1106,84 +1133,72 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
 
         // Ajouter les salles
         if (salles) {
+          let nuitsSalles = nuits;
+          let datesSuffix = "";
+          if (salles.dateDebut && salles.dateFin) {
+            const startS = new Date(salles.dateDebut);
+            const endS = new Date(salles.dateFin);
+            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+            const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+            const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+            datesSuffix = ` (du ${strD} au ${strF})`;
+          }
           const prixSalle = chambres.length > 0 ? 100 : 150;
           if (salles.salle15) {
             lignes.push({
-              designation: `Location Salle 15 personnes`,
+              designation: `Location Salle 15 personnes${datesSuffix}`,
               nbPersonnes: 1,
               tarifParPersonne: prixSalle,
-              nuits: nuits,
-              total: prixSalle * nuits
+              nuits: nuitsSalles,
+              total: prixSalle * nuitsSalles
             });
           }
           if (salles.salle12) {
             lignes.push({
-              designation: `Location Salle 12 personnes`,
+              designation: `Location Salle 12 personnes${datesSuffix}`,
               nbPersonnes: 1,
               tarifParPersonne: prixSalle,
-              nuits: nuits,
-              total: prixSalle * nuits
+              nuits: nuitsSalles,
+              total: prixSalle * nuitsSalles
             });
           }
         }
 
         // Ajouter les repas
         if (repas) {
-          let totalPDJ = { qte: 0, total: 0 };
-          let totalDEJ = { qte: 0, total: 0 };
-          let totalDIN = { qte: 0, total: 0 };
+          let totalPDJ = { adulte: 0, enfant12: 0, enfant5: 0 };
+          let totalDEJ = { adulte: 0, enfant12: 0, enfant5: 0 };
+          let totalDIN = { adulte: 0, enfant12: 0, enfant5: 0 };
 
           Object.values(repas).forEach(dayRepas => {
             if (dayRepas.PETIT_DEJ) {
-              const countA = parseInt(dayRepas.PETIT_DEJ.ADULTE || 0);
-              const count12 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0);
-              const count5 = parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0);
-              totalPDJ.qte += (countA + count12 + count5);
-              totalPDJ.total += (countA * 6) + (count12 * 5) + (count5 * 4);
+              totalPDJ.adulte += parseInt(dayRepas.PETIT_DEJ.ADULTE || 0);
+              totalPDJ.enfant12 += parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0);
+              totalPDJ.enfant5 += parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0);
             }
             if (dayRepas.DEJEUNER) {
-              const countA = parseInt(dayRepas.DEJEUNER.ADULTE || 0);
-              const count12 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0);
-              const count5 = parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0);
-              totalDEJ.qte += (countA + count12 + count5);
-              totalDEJ.total += (countA * 11.5) + (count12 * 9.5) + (count5 * 8);
+              totalDEJ.adulte += parseInt(dayRepas.DEJEUNER.ADULTE || 0);
+              totalDEJ.enfant12 += parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0);
+              totalDEJ.enfant5 += parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0);
             }
             if (dayRepas.DINER) {
-              const countA = parseInt(dayRepas.DINER.ADULTE || 0);
-              const count12 = parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0);
-              const count5 = parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0);
-              totalDIN.qte += (countA + count12 + count5);
-              totalDIN.total += (countA * 14) + (count12 * 12) + (count5 * 10);
+              totalDIN.adulte += parseInt(dayRepas.DINER.ADULTE || 0);
+              totalDIN.enfant12 += parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0);
+              totalDIN.enfant5 += parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0);
             }
           });
 
-          if (totalPDJ.qte > 0) {
-            lignes.push({
-              designation: 'Petits-déjeuners',
-              nbPersonnes: totalPDJ.qte,
-              tarifParPersonne: totalPDJ.total / totalPDJ.qte,
-              nuits: 1,
-              total: totalPDJ.total
-            });
-          }
-          if (totalDEJ.qte > 0) {
-            lignes.push({
-              designation: 'Déjeuners',
-              nbPersonnes: totalDEJ.qte,
-              tarifParPersonne: totalDEJ.total / totalDEJ.qte,
-              nuits: 1,
-              total: totalDEJ.total
-            });
-          }
-          if (totalDIN.qte > 0) {
-            lignes.push({
-              designation: 'Dîners',
-              nbPersonnes: totalDIN.qte,
-              tarifParPersonne: totalDIN.total / totalDIN.qte,
-              nuits: 1,
-              total: totalDIN.total
-            });
-          }
+          if (totalPDJ.adulte > 0) lignes.push({ designation: 'Petits-déjeuners (Adulte)', nbPersonnes: totalPDJ.adulte, tarifParPersonne: 6, nuits: 1, total: totalPDJ.adulte * 6 });
+          if (totalPDJ.enfant12 > 0) lignes.push({ designation: 'Petits-déjeuners (Enfant -12 ans)', nbPersonnes: totalPDJ.enfant12, tarifParPersonne: 5, nuits: 1, total: totalPDJ.enfant12 * 5 });
+          if (totalPDJ.enfant5 > 0) lignes.push({ designation: 'Petits-déjeuners (Enfant -5 ans)', nbPersonnes: totalPDJ.enfant5, tarifParPersonne: 4, nuits: 1, total: totalPDJ.enfant5 * 4 });
+
+          if (totalDEJ.adulte > 0) lignes.push({ designation: 'Déjeuners (Adulte)', nbPersonnes: totalDEJ.adulte, tarifParPersonne: 11.5, nuits: 1, total: totalDEJ.adulte * 11.5 });
+          if (totalDEJ.enfant12 > 0) lignes.push({ designation: 'Déjeuners (Enfant -12 ans)', nbPersonnes: totalDEJ.enfant12, tarifParPersonne: 9.5, nuits: 1, total: totalDEJ.enfant12 * 9.5 });
+          if (totalDEJ.enfant5 > 0) lignes.push({ designation: 'Déjeuners (Enfant -5 ans)', nbPersonnes: totalDEJ.enfant5, tarifParPersonne: 8, nuits: 1, total: totalDEJ.enfant5 * 8 });
+
+          if (totalDIN.adulte > 0) lignes.push({ designation: 'Dîners (Adulte)', nbPersonnes: totalDIN.adulte, tarifParPersonne: 14, nuits: 1, total: totalDIN.adulte * 14 });
+          if (totalDIN.enfant12 > 0) lignes.push({ designation: 'Dîners (Enfant -12 ans)', nbPersonnes: totalDIN.enfant12, tarifParPersonne: 12, nuits: 1, total: totalDIN.enfant12 * 12 });
+          if (totalDIN.enfant5 > 0) lignes.push({ designation: 'Dîners (Enfant -5 ans)', nbPersonnes: totalDIN.enfant5, tarifParPersonne: 10, nuits: 1, total: totalDIN.enfant5 * 10 });
         }
 
         return lignes;
