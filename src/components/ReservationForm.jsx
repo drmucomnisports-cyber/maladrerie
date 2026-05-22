@@ -44,7 +44,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     occupants: [],
     repas: {},
     modeRestauration: 'global',
-    repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }
+    repasGlobal: {
+      PETIT_DEJ: false,
+      DEJEUNER: false,
+      DINER: false
+    },
+    sendEmail: true
   });
 
   // Grille tarifaire restauration
@@ -745,7 +750,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         repas: computedRepas,
         promoCode: promoApplied?.code,
         adminEmail: adminUser?.email,
-        adminName: adminUser?.nom
+        adminName: adminUser?.nom,
+        sendEmail: formData.sendEmail
       };
       
       const url = isDevis
@@ -787,7 +793,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false } });
+        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
         setStep(1);
         
         if (onCreated) {
@@ -866,6 +872,17 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           <div className="space-y-1">
             <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">E-mail</label>
             <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="jean@exemple.com" />
+            {isAdmin && !isDevis && (
+              <label className="flex items-center gap-2 mt-2 ml-1 cursor-pointer w-max">
+                <input 
+                  type="checkbox" 
+                  checked={formData.sendEmail !== false}
+                  onChange={(e) => setFormData(prev => ({...prev, sendEmail: e.target.checked}))}
+                  className="w-4 h-4 rounded accent-[#004B93]" 
+                />
+                <span className="text-xs font-semibold text-slate-600">Envoyer un e-mail de confirmation</span>
+              </label>
+            )}
           </div>
 
           <div className="space-y-1">
