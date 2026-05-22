@@ -35,6 +35,7 @@ const Admin = () => {
   // Finances & Missions
   const [finances, setFinances] = useState(null);
   const [showMissionModal, setShowMissionModal] = useState(false);
+  const [editingReservation, setEditingReservation] = useState(null);
   const [currentReservationForMission, setCurrentReservationForMission] = useState(null);
   const [missionChecks, setMissionChecks] = useState({
     'Préparation petit-déjeuner': { checked: false, montant: 30 },
@@ -890,7 +891,10 @@ const Admin = () => {
                           <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors" title="Enregistrer un paiement manuel">
                             <Banknote size={18} />
                           </button>
-                          <button onClick={() => setDeleteModalId(res.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer la réservation">
+                          <button onClick={() => setEditingReservation(res)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-500 hover:text-white transition-colors" title="Modifier la réservation">
+                              <Edit3 size={18} />
+                            </button>
+                            <button onClick={() => setDeleteModalId(res.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer la réservation">
                             <Trash2 size={18} />
                           </button>
                         </div>

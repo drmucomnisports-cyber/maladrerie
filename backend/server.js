@@ -819,7 +819,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
+              name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
               description: `Client: ${existingReservation.client.nom}\nDu ${new Date(existingReservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(existingReservation.dateFin).toLocaleDateString('fr-FR')}\n${existingReservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`,
             },
             unit_amount: Math.round(montantAcompte * 100), // En centimes
@@ -908,7 +908,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
 
                     ${paymentLink ? `
                       <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
-                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'Acompte (30% H�bergement + 100% Repas) :</p>
+                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'Acompte (30% H�bergement + 100% Repas) :</p>
                         <table width="100%" cellpadding="0" cellspacing="0" border="0">
                           <tr>
                             <td align="center">
@@ -1459,7 +1459,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
+            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
             description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres?.length || 0} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
@@ -1571,7 +1571,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
+            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
             description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
@@ -1651,7 +1651,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1 style="color: #28a745;">Devis validé !</h1>
         <p>Votre demande a été confirmée.</p>
-        <p>Pour finaliser votre réservation, veuillez procéder au paiement de l'Acompte (30% H�bergement + 100% Repas).</p>
+        <p>Pour finaliser votre réservation, veuillez procéder au paiement de l'Acompte (30% H�bergement + 100% Repas).</p>
         <div style="margin-top: 30px;">
           <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block;">Payer l'acompte en ligne</a>
         </div>
@@ -2208,7 +2208,7 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     const prochainsPaiements = reservationsEnAttente.map(r => ({
       reservationId: r.id,
       dateDebut: r.dateDebut,
-      typeAttendu: r.statutPaiement === 'EN_ATTENTE' ? 'Acompte (30% H�bergement + 100% Repas)' : 'SOLDE (70%)',
+      typeAttendu: r.statutPaiement === 'EN_ATTENTE' ? 'Acompte (30% H�bergement + 100% Repas)' : 'SOLDE (70%)',
       montant: r.statutPaiement === 'EN_ATTENTE' ? r.montantAcompte : r.montantSolde
     })).sort((a, b) => new Date(a.dateDebut) - new Date(b.dateDebut));
 
@@ -2264,7 +2264,7 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
+            name: 'Acompte (30% H�bergement + 100% Repas) - Séjour Gîte de La Maladrerie',
             description: `Client: ${reservation.client.nom}\nSéjour: du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
@@ -2761,6 +2761,111 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
   }
 });
 
+// Modification complete d'une reservation existante
+app.put('/api/admin/reservations/:id/full', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, repas, salles, promoCode, prixTotal, structure, sendEmail } = req.body;
+  
+  try {
+    const oldRes = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true, occupants: true }
+    });
+
+    if (!oldRes) {
+      return res.status(404).json({ error: 'Reservation non trouvee' });
+    }
+
+    const newPrixTotal = prixTotal !== undefined && prixTotal !== null ? parseFloat(prixTotal) : oldRes.prixTotal;
+    let newAcompte = oldRes.montantAcompte;
+    let newSolde = oldRes.montantSolde;
+    let newStatutPaiement = oldRes.statutPaiement;
+
+    if (newPrixTotal !== oldRes.prixTotal) {
+      if (oldRes.statutPaiement === 'EN_ATTENTE') {
+        newAcompte = Math.round(newPrixTotal * 0.3 * 100) / 100;
+        newSolde = Math.round(newPrixTotal * 0.7 * 100) / 100;
+      } else if (oldRes.statutPaiement === 'ACOMPTE_PAYE') {
+        newSolde = Math.max(0, newPrixTotal - (oldRes.montantAcompte || 0));
+      } else if (oldRes.statutPaiement === 'PAYE') {
+        if (newPrixTotal > oldRes.prixTotal) {
+          newStatutPaiement = 'ACOMPTE_PAYE';
+          newAcompte = oldRes.prixTotal; 
+          newSolde = newPrixTotal - oldRes.prixTotal;
+        } else {
+          newSolde = 0;
+        }
+      }
+    }
+
+    await prisma.occupant.deleteMany({ where: { reservationId: parseInt(id) } });
+    
+    const newOccupants = occupants && occupants.length > 0 ? occupants.map(occ => {
+      const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+      let occNom = occ.nom;
+      let occPrenom = occ.prenom;
+      if (!estAdulte && (!occNom?.trim() && !occPrenom?.trim())) {
+        occNom = "Mineur";
+        occPrenom = "";
+      }
+      const age = (occ.age !== undefined && occ.age !== null && occ.age !== '') ? parseInt(occ.age) : null;
+      let nationalite = occ.nationalite;
+      if (nationalite === true || nationalite === 'true') nationalite = 'Francaise';
+      else if (nationalite === false || nationalite === 'false') nationalite = 'Etrangere';
+      else if (!nationalite) nationalite = 'Francaise';
+      
+      return { nom: occNom || '', prenom: occPrenom || '', estAdulte, age, nationalite };
+    }) : [];
+
+    const updatedReservation = await prisma.reservation.update({
+      where: { id: parseInt(id) },
+      data: {
+        dateDebut: dateDebut ? new Date(dateDebut) : oldRes.dateDebut,
+        dateFin: dateFin ? new Date(dateFin) : oldRes.dateFin,
+        chambres: chambres || oldRes.chambres,
+        chambresDetails: chambresDetails !== undefined ? chambresDetails : oldRes.chambresDetails,
+        options: options !== undefined ? options : oldRes.options,
+        repas: repas !== undefined ? repas : oldRes.repas,
+        salles: salles !== undefined ? salles : oldRes.salles,
+        codePromo: promoCode !== undefined ? promoCode : oldRes.codePromo,
+        prixTotal: newPrixTotal,
+        montantAcompte: newAcompte,
+        montantSolde: newSolde,
+        statutPaiement: newStatutPaiement,
+        structure: structure !== undefined ? structure : oldRes.structure,
+        client: {
+          update: { 
+            nom: nom || oldRes.client.nom, 
+            email: email || oldRes.client.email, 
+            telephone: telephone || oldRes.client.telephone, 
+            adressePostale: adressePostale || oldRes.client.adressePostale 
+          }
+        },
+        occupants: {
+          create: newOccupants
+        }
+      },
+      include: { client: true, occupants: true }
+    });
+
+    if (sendEmail && email && email !== 'N/A') {
+      try {
+        await sendMail({
+          to: email,
+          subject: "Mise a jour de votre reservation - Gite de La Maladrerie",
+          html: "<div style='font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;'><div style='background-color: #004B93; padding: 20px; text-align: center;'><h1 style='color: white; margin: 0;'>Gite de La Maladrerie</h1></div><div style='padding: 20px;'><h2 style='color: #004B93;'>Bonjour " + (nom || oldRes.client.nom) + ",</h2><p>Nous vous informons que votre reservation a ete mise a jour par notre equipe.</p><p>Si cette modification a entraine un changement de tarif necessitant un paiement complementaire, vous recevrez prochainement un nouveau lien de paiement.</p><br><p>A tres bientot,<br>L equipe du Gite de La Maladrerie</p></div></div>"
+        });
+      } catch (err) {
+        console.error("Erreur lors de l'envoi de l'e-mail de mise a jour:", err);
+      }
+    }
+
+    res.json(updatedReservation);
+  } catch (error) {
+    console.error("Erreur lors de la modification de la reservation:", error);
+    res.status(500).json({ error: 'Erreur lors de la modification de la reservation' });
+  }
+});
 // Envoyer le lien de paiement par e-mail
 app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req, res) => {
   const { id } = req.params;

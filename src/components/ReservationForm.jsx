@@ -13,7 +13,7 @@ const CHAMBRES_INFO = {
   6: { num: 6, name: 'Chambre standard', lits: 5, etage: '2e étage' }
 };
 
-const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCreated = () => {}, adminUser = null }) => {
+const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCreated = () => {}, adminUser = null, existingReservation = null }) => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -458,7 +458,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     setPromoError('');
     try {
       const res = await fetch(`${API_URL}/api/promo-codes/validate`, {
-        method: 'POST',
+        method: httpMethod,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: promoCode,
