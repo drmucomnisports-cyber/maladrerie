@@ -821,15 +821,20 @@ const Admin = () => {
                               const needsMenage = !!res.options?.menage;
                               const needsPetitDej = res.repasGlobal?.PETIT_DEJ || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJ && Object.keys(r.PETIT_DEJ).length > 0));
                               
+                              const start = new Date(res.dateDebut);
+                              const end = new Date(res.dateFin);
+                              const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+                              const nbChambres = res.chambres?.length || 1;
+                              
                               setMissionChecks({
-                                'Préparation petit-déjeuner': { checked: !!needsPetitDej, montant: 30, isRecommended: !!needsPetitDej },
+                                'Préparation petit-déjeuner': { checked: !!needsPetitDej, montant: 30 * nuits, isRecommended: !!needsPetitDej },
                                 'Draps et ménage': { checked: false, montant: 70 },
-                                'Lits faits': { checked: needsLitsFaits, montant: 30, isRecommended: needsLitsFaits },
-                                'Linge de toilette': { checked: needsLinge, montant: 20, isRecommended: needsLinge },
-                                'Ménage': { checked: needsMenage, montant: 50, isRecommended: needsMenage },
+                                'Lits faits': { checked: needsLitsFaits, montant: 10 * nbChambres, isRecommended: needsLitsFaits },
+                                'Linge de toilette': { checked: needsLinge, montant: 10 * nbChambres, isRecommended: needsLinge },
+                                'Ménage': { checked: needsMenage, montant: 30 * nbChambres, isRecommended: needsMenage },
                                 'Remise des clés': { checked: false, montant: 30 },
-                                'Astreinte de nuit sur place': { checked: false, montant: 200 },
-                                'Astreinte de nuit à domicile': { checked: false, montant: 100 }
+                                'Astreinte de nuit sur place': { checked: false, montant: 200 * nuits },
+                                'Astreinte de nuit à domicile': { checked: false, montant: 100 * nuits }
                               });
                               setShowMissionModal(true);
                             }}
