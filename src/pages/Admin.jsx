@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3 } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
@@ -852,41 +852,47 @@ const Admin = () => {
                         <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
                       </td>
                       <td className="p-4 text-right">
-                        <div className="flex justify-end gap-2 flex-wrap max-w-[200px] ml-auto">
+                        <div className="flex justify-end gap-1.5">
                           {res.statut === 'EN_ATTENTE' && (
                             <>
-                              <button onClick={() => handleAction('accept', res.id)} className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600 transition-colors">Accepter</button>
-                              <button onClick={() => handleAction('reject', res.id)} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded hover:bg-red-600 transition-colors">Refuser</button>
+                              <button onClick={() => handleAction('accept', res.id)} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-500 hover:text-white transition-colors" title="Accepter la réservation">
+                                <Check size={18} />
+                              </button>
+                              <button onClick={() => handleAction('reject', res.id)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Refuser la réservation">
+                                <X size={18} />
+                              </button>
                             </>
                           )}
                           {res.statut === 'RESERVE' && (
-                            <div className="flex gap-2 w-full justify-end flex-wrap">
+                            <>
                               {res.statutPaiement !== 'PAYE' && (
-                                <button onClick={() => triggerPaymentAction(res.id, 'solde')} className="px-3 py-1.5 bg-muc-blue/10 text-muc-blue text-xs font-bold rounded hover:bg-muc-blue hover:text-white transition-colors" title="Demander le solde">
-                                  Demander Solde
+                                <button onClick={() => triggerPaymentAction(res.id, 'solde')} className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Demander le solde">
+                                  <CreditCard size={18} />
                                 </button>
                               )}
                               {res.statutCaution !== 'DEPOSEE' && res.statutCaution !== 'RESTITUEE' && (
-                                <button onClick={() => triggerPaymentAction(res.id, 'caution')} className="px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-bold rounded hover:bg-amber-600 hover:text-white transition-colors" title="Demander la caution">
-                                  Demander Caution
+                                <button onClick={() => triggerPaymentAction(res.id, 'caution')} className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors" title="Demander la caution">
+                                  <Shield size={18} />
                                 </button>
                               )}
                               {res.statutCaution === 'DEPOSEE' && (
                                 <>
-                                  <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-bold rounded hover:bg-red-600 hover:text-white transition-colors" title="Annuler la caution">
-                                    Annuler Caution
+                                  <button onClick={() => triggerPaymentAction(res.id, 'cancel-caution')} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Annuler la caution">
+                                    <ShieldAlert size={18} />
                                   </button>
-                                  <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded hover:bg-purple-600 hover:text-white transition-colors" title="Retenir un montant partiel">
-                                    Retenir montant
+                                  <button onClick={() => { setCaptureReservationId(res.id); setShowCaptureModal(true); }} className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-500 hover:text-white transition-colors" title="Retenir un montant partiel">
+                                    <Coins size={18} />
                                   </button>
                                 </>
                               )}
-                            </div>
+                            </>
                           )}
-                          <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded hover:bg-green-600 hover:text-white transition-colors w-full" title="Enregistrer un paiement manuel">
-                            Enregistrer Paiement
+                          <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors" title="Enregistrer un paiement manuel">
+                            <Banknote size={18} />
                           </button>
-                          <button onClick={() => setDeleteModalId(res.id)} className="px-3 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded hover:bg-red-500 hover:text-white transition-colors w-full mt-2">Supprimer</button>
+                          <button onClick={() => setDeleteModalId(res.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer la réservation">
+                            <Trash2 size={18} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -996,7 +1002,7 @@ const Admin = () => {
                           <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
                         </td>
                         <td className="p-4 text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1.5">
                             {res.statut === 'DEVIS_EN_ATTENTE' && (
                               <button
                                 onClick={async () => {
@@ -1022,17 +1028,18 @@ const Admin = () => {
                                     }
                                   }
                                 }}
-                                className="px-3 py-1.5 bg-muc-blue text-white text-xs font-bold rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors"
+                                title="Valider et transformer en réservation"
                               >
-                                <CheckCircle size={14} />
-                                Valider
+                                <Check size={18} />
                               </button>
                             )}
                             <button
                               onClick={() => setDeleteModalId(res.id)}
-                              className="p-1.5 bg-red-50 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"
+                              className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                              title="Supprimer le devis"
                             >
-                              <Trash size={16} />
+                              <Trash2 size={18} />
                             </button>
                           </div>
                         </td>
@@ -1143,9 +1150,13 @@ const Admin = () => {
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0 ml-4">
-                      <button onClick={() => editIntervenant(interv)} className="text-muc-blue bg-muc-blue/10 px-3 py-1.5 rounded-md hover:bg-muc-blue hover:text-white transition-colors text-xs font-bold uppercase">Modifier</button>
-                      <button onClick={() => deleteIntervenant(interv.id)} className="text-red-500 bg-red-100 px-3 py-1.5 rounded-md hover:bg-red-500 hover:text-white transition-colors text-xs font-bold uppercase">Supprimer</button>
+                    <div className="flex gap-1.5 shrink-0 ml-4">
+                      <button onClick={() => editIntervenant(interv)} className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Modifier">
+                        <Edit3 size={18} />
+                      </button>
+                      <button onClick={() => deleteIntervenant(interv.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1368,7 +1379,11 @@ const Admin = () => {
                       </button>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => deletePromoCode(promo.id)} className="text-red-400 hover:text-red-600 p-2">&times; Supprimer</button>
+                      <div className="flex justify-end gap-1.5">
+                        <button onClick={() => deletePromoCode(promo.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer ce code promo">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1407,7 +1422,11 @@ const Admin = () => {
                     <td className="px-6 py-4 text-slate-600">{acc.email}</td>
                     <td className="px-6 py-4 text-slate-500">{new Date(acc.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => deleteAdminAccount(acc.id)} className="text-red-500 hover:text-red-700 font-bold uppercase text-xs tracking-widest">Supprimer</button>
+                      <div className="flex justify-end gap-1.5">
+                        <button onClick={() => deleteAdminAccount(acc.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer ce compte">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
