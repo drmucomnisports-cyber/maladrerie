@@ -411,6 +411,30 @@ app.get('/api/reservations', async (req, res) => {
   }
 });
 
+// --- HELPER : Calculer le total des repas ---
+function calculerTotalRepasServeur(repas) {
+  if (!repas) return 0;
+  let total = 0;
+  Object.values(repas).forEach(day => {
+    if (day.PETIT_DEJ) {
+      total += (parseInt(day.PETIT_DEJ.ADULTE || 0) * 6);
+      total += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_12 || 0) * 5);
+      total += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_5 || 0) * 4);
+    }
+    if (day.DEJEUNER) {
+      total += (parseInt(day.DEJEUNER.ADULTE || 0) * 11.5);
+      total += (parseInt(day.DEJEUNER.ENFANT_MOINS_12 || 0) * 9.5);
+      total += (parseInt(day.DEJEUNER.ENFANT_MOINS_5 || 0) * 8);
+    }
+    if (day.DINER) {
+      total += (parseInt(day.DINER.ADULTE || 0) * 14);
+      total += (parseInt(day.DINER.ENFANT_MOINS_12 || 0) * 12);
+      total += (parseInt(day.DINER.ENFANT_MOINS_5 || 0) * 10);
+    }
+  });
+  return total;
+}
+
 // --- HELPER : Générer la section Options, Repas et Salles pour les e-mails ---
 function generateOptionsHTML(options, repas, salles) {
   let html = `<div style="margin-top: 30px; margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px;">
@@ -476,6 +500,9 @@ function generateOptionsHTML(options, repas, salles) {
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${sallesSelected.map(s => `<li style="margin-bottom: 5px;">${s}</li>`).join('')}
         </ul>
+        <p style="margin: 5px 0 0 20px; font-size: 12px; font-style: italic; color: #777;">
+          Note : La salle est disponible à partir de 17h le jour d'arrivée, jusqu'à minuit le jour du départ.
+        </p>
       `;
     }
   }
@@ -778,7 +805,9 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     
     // Calcul des montants
     const montantTotal = existingReservation.prixTotal || 0;
-    const montantAcompte = Math.round(montantTotal * 0.3 * 100) / 100;
+    const repasTotal = calculerTotalRepasServeur(existingReservation.repas);
+    const montantHebergement = Math.max(0, montantTotal - repasTotal);
+    const montantAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
     const montantSolde = Math.round((montantTotal - montantAcompte) * 100) / 100;
 
     if (montantTotal > 0 && process.env.STRIPE_SECRET_KEY) {
@@ -1416,8 +1445,10 @@ app.post('/api/devis/validate/:token', async (req, res) => {
     }
 
     // 2. Convertir en demande de réservation classique (RESERVE)
-    const montantAcompte = devis.prixTotal * 0.3;
-    const montantSolde = devis.prixTotal * 0.7;
+    const repasTotal = calculerTotalRepasServeur(devis.repas);
+    const montantHebergement = Math.max(0, devis.prixTotal - repasTotal);
+    const montantAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+    const montantSolde = Math.round((devis.prixTotal - montantAcompte) * 100) / 100;
 
     const stripeCustomerPL = await getOrCreateStripeCustomer(devis.client.email, devis.client.nom);
     const plParams = {
@@ -1428,7 +1459,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           currency: 'eur',
           product_data: { 
             name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
-            description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
+            description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres?.length || 0} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
         },
@@ -1475,7 +1506,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
                 <p style="margin: 0 0 8px 0;"><strong>Détails du séjour :</strong></p>
                 <ul style="margin: 0; padding-left: 20px;">
                   <li><strong>Dates :</strong> du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}</li>
-                  <li><strong>Chambres :</strong> ${devis.chambres.join(', ')}</li>
+                  <li><strong>Chambres :</strong> ${devis.chambres?.length > 0 ? devis.chambres.join(', ') : 'Aucune'}</li>
                   <li><strong>Prix Total :</strong> ${devis.prixTotal} €</li>
                 </ul>
               </div>
@@ -1526,8 +1557,10 @@ app.get('/api/devis/validate/:token', async (req, res) => {
     }
 
     // Convertir en demande de réservation classique (RESERVE)
-    const montantAcompte = devis.prixTotal * 0.3;
-    const montantSolde = devis.prixTotal * 0.7;
+    const repasTotal = calculerTotalRepasServeur(devis.repas);
+    const montantHebergement = Math.max(0, devis.prixTotal - repasTotal);
+    const montantAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+    const montantSolde = Math.round((devis.prixTotal - montantAcompte) * 100) / 100;
 
     const stripeCustomerPL = await getOrCreateStripeCustomer(devis.client.email, devis.client.nom);
     const plParams = {
@@ -1585,7 +1618,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
                 <p style="margin: 0 0 8px 0;"><strong>Détails du séjour :</strong></p>
                 <ul style="margin: 0; padding-left: 20px;">
                   <li><strong>Dates :</strong> du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}</li>
-                  <li><strong>Chambres :</strong> ${devis.chambres.join(', ')}</li>
+                  <li><strong>Chambres :</strong> ${devis.chambres?.length > 0 ? devis.chambres.join(', ') : 'Aucune'}</li>
                   <li><strong>Prix Total :</strong> ${devis.prixTotal} €</li>
                 </ul>
               </div>
@@ -2218,6 +2251,10 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
     if (!reservation) return res.status(404).json({ error: 'Réservation non trouvée' });
     if (!reservation.prixTotal) return res.status(400).json({ error: 'Le prix total doit être défini pour payer' });
 
+    const repasTotal = calculerTotalRepasServeur(reservation.repas);
+    const montantHebergement = Math.max(0, reservation.prixTotal - repasTotal);
+    const montantAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+
     const stripeCustomerPL = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
     const plParams = {
       payment_method_types: ['card'],
@@ -2229,7 +2266,7 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
             name: 'Acompte (30%) - Séjour Gîte de La Maladrerie',
             description: `Client: ${reservation.client.nom}\nSéjour: du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
-          unit_amount: Math.round(reservation.prixTotal * 0.3 * 100),
+          unit_amount: Math.round(montantAcompte * 100),
         },
         quantity: 1,
       }],
