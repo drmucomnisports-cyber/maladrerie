@@ -654,10 +654,10 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F8F8] font-sans p-8">
-      <div className="max-w-7xl mx-auto relative">
+    <div className="min-h-screen bg-[#F8F8F8] font-sans p-4 md:p-8">
+      <div className="w-full max-w-[96%] mx-auto relative">
         <div className="bg-[#F8F8F8] pb-8 border-b border-slate-200 shadow-sm mb-8">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h1 className="text-3xl font-black text-muc-blue tracking-tight uppercase">Dashboard</h1>
