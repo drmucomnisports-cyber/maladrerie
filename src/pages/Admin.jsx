@@ -705,7 +705,8 @@ const Admin = () => {
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
                     <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
                     <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
                     <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
                     <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
@@ -727,12 +728,42 @@ const Admin = () => {
                       </td>
                       <td className="p-4">
                         <div className="text-sm font-bold text-muc-blue">
-                          {res.chambres.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
+                          {res.chambres?.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {res.options?.litsFaits && <span className="mr-2">🛏️ Lits faits</span>}
-                          {res.options?.lingeFourni && <span className="mr-2">🧴 Linge</span>}
-                          {res.options?.menage && <span>🧹 Ménage</span>}
+                        {res.salles && (
+                          <div className="text-sm font-bold text-indigo-600 mt-1 flex flex-col">
+                            {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
+                            {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
+                          </div>
+                        )}
+                        <div className="text-xs font-bold text-slate-700 mt-1">
+                          👥 {res.occupants ? res.occupants.length : 0} occupant(s)
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1.5 flex gap-1 flex-wrap font-bold">
+                          {res.options?.litsFaits && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🛏️ Lits</span>}
+                          {res.options?.lingeFourni && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧴 Linge</span>}
+                          {res.options?.menage && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧹 Ménage</span>}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1 text-[11px] uppercase tracking-wider font-bold">
+                          {(() => {
+                            const hasPtitDej = res.repasGlobal?.PETIT_DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJEUNER && Object.keys(r.PETIT_DEJEUNER).length > 0));
+                            const hasDej = res.repasGlobal?.DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.DEJEUNER && Object.keys(r.DEJEUNER).length > 0));
+                            const hasDiner = res.repasGlobal?.DINER || (res.repas && Object.values(res.repas).some(r => r.DINER && Object.keys(r.DINER).length > 0));
+                            
+                            if (!hasPtitDej && !hasDej && !hasDiner) {
+                              return <span className="text-slate-400 normal-case italic font-medium">Aucune</span>;
+                            }
+                            
+                            return (
+                              <>
+                                {hasPtitDej && <span className="text-orange-600">🥐 Petit-déj</span>}
+                                {hasDej && <span className="text-green-600">🍲 Déjeuner</span>}
+                                {hasDiner && <span className="text-blue-600">🍝 Dîner</span>}
+                              </>
+                            );
+                          })()}
                         </div>
                       </td>
                       <td className="p-4">
@@ -781,6 +812,17 @@ const Admin = () => {
                           <button
                             onClick={() => {
                               setCurrentReservationForMission(res);
+                              const needsDraps = res.options?.litsFaits || res.options?.lingeFourni || res.options?.menage;
+                              const needsPetitDej = res.repasGlobal?.PETIT_DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJEUNER && Object.keys(r.PETIT_DEJEUNER).length > 0));
+                              
+                              setMissionChecks({
+                                'Préparation petit-déjeuner': { checked: !!needsPetitDej, montant: 30, isRecommended: !!needsPetitDej },
+                                'Draps et ménage': { checked: !!needsDraps, montant: 70, isRecommended: !!needsDraps },
+                                'Remise des clés': { checked: false, montant: 30 },
+                                'Astreinte de nuit sur place': { checked: false, montant: 200 },
+                                'Astreinte de nuit à domicile': { checked: false, montant: 50 },
+                                'Déplacement astreinte': { checked: false, montant: 30 }
+                              });
                               setShowMissionModal(true);
                             }}
                             className="w-full text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 rounded-lg outline-none border border-slate-200 bg-white text-slate-600 hover:border-muc-blue hover:text-muc-blue transition-colors flex justify-between items-center"
@@ -838,7 +880,7 @@ const Admin = () => {
                   ))}
                   {reservations.length === 0 && !loading && (
                     <tr>
-                      <td colSpan="6" className="p-8 text-center text-slate-500 font-medium">Aucune réservation trouvée</td>
+                      <td colSpan="9" className="p-16 text-center text-slate-500 font-medium">Aucune réservation trouvée</td>
                     </tr>
                   )}
                 </tbody>
@@ -1529,26 +1571,36 @@ const Admin = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-3">Types de missions</label>
                   <div className="space-y-3">
                     {Object.entries(missionChecks).map(([type, val]) => (
-                      <label key={type} className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${val.checked ? 'border-muc-blue bg-muc-blue/5' : 'border-slate-200 bg-white hover:border-slate-300'
+                      <label key={type} className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        val.checked 
+                          ? 'border-muc-blue bg-muc-blue/5' 
+                          : val.isRecommended 
+                            ? 'border-amber-400 bg-amber-50 shadow-[0_0_15px_rgba(251,191,36,0.2)]' 
+                            : 'border-slate-200 bg-white hover:border-slate-300'
                         }`}>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={val.checked}
-                            onChange={e => setMissionChecks(prev => ({
-                              ...prev,
-                              [type]: { ...prev[type], checked: e.target.checked }
-                            }))}
-                            className="w-5 h-5 rounded accent-[#004B93]"
-                          />
-                          <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : 'text-slate-700'}`}>
-                            {type === 'Draps et ménage' && '🛏️ '}
-                            {type === 'Remise des clés' && '🔑 '}
-                            {type === 'Astreinte de nuit sur place' && '🏠 '}
-                            {type === 'Astreinte de nuit à domicile' && '📞 '}
-                            {type === 'Déplacement astreinte' && '🚗 '}
-                            {type}
-                          </span>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={val.checked}
+                              onChange={e => setMissionChecks(prev => ({
+                                ...prev,
+                                [type]: { ...prev[type], checked: e.target.checked }
+                              }))}
+                              className="w-5 h-5 rounded accent-[#004B93]"
+                            />
+                            <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : val.isRecommended ? 'text-amber-700' : 'text-slate-700'}`}>
+                              {type === 'Draps et ménage' && '🛏️ '}
+                              {type === 'Remise des clés' && '🔑 '}
+                              {type === 'Astreinte de nuit sur place' && '🏠 '}
+                              {type === 'Astreinte de nuit à domicile' && '📞 '}
+                              {type === 'Déplacement astreinte' && '🚗 '}
+                              {type}
+                            </span>
+                          </div>
+                          {val.isRecommended && !val.checked && (
+                            <span className="text-[10px] text-amber-600 font-black ml-8 mt-1 uppercase tracking-wider block">Suggéré selon la réservation</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <input
