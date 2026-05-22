@@ -39,10 +39,12 @@ const Admin = () => {
   const [missionChecks, setMissionChecks] = useState({
     'Préparation petit-déjeuner': { checked: false, montant: 30 },
     'Draps et ménage': { checked: false, montant: 70 },
+    'Lits faits': { checked: false, montant: 30 },
+    'Linge de toilette': { checked: false, montant: 20 },
+    'Ménage': { checked: false, montant: 50 },
     'Remise des clés': { checked: false, montant: 30 },
     'Astreinte de nuit sur place': { checked: false, montant: 200 },
-    'Astreinte de nuit à domicile': { checked: false, montant: 100 },
-    'Déplacement astreinte': { checked: false, montant: 100 }
+    'Astreinte de nuit à domicile': { checked: false, montant: 100 }
   });
   const [missionIntervenantId, setMissionIntervenantId] = useState('');
   const [isAssigningMissions, setIsAssigningMissions] = useState(false);
@@ -481,10 +483,12 @@ const Admin = () => {
         setMissionChecks({
           'Préparation petit-déjeuner': { checked: false, montant: 30 },
           'Draps et ménage': { checked: false, montant: 70 },
+          'Lits faits': { checked: false, montant: 30 },
+          'Linge de toilette': { checked: false, montant: 20 },
+          'Ménage': { checked: false, montant: 50 },
           'Remise des clés': { checked: false, montant: 30 },
           'Astreinte de nuit sur place': { checked: false, montant: 200 },
-          'Astreinte de nuit à domicile': { checked: false, montant: 100 },
-          'Déplacement astreinte': { checked: false, montant: 100 }
+          'Astreinte de nuit à domicile': { checked: false, montant: 100 }
         });
         setMissionIntervenantId('');
       } else {
@@ -812,16 +816,20 @@ const Admin = () => {
                           <button
                             onClick={() => {
                               setCurrentReservationForMission(res);
-                              const needsDraps = res.options?.litsFaits || res.options?.lingeFourni || res.options?.menage;
+                              const needsLitsFaits = !!res.options?.litsFaits;
+                              const needsLinge = !!res.options?.lingeFourni;
+                              const needsMenage = !!res.options?.menage;
                               const needsPetitDej = res.repasGlobal?.PETIT_DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJEUNER && Object.keys(r.PETIT_DEJEUNER).length > 0));
                               
                               setMissionChecks({
                                 'Préparation petit-déjeuner': { checked: !!needsPetitDej, montant: 30, isRecommended: !!needsPetitDej },
-                                'Draps et ménage': { checked: !!needsDraps, montant: 70, isRecommended: !!needsDraps },
+                                'Draps et ménage': { checked: false, montant: 70 },
+                                'Lits faits': { checked: needsLitsFaits, montant: 30, isRecommended: needsLitsFaits },
+                                'Linge de toilette': { checked: needsLinge, montant: 20, isRecommended: needsLinge },
+                                'Ménage': { checked: needsMenage, montant: 50, isRecommended: needsMenage },
                                 'Remise des clés': { checked: false, montant: 30 },
                                 'Astreinte de nuit sur place': { checked: false, montant: 200 },
-                                'Astreinte de nuit à domicile': { checked: false, montant: 50 },
-                                'Déplacement astreinte': { checked: false, montant: 30 }
+                                'Astreinte de nuit à domicile': { checked: false, montant: 100 }
                               });
                               setShowMissionModal(true);
                             }}
@@ -1591,10 +1599,12 @@ const Admin = () => {
                             />
                             <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : val.isRecommended ? 'text-amber-700' : 'text-slate-700'}`}>
                               {type === 'Draps et ménage' && '🛏️ '}
+                              {type === 'Lits faits' && '🛏️ '}
+                              {type === 'Ménage' && '🧹 '}
+                              {type === 'Linge de toilette' && '🧴 '}
                               {type === 'Remise des clés' && '🔑 '}
                               {type === 'Astreinte de nuit sur place' && '🏠 '}
                               {type === 'Astreinte de nuit à domicile' && '📞 '}
-                              {type === 'Déplacement astreinte' && '🚗 '}
                               {type}
                             </span>
                           </div>
