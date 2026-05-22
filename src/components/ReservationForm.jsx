@@ -232,37 +232,19 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     }
   }, [formData.dateDebut, formData.dateFin]);
 
-
   const getChambresDetailsDistribues = () => {
-    if (!isDevis) return formData.chambresDetails;
-    const distribDetails = {};
-    let remainingAdultes = parseInt(formData.devisAdultes) || 0;
-    let remainingMineurs = parseInt(formData.devisMineurs) || 0;
-
-    formData.chambres.forEach(chId => {
-      const info = CHAMBRES_INFO[chId];
-      const cap = info.lits;
-      let allocAdultes = Math.min(remainingAdultes, cap);
-      remainingAdultes -= allocAdultes;
-      
-      let capRestante = cap - allocAdultes;
-      let allocMineurs = Math.min(remainingMineurs, capRestante);
-      remainingMineurs -= allocMineurs;
-
-      distribDetails[chId] = {
-        adultes: allocAdultes,
-        mineurs: allocMineurs,
-        enfants: allocMineurs
-      };
-    });
-
-    return distribDetails;
+    return formData.chambresDetails;
   };
 
   const generateFakeOccupants = () => {
     const list = [];
-    const totalAdults = parseInt(formData.devisAdultes) || 0;
-    const totalMineurs = parseInt(formData.devisMineurs) || 0;
+    const totalAdults = formData.chambres.length > 0 
+      ? Object.values(formData.chambresDetails || {}).reduce((acc, curr) => acc + (parseInt(curr.adultes) || 0), 0)
+      : (parseInt(formData.devisAdultes) || 0);
+    const totalMineurs = formData.chambres.length > 0 
+      ? Object.values(formData.chambresDetails || {}).reduce((acc, curr) => acc + (parseInt(curr.mineurs) || 0), 0)
+      : (parseInt(formData.devisMineurs) || 0);
+
     for (let i = 1; i <= totalAdults; i++) {
       list.push({ nom: formData.nom, prenom: `Adulte ${i}`, estAdulte: true, age: 30, nationalite: true });
     }
@@ -377,8 +359,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       let nbMineurs5 = 0;
 
       if (isDevis) {
-        nbAdultes = parseInt(formData.devisAdultes) || 0;
-        nbMineurs12 = parseInt(formData.devisMineurs) || 0;
+        if (formData.chambres.length > 0) {
+          Object.values(formData.chambresDetails || {}).forEach(ch => {
+            nbAdultes += parseInt(ch.adultes) || 0;
+            nbMineurs12 += parseInt(ch.mineurs) || 0;
+          });
+        } else {
+          nbAdultes = parseInt(formData.devisAdultes) || 0;
+          nbMineurs12 = parseInt(formData.devisMineurs) || 0;
+        }
       } else {
         if (formData.occupants && formData.occupants.length > 0) {
           formData.occupants.forEach(occ => {
@@ -658,11 +647,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         return;
       }
       if (formData.chambres.length > 0) {
-        const totalAdults = parseInt(formData.devisAdultes) || 0;
-        const totalMineurs = parseInt(formData.devisMineurs) || 0;
+        const totalAdults = Object.values(formData.chambresDetails || {}).reduce((acc, curr) => acc + (parseInt(curr.adultes) || 0), 0);
+        const totalMineurs = Object.values(formData.chambresDetails || {}).reduce((acc, curr) => acc + (parseInt(curr.mineurs) || 0), 0);
         const totalOccupants = totalAdults + totalMineurs;
         if (totalOccupants <= 0) {
-          triggerError("Veuillez indiquer le nombre d'adultes et de mineurs.");
+          triggerError("Veuillez indiquer le nombre d'adultes et de mineurs pour chaque chambre sélectionnée.");
           return;
         }
         const totalCapacite = formData.chambres.reduce((acc, chId) => acc + CHAMBRES_INFO[chId].lits, 0);
@@ -822,7 +811,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   
   let nombreTotalOccupants = 0;
   if (isDevis) {
-    nombreTotalOccupants = (parseInt(formData.devisAdultes) || 0) + (parseInt(formData.devisMineurs) || 0);
+    if (formData.chambres.length > 0) {
+      nombreTotalOccupants = Object.values(formData.chambresDetails || {}).reduce((acc, curr) => acc + parseInt(curr.adultes || 0) + parseInt(curr.mineurs || 0), 0);
+    } else {
+      nombreTotalOccupants = (parseInt(formData.devisAdultes) || 0) + (parseInt(formData.devisMineurs) || 0);
+    }
   } else {
     nombreTotalOccupants = Object.values(formData.chambresDetails || {}).reduce((acc, curr) => acc + parseInt(curr.adultes || 0) + parseInt(curr.mineurs || 0), 0) || formData.occupants?.length || 0;
   }
@@ -931,7 +924,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   </div>
                 </label>
                 
-                {isChecked && !isUnavailable && !isDevis && (
+                {isChecked && !isUnavailable && (
                   <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Adultes (≥13 ans)</label>
@@ -1015,7 +1008,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         )}
       </div>
 
-      {isDevis && (
+      {isDevis && formData.chambres.length === 0 && (
         <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Nombre d'adultes</label>
@@ -1303,7 +1296,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="bg-white/80 rounded-xl p-3 border border-muc-blue/10">
               <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-600">30% hébergement + 100% restauration</span>
+                <span className="text-slate-600">{calculerTotalRepas() > 0 ? "30% hébergement + 100% restauration" : "Acompte (30%)"}</span>
                 <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
@@ -1458,7 +1451,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="bg-white/80 rounded-xl p-3 border border-muc-blue/10">
               <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-600">30% hébergement + 100% restauration</span>
+                <span className="text-slate-600">{calculerTotalRepas() > 0 ? "30% hébergement + 100% restauration" : "Acompte (30%)"}</span>
                 <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
