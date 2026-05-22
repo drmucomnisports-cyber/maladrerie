@@ -752,7 +752,7 @@ const Admin = () => {
                       <td className="p-4">
                         <div className="flex flex-col gap-1 text-[11px] uppercase tracking-wider font-bold">
                           {(() => {
-                            const hasPtitDej = res.repasGlobal?.PETIT_DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJEUNER && Object.keys(r.PETIT_DEJEUNER).length > 0));
+                            const hasPtitDej = res.repasGlobal?.PETIT_DEJ || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJ && Object.keys(r.PETIT_DEJ).length > 0));
                             const hasDej = res.repasGlobal?.DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.DEJEUNER && Object.keys(r.DEJEUNER).length > 0));
                             const hasDiner = res.repasGlobal?.DINER || (res.repas && Object.values(res.repas).some(r => r.DINER && Object.keys(r.DINER).length > 0));
                             
@@ -819,7 +819,7 @@ const Admin = () => {
                               const needsLitsFaits = !!res.options?.litsFaits;
                               const needsLinge = !!res.options?.lingeFourni;
                               const needsMenage = !!res.options?.menage;
-                              const needsPetitDej = res.repasGlobal?.PETIT_DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJEUNER && Object.keys(r.PETIT_DEJEUNER).length > 0));
+                              const needsPetitDej = res.repasGlobal?.PETIT_DEJ || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJ && Object.keys(r.PETIT_DEJ).length > 0));
                               
                               setMissionChecks({
                                 'Préparation petit-déjeuner': { checked: !!needsPetitDej, montant: 30, isRecommended: !!needsPetitDej },
@@ -1598,6 +1598,7 @@ const Admin = () => {
                               className="w-5 h-5 rounded accent-[#004B93]"
                             />
                             <span className={`text-sm font-semibold ${val.checked ? 'text-muc-blue' : val.isRecommended ? 'text-amber-700' : 'text-slate-700'}`}>
+                              {type === 'Préparation petit-déjeuner' && '🥐 '}
                               {type === 'Draps et ménage' && '🛏️ '}
                               {type === 'Lits faits' && '🛏️ '}
                               {type === 'Ménage' && '🧹 '}
