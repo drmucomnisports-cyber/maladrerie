@@ -3,7 +3,7 @@ import { API_URL } from '../config';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Send, CheckCircle2, Calendar as CalendarIcon } from 'lucide-react';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import gsap from 'gsap';
@@ -37,6 +37,12 @@ const Planning = () => {
   const [events, setEvents] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState('month');
+  
+  const location = useLocation();
+  const editReservation = location.state?.editReservation;
+  const urlMode = new URLSearchParams(location.search).get('mode');
+  const isEditMode = urlMode === 'edit' && editReservation;
+  const isDevisMode = urlMode === 'devis';
 
   const sectionsRef = useRef([]);
 
@@ -204,12 +210,13 @@ const Planning = () => {
           {/* Formulaire */}
           <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl h-fit sticky top-32 border-t-8 border-muc-yellow" data-reveal="right">
             <h2 className="text-3xl font-black text-muc-blue mb-8 uppercase tracking-tight">
-              {new URLSearchParams(window.location.search).get('mode') === 'devis' ? 'Générer un Devis' : 'Réservation'}
+              {isEditMode ? 'Modifier la réservation' : isDevisMode ? 'Générer un Devis' : 'Réservation'}
             </h2>
             <ReservationForm 
               events={events} 
               isAdmin={false} 
-              isDevis={new URLSearchParams(window.location.search).get('mode') === 'devis'}
+              isDevis={isDevisMode}
+              existingReservation={isEditMode ? editReservation : null}
               onCreated={fetchReservations} 
             />
           </div>

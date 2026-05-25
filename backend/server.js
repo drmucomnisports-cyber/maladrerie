@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -2695,6 +2695,7 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
         statut: 'RESERVE',
         statutPaiement: 'EN_ATTENTE',
         structure: structure || null,
+        validePar: req.user.email,
         client: {
           create: { nom, email: email || 'N/A', telephone: telephone || 'N/A', adressePostale: adressePostale || null }
         },

@@ -59,6 +59,52 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     DINER:     { ADULTE: 14, ENFANT_MOINS_12: 12, ENFANT_MOINS_5: 10, label: 'Dîner' }
   };
 
+  const [showPromoMessage, setShowPromoMessage] = useState(false);
+
+  useEffect(() => {
+    if (existingReservation) {
+      // Split "nom" to prenom and nom if client exists
+      let prenom = '';
+      let nom = '';
+      let structure = existingReservation.structure || '';
+      
+      if (existingReservation.client) {
+        const parts = (existingReservation.client.nom || '').split(' ');
+        prenom = parts[0] || '';
+        nom = parts.slice(1).join(' ') || '';
+        if (nom.includes(' - ')) {
+          const splitNom = nom.split(' - ');
+          nom = splitNom[0];
+          structure = splitNom[1];
+        }
+      }
+
+      setFormData({
+        nom,
+        prenom,
+        structure,
+        devisAdultes: existingReservation.chambres?.length === 0 ? (existingReservation.chambresDetails ? Object.values(existingReservation.chambresDetails).reduce((acc, curr) => acc + parseInt(curr.adultes || 0), 0) : 0) : 0,
+        devisMineurs: existingReservation.chambres?.length === 0 ? (existingReservation.chambresDetails ? Object.values(existingReservation.chambresDetails).reduce((acc, curr) => acc + parseInt(curr.mineurs || curr.enfants || 0), 0) : 0) : 0,
+        email: existingReservation.client?.email || '',
+        telephone: existingReservation.client?.telephone || '',
+        adressePostale: existingReservation.client?.adressePostale || '',
+        dateDebut: new Date(existingReservation.dateDebut).toISOString().split('T')[0],
+        dateFin: new Date(existingReservation.dateFin).toISOString().split('T')[0],
+        chambres: existingReservation.chambres || [],
+        chambresDetails: existingReservation.chambresDetails || {},
+        options: existingReservation.options || { litsFaits: false, lingeFourni: false, menage: false },
+        salles: existingReservation.salles || { salle15: false, salle12: false, dateDebut: '', dateFin: '' },
+        occupants: existingReservation.occupants || [],
+        repas: existingReservation.repas || {},
+        modeRestauration: 'global',
+        repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false },
+        sendEmail: true
+      });
+      // Skip the dates step if we are editing
+      setStep(1); 
+    }
+  }, [existingReservation]);
+
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
   const [isLastMinute, setIsLastMinute] = useState(false);
@@ -743,14 +789,20 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         sendEmail: formData.sendEmail
       };
       
-      const url = isDevis
-        ? `${API_URL}/api/admin/devis`
-        : isAdmin 
-          ? `${API_URL}/api/admin/reservations`
-          : `${API_URL}/api/reservations`;
+      let url = `${API_URL}/api/reservations`;
+      let method = 'POST';
+
+      if (existingReservation) {
+        url = `${API_URL}/api/admin/reservations/${existingReservation.id}/full`;
+        method = 'PUT';
+      } else if (isDevis) {
+        url = `${API_URL}/api/admin/devis`;
+      } else if (isAdmin) {
+        url = `${API_URL}/api/admin/reservations`;
+      }
 
       const headers = { 'Content-Type': 'application/json' };
-      if (isAdmin || isDevis) {
+      if (isAdmin || isDevis || existingReservation) {
         const token = localStorage.getItem('adminToken');
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -758,7 +810,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
       
       const res = await fetch(url, {
-        method: 'POST',
+        method,
         headers,
         body: JSON.stringify(payload)
       });
@@ -766,11 +818,16 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       if (res.ok) {
         const data = await res.json();
         const roomNames = formData.chambres.map(id => CHAMBRES_INFO[id]?.name || `Chambre ${id}`).join(', ');
-        let message = isDevis
-          ? `Le devis pour ${roomNames} a été généré et envoyé à ${formData.email}. Il est valable pendant 48 heures.`
-          : isAdmin 
-            ? 'La réservation a bien été enregistrée.' 
-            : 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
+        let message = '';
+        if (existingReservation) {
+          message = 'La réservation a été mise à jour avec succès.';
+        } else if (isDevis) {
+          message = `Le devis pour ${roomNames} a été généré et envoyé à ${formData.email}. Il est valable pendant 48 heures.`;
+        } else if (isAdmin) {
+          message = 'La réservation a bien été enregistrée.';
+        } else {
+          message = 'Demande de réservation envoyée avec succès. Vous recevrez une confirmation prochainement.';
+        }
         
         setSuccessMsg(message);
         if (data.isLastMinute) {
@@ -790,7 +847,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
 
         setTimeout(() => {
-          if (isDevis || isAdmin) {
+          if (isDevis || isAdmin || existingReservation) {
             navigate('/admin');
           } else {
             navigate('/');
