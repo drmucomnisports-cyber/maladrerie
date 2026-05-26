@@ -702,6 +702,199 @@ const Admin = () => {
           </div>
         </div>
 
+        {activeTab === 'reservations' && (
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
+                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
+                    <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
+                        <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
+                        <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
+                        <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm font-bold text-muc-blue">
+  const updateStatut = async (id, newStatut) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ statut: newStatut })
+      });
+      if (res.ok) {
+        fetchReservations();
+      } else {
+        alert('Erreur lors de la mise à jour');
+      }
+    } catch (err) {
+      alert('Erreur réseau');
+    }
+  };
+
+  const updateIntervenant = async (reservationId, intervenantId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${reservationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ intervenantId: intervenantId ? parseInt(intervenantId) : null })
+      });
+      if (res.ok) {
+        fetchReservations();
+      } else {
+        alert('Erreur lors de l\'assignation');
+      }
+    } catch (err) {
+      alert('Erreur réseau');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setDeleteModalId(null);
+        fetchReservations();
+      } else {
+        alert('Erreur lors de la suppression');
+      }
+    } catch (err) {
+      alert('Erreur réseau');
+    }
+  };
+
+  const triggerPaymentAction = async (id, actionType) => {
+    try {
+      const res = await fetch(`${API_URL}/api/reservations/${id}/${actionType}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const contentType = res.headers.get("content-type");
+      if (res.ok) {
+        const data = await res.json();
+        setAdminFeedback({ type: 'success', msg: actionType === 'cancel-caution' ? data.message : `${data.message}. Le lien a été envoyé au client.` });
+        if (data.url) setPaymentLinkData({ link: data.url, id, action: actionType });
+        fetchReservations();
+      } else {
+        if (contentType && contentType.includes("application/json")) {
+          const errData = await res.json();
+          setAdminFeedback({ type: 'error', msg: errData.error || `Erreur lors de la génération (${actionType})` });
+        } else {
+          const errText = await res.text();
+          console.error('Server error response:', errText);
+          setAdminFeedback({ type: 'error', msg: `Erreur serveur: ${res.status} ${res.statusText}` });
+        }
+      }
+    } catch (err) {
+      setAdminFeedback({ type: 'error', message: 'Erreur réseau ou serveur inaccessible' });
+    }
+  };
+
+  const handleAction = async (action, id) => {
+    // Action 'accept' or 'reject' triggers the backend email logic
+    try {
+      const res = await fetch(`${API_URL}/api/reservations/${id}/${action}`);
+      if (res.ok) {
+        alert(action === 'accept' ? 'Réservation acceptée et e-mail envoyé.' : 'Réservation refusée et e-mail envoyé.');
+        fetchReservations();
+      } else {
+        alert('Erreur lors de l\'action');
+      }
+    } catch (err) {
+      alert('Erreur réseau');
+    }
+  };
+
+  useEffect(() => {
+    console.log('Admin Component Mounted. Token:', token ? 'Present' : 'Missing');
+    if (!token) {
+      console.log('No token found, redirecting to /login');
+      navigate('/login');
+    }
+  }, [token, navigate]);
+
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-muc-blue mx-auto mb-4"></div>
+          <p className="text-slate-500 font-medium">Vérification de l'authentification...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F8F8] font-sans p-4 md:p-8">
+      <div className="w-full max-w-[96%] mx-auto relative">
+        <div className="bg-[#F8F8F8] pb-8 border-b border-slate-200 shadow-sm mb-8">
+          <div className="w-full">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h1 className="text-3xl font-black text-muc-blue tracking-tight uppercase">Dashboard</h1>
+                <p className="text-sm font-medium text-slate-500">Gestion des réservations - La Maladrerie</p>
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="px-6 py-2 bg-muc-blue text-white font-bold rounded-lg hover:bg-muc-blue/90 transition-colors shadow-md"
+                >
+                  + Ajouter une réservation
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('adminToken');
+                    window.location.reload();
+                  }}
+                  className="px-6 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors"
+                >
+                  Déconnexion
+                </button>
+              </div>
+            </div>
+
+
+
+            <div className="flex gap-4">
+              <button onClick={() => setActiveTab('reservations')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'reservations' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Réservations</button>
+              <button onClick={() => setActiveTab('devis')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'devis' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Devis</button>
+              <button onClick={() => setActiveTab('clients')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'clients' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Clients</button>
+              <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
+              <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
+              <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'promos' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Promos</button>
+              <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'accounts' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Comptes</button>
+              <button onClick={() => setActiveTab('profil')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'profil' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Mon Profil</button>
+            </div>
+          </div>
+        </div>
 
         {activeTab === 'reservations' && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
@@ -1046,12 +1239,9 @@ const Admin = () => {
                             >
                               <Trash2 size={18} />
                             </button>
-                          </div>
-                        </td>
-                      </tr>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1739,7 +1929,6 @@ const Admin = () => {
         </div>,
         document.body
       )}
-      </div>
     </div>
   );
 };
