@@ -733,200 +733,6 @@ const Admin = () => {
                       </td>
                       <td className="p-4">
                         <div className="text-sm font-bold text-muc-blue">
-  const updateStatut = async (id, newStatut) => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/reservations/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ statut: newStatut })
-      });
-      if (res.ok) {
-        fetchReservations();
-      } else {
-        alert('Erreur lors de la mise à jour');
-      }
-    } catch (err) {
-      alert('Erreur réseau');
-    }
-  };
-
-  const updateIntervenant = async (reservationId, intervenantId) => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/reservations/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ intervenantId: intervenantId ? parseInt(intervenantId) : null })
-      });
-      if (res.ok) {
-        fetchReservations();
-      } else {
-        alert('Erreur lors de l\'assignation');
-      }
-    } catch (err) {
-      alert('Erreur réseau');
-    }
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/reservations/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setDeleteModalId(null);
-        fetchReservations();
-      } else {
-        alert('Erreur lors de la suppression');
-      }
-    } catch (err) {
-      alert('Erreur réseau');
-    }
-  };
-
-  const triggerPaymentAction = async (id, actionType) => {
-    try {
-      const res = await fetch(`${API_URL}/api/reservations/${id}/${actionType}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      const contentType = res.headers.get("content-type");
-      if (res.ok) {
-        const data = await res.json();
-        setAdminFeedback({ type: 'success', msg: actionType === 'cancel-caution' ? data.message : `${data.message}. Le lien a été envoyé au client.` });
-        if (data.url) setPaymentLinkData({ link: data.url, id, action: actionType });
-        fetchReservations();
-      } else {
-        if (contentType && contentType.includes("application/json")) {
-          const errData = await res.json();
-          setAdminFeedback({ type: 'error', msg: errData.error || `Erreur lors de la génération (${actionType})` });
-        } else {
-          const errText = await res.text();
-          console.error('Server error response:', errText);
-          setAdminFeedback({ type: 'error', msg: `Erreur serveur: ${res.status} ${res.statusText}` });
-        }
-      }
-    } catch (err) {
-      setAdminFeedback({ type: 'error', message: 'Erreur réseau ou serveur inaccessible' });
-    }
-  };
-
-  const handleAction = async (action, id) => {
-    // Action 'accept' or 'reject' triggers the backend email logic
-    try {
-      const res = await fetch(`${API_URL}/api/reservations/${id}/${action}`);
-      if (res.ok) {
-        alert(action === 'accept' ? 'Réservation acceptée et e-mail envoyé.' : 'Réservation refusée et e-mail envoyé.');
-        fetchReservations();
-      } else {
-        alert('Erreur lors de l\'action');
-      }
-    } catch (err) {
-      alert('Erreur réseau');
-    }
-  };
-
-  useEffect(() => {
-    console.log('Admin Component Mounted. Token:', token ? 'Present' : 'Missing');
-    if (!token) {
-      console.log('No token found, redirecting to /login');
-      navigate('/login');
-    }
-  }, [token, navigate]);
-
-  if (!token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-muc-blue mx-auto mb-4"></div>
-          <p className="text-slate-500 font-medium">Vérification de l'authentification...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#F8F8F8] font-sans p-4 md:p-8">
-      <div className="w-full max-w-[96%] mx-auto relative">
-        <div className="bg-[#F8F8F8] pb-8 border-b border-slate-200 shadow-sm mb-8">
-          <div className="w-full">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h1 className="text-3xl font-black text-muc-blue tracking-tight uppercase">Dashboard</h1>
-                <p className="text-sm font-medium text-slate-500">Gestion des réservations - La Maladrerie</p>
-              </div>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="px-6 py-2 bg-muc-blue text-white font-bold rounded-lg hover:bg-muc-blue/90 transition-colors shadow-md"
-                >
-                  + Ajouter une réservation
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('adminToken');
-                    window.location.reload();
-                  }}
-                  className="px-6 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors"
-                >
-                  Déconnexion
-                </button>
-              </div>
-            </div>
-
-
-
-            <div className="flex gap-4">
-              <button onClick={() => setActiveTab('reservations')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'reservations' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Réservations</button>
-              <button onClick={() => setActiveTab('devis')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'devis' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Devis</button>
-              <button onClick={() => setActiveTab('clients')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'clients' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Clients</button>
-              <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
-              <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
-              <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'promos' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Promos</button>
-              <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'accounts' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Comptes</button>
-              <button onClick={() => setActiveTab('profil')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'profil' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Mon Profil</button>
-            </div>
-          </div>
-        </div>
-
-        {activeTab === 'reservations' && (
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
-                    <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
-                        <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
-                        <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
-                        <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm font-bold text-muc-blue">
                           {res.chambres?.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
                         </div>
                         {res.salles && (
@@ -936,7 +742,7 @@ const Admin = () => {
                           </div>
                         )}
                         <div className="text-xs font-bold text-slate-700 mt-1">
-                          👨‍👩‍👧‍👦 {(res.occupants && res.occupants.length > 0) ? res.occupants.length : (res.chambresDetails ? Object.values(res.chambresDetails).reduce((acc, curr) => acc + parseInt(curr.adultes || 0) + parseInt(curr.enfants || curr.mineurs || 0), 0) : 0)} occupant(s)
+                          👥 {res.occupants ? res.occupants.length : 0} occupant(s)
                         </div>
                         <div className="text-[10px] text-slate-500 mt-1.5 flex gap-1 flex-wrap font-bold">
                           {res.options?.litsFaits && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🛏️ Lits</span>}
@@ -1082,11 +888,11 @@ const Admin = () => {
                               )}
                             </>
                           )}
-                          <button onClick={() => navigate(`/planning?mode=edit`, { state: { editReservation: res } })} className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Modifier la réservation">
-                            <Edit3 size={18} />
-                          </button>
                           <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors" title="Enregistrer un paiement manuel">
                             <Banknote size={18} />
+                          </button>
+                          <button onClick={() => setEditingReservation(res)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-500 hover:text-white transition-colors" title="Modifier la réservation">
+                            <Edit3 size={18} />
                           </button>
                           <button onClick={() => setDeleteModalId(res.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer la réservation">
                             <Trash2 size={18} />
@@ -1239,6 +1045,169 @@ const Admin = () => {
                             >
                               <Trash2 size={18} />
                             </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {reservations.filter(res => res.statut.includes('DEVIS')).length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-slate-500 font-medium">Aucun devis trouvé</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'clients' && (() => {
+          const filteredClients = clients.filter(c =>
+            (c.nom || '').toLowerCase().includes(clientSearch.toLowerCase()) ||
+            (c.email || '').toLowerCase().includes(clientSearch.toLowerCase()) ||
+            (c.telephone || '').includes(clientSearch)
+          );
+          return (
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 p-6">
+              <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <h2 className="text-xl font-black text-muc-blue uppercase tracking-tight">Liste des Clients</h2>
+                <input
+                  type="text"
+                  placeholder="Rechercher un client..."
+                  value={clientSearch}
+                  onChange={e => setClientSearch(e.target.value)}
+                  className="px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-muc-yellow outline-none text-sm w-full md:w-64"
+                />
+              </div>
+              <div className="flex flex-col gap-3">
+                {filteredClients.map((client, idx) => (
+                  <div key={idx} className="bg-slate-50 p-4 rounded-xl border border-slate-100 cursor-pointer hover:shadow-md transition-shadow flex justify-between items-center" onClick={() => { setSelectedClient(client); setShowClientModal(true); }}>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg">{client.nom}</h3>
+                      <div className="flex gap-4 mt-1 text-sm text-slate-500">
+                        <span>{client.email}</span>
+                        <span>{client.telephone}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 px-3 py-1 bg-muc-blue/10 text-muc-blue text-xs font-bold rounded-lg uppercase tracking-wider">
+                      {client.reservations.length} réservation(s)
+                    </div>
+                  </div>
+                ))}
+                {filteredClients.length === 0 && <p className="text-slate-500 font-medium p-4 text-center">Aucun client trouvé.</p>}
+              </div>
+            </div>
+          );
+        })()}
+
+        {activeTab === 'intervenants' && (() => {
+          const filteredIntervenants = intervenants.filter(i =>
+            (i.nom || '').toLowerCase().includes(intervenantSearch.toLowerCase()) ||
+            (i.prenom || '').toLowerCase().includes(intervenantSearch.toLowerCase()) ||
+            (i.email || '').toLowerCase().includes(intervenantSearch.toLowerCase())
+          );
+          return (
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 p-6">
+              <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <h2 className="text-xl font-black text-muc-blue uppercase tracking-tight">Gestion des Intervenants</h2>
+                <div className="flex gap-4 w-full md:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Rechercher un intervenant..."
+                    value={intervenantSearch}
+                    onChange={e => setIntervenantSearch(e.target.value)}
+                    className="px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-muc-yellow outline-none text-sm w-full md:w-64"
+                  />
+                  <button
+                    onClick={() => {
+                      setCurrentIntervenant(null);
+                      setIntervenantForm({ nom: '', prenom: '', email: '', telephone: '', disponibilites: [] });
+                      setShowIntervenantModal(true);
+                    }}
+                    className="bg-muc-yellow text-muc-blue px-4 py-2 rounded-lg font-black text-sm uppercase shrink-0"
+                  >
+                    + Ajouter
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                {filteredIntervenants.map((interv) => (
+                  <div key={interv.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-4">
+                        <h3 className="font-bold text-slate-800 text-lg">{interv.prenom} {interv.nom}</h3>
+                        <span className="text-sm text-slate-500">{interv.email}</span>
+                        <span className="text-sm text-slate-500">{interv.telephone}</span>
+                      </div>
+
+                      <div className="mt-2">
+                        {interv.disponibilites && interv.disponibilites.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {interv.disponibilites.map(dispo => (
+                              <span key={dispo.id} className="text-[11px] text-slate-600 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
+                                Du <span className="font-semibold">{new Date(dispo.dateDebut).toLocaleDateString('fr-FR')}</span> au <span className="font-semibold">{new Date(dispo.dateFin).toLocaleDateString('fr-FR')}</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">Aucune disponibilité</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0 ml-4">
+                      <button onClick={() => editIntervenant(interv)} className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Modifier">
+                        <Edit3 size={18} />
+                      </button>
+                      <button onClick={() => deleteIntervenant(interv.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {filteredIntervenants.length === 0 && <p className="text-slate-500 font-medium p-4 text-center">Aucun intervenant trouvé.</p>}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
+      {showClientModal && selectedClient && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-y-auto max-h-[90vh] border border-slate-100 p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black text-muc-blue uppercase tracking-tight">Fiche Client</h2>
+              <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-2xl">&times;</button>
+            </div>
+            <div className="space-y-6">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <h3 className="font-bold text-slate-800 mb-2">Informations</h3>
+                <p className="text-sm text-slate-600"><strong>Nom:</strong> {selectedClient.nom}</p>
+                <p className="text-sm text-slate-600"><strong>Email:</strong> {selectedClient.email}</p>
+                <p className="text-sm text-slate-600"><strong>Téléphone:</strong> {selectedClient.telephone}</p>
+                {selectedClient.adressePostale && <p className="text-sm text-slate-600"><strong>Adresse:</strong> {selectedClient.adressePostale}</p>}
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 mb-3">Historique des Réservations</h3>
+                <div className="space-y-3">
+                  {selectedClient.reservations.map(res => (
+                    <div key={res.id} className="border border-slate-100 p-4 rounded-lg bg-white shadow-sm">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-bold text-muc-blue">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')} au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</span>
+                        <span className="text-xs px-2 py-1 bg-slate-100 rounded-md uppercase font-bold text-slate-600">{res.statut}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">Chambres : {res.chambres.join(', ')}</p>
+                      <p className="text-xs text-slate-500">Prix Total : {res.prixTotal ? `${res.prixTotal} €` : 'N/A'}</p>
+                      {res.occupants && res.occupants.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-50">
+                          <p className="text-xs font-bold text-slate-700 mb-1">Occupants:</p>
+                          <ul className="text-xs text-slate-500 list-disc list-inside">
+                            {res.occupants.map(o => (
+                              <li key={o.id}>{o.prenom} {o.nom} {o.estAdulte ? '(Adulte)' : `(Enfant, ${o.age} ans)`}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1729,6 +1698,28 @@ const Admin = () => {
                 events={reservations.map(r => ({ start: r.dateDebut, end: r.dateFin, chambres: r.chambres }))}
                 isAdmin={true}
                 onCreated={() => { setShowAddModal(false); fetchReservations(); }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingReservation && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-y-auto max-h-[90vh] border border-slate-100">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <div>
+                <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">Modifier la réservation</h2>
+                <p className="text-xs text-slate-500 mt-1">Modification de la réservation #{editingReservation.id}</p>
+              </div>
+              <button onClick={() => setEditingReservation(null)} className="text-slate-400 hover:text-slate-600 font-bold text-2xl px-2">&times;</button>
+            </div>
+            <div className="p-6">
+              <ReservationForm
+                events={reservations.map(r => ({ start: r.dateDebut, end: r.dateFin, chambres: r.chambres }))}
+                isAdmin={true}
+                existingReservation={editingReservation}
+                onCreated={() => { setEditingReservation(null); fetchReservations(); }}
               />
             </div>
           </div>
