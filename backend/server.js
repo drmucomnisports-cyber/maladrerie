@@ -819,7 +819,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: (devis ? calculerTotalRepasServeur(devis.repas) : (typeof reservation !== 'undefined' ? calculerTotalRepasServeur(reservation.repas) : 0)) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
+              name: (calculerTotalRepasServeur(typeof devis !== 'undefined' ? devis.repas : (typeof reservation !== 'undefined' ? reservation.repas : (typeof existingReservation !== 'undefined' ? existingReservation.repas : {})))) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
               description: `Client: ${existingReservation.client.nom}\nDu ${new Date(existingReservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(existingReservation.dateFin).toLocaleDateString('fr-FR')}\n${existingReservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`,
             },
             unit_amount: Math.round(montantAcompte * 100), // En centimes
@@ -1459,7 +1459,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: (devis ? calculerTotalRepasServeur(devis.repas) : (typeof reservation !== 'undefined' ? calculerTotalRepasServeur(reservation.repas) : 0)) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
+            name: (calculerTotalRepasServeur(typeof devis !== 'undefined' ? devis.repas : (typeof reservation !== 'undefined' ? reservation.repas : (typeof existingReservation !== 'undefined' ? existingReservation.repas : {})))) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
             description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres?.length || 0} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
@@ -1571,7 +1571,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: (devis ? calculerTotalRepasServeur(devis.repas) : (typeof reservation !== 'undefined' ? calculerTotalRepasServeur(reservation.repas) : 0)) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
+            name: (calculerTotalRepasServeur(typeof devis !== 'undefined' ? devis.repas : (typeof reservation !== 'undefined' ? reservation.repas : (typeof existingReservation !== 'undefined' ? existingReservation.repas : {})))) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
             description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
@@ -2264,7 +2264,7 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
         price_data: {
           currency: 'eur',
           product_data: { 
-            name: (devis ? calculerTotalRepasServeur(devis.repas) : (typeof reservation !== 'undefined' ? calculerTotalRepasServeur(reservation.repas) : 0)) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
+            name: (calculerTotalRepasServeur(typeof devis !== 'undefined' ? devis.repas : (typeof reservation !== 'undefined' ? reservation.repas : (typeof existingReservation !== 'undefined' ? existingReservation.repas : {})))) > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
             description: `Client: ${reservation.client.nom}\nSéjour: du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
           },
           unit_amount: Math.round(montantAcompte * 100),
