@@ -109,11 +109,16 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'muc2024';
 
 const checkAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Non autorisé' });
+  let token;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token;
   }
 
-  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Non autorisé' });
+  }
   
   // Compatibilité avec l'ancien token pour l'instant si besoin, mais on privilégie JWT
   if (token === 'fake-jwt-token-muc') {
