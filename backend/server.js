@@ -281,11 +281,11 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
 
   // Salles de réunion
   if (salles) {
-    let nuitsSalles = nuits + 1;
+    let nuitsSalles = nuits;
     if (salles.dateDebut && salles.dateFin) {
       const startS = new Date(salles.dateDebut);
       const endS = new Date(salles.dateFin);
-      nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
+      nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
     }
     const prixSalle = chambres.length > 0 ? 100 : 150;
     if (salles.salle15) total += prixSalle * nuitsSalles;
@@ -1227,12 +1227,12 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
 
         // Ajouter les salles
         if (salles) {
-          let nuitsSalles = nuits + 1;
+          let nuitsSalles = nuits;
           let datesSuffix = "";
           if (salles.dateDebut && salles.dateFin) {
             const startS = new Date(salles.dateDebut);
             const endS = new Date(salles.dateFin);
-            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
+            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
             const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             datesSuffix = ` (du ${strD} au ${strF})`;
@@ -1571,12 +1571,12 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
         });
 
         if (devisFinal.salles) {
-          let nuitsSalles = nuits + 1;
+          let nuitsSalles = nuits;
           let datesSuffix = "";
           if (devisFinal.salles.dateDebut && devisFinal.salles.dateFin) {
             const startS = new Date(devisFinal.salles.dateDebut);
             const endS = new Date(devisFinal.salles.dateFin);
-            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
+            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
             const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             datesSuffix = ` (du ${strD} au ${strF})`;
@@ -1785,12 +1785,12 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
 
     // Salles
     if (devis.salles) {
-      let nuitsSalles = nuits + 1;
+      let nuitsSalles = nuits;
       let datesSuffix = "";
       if (devis.salles.dateDebut && devis.salles.dateFin) {
         const startS = new Date(devis.salles.dateDebut);
         const endS = new Date(devis.salles.dateFin);
-        nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
+        nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
         const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
         const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
         datesSuffix = ` (du ${strD} au ${strF})`;

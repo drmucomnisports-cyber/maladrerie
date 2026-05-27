@@ -363,7 +363,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     if (!startStr || !endStr) return 0;
     const start = new Date(startStr);
     const end = new Date(endStr);
-    const nuitsSalles = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
+    const nuitsSalles = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
     
     const aDesChambres = formData.chambres.length > 0;
     const tarifSalleParJour = aDesChambres ? 100 : 150;
