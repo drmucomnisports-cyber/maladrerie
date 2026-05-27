@@ -69,13 +69,22 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       let structure = existingReservation.structure || '';
       
       if (existingReservation.client) {
-        const parts = (existingReservation.client.nom || '').split(' ');
-        prenom = parts[0] || '';
-        nom = parts.slice(1).join(' ') || '';
-        if (nom.includes(' - ')) {
-          const splitNom = nom.split(' - ');
-          nom = splitNom[0];
-          structure = splitNom[1];
+        if (isAdmin && !isDevis) {
+          nom = existingReservation.client.nom || '';
+          if (nom.includes(' - ')) {
+            const splitNom = nom.split(' - ');
+            nom = splitNom[0];
+            structure = splitNom[1];
+          }
+        } else {
+          const parts = (existingReservation.client.nom || '').split(' ');
+          prenom = parts[0] || '';
+          nom = parts.slice(1).join(' ') || '';
+          if (nom.includes(' - ')) {
+            const splitNom = nom.split(' - ');
+            nom = splitNom[0];
+            structure = splitNom[1];
+          }
         }
       }
 
@@ -163,12 +172,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       const end = new Date(formData.dateFin);
       
       const unavailable = new Set();
-
       events.forEach(event => {
+        if (existingReservation && (event.id === existingReservation.id || event.id === `res-${existingReservation.id}`)) return;
+        
         const evStart = new Date(event.start);
         const evEnd = new Date(event.end);
 
-        // Check for date overlap
         if (start < evEnd && end > evStart) {
            if (event.chambres && Array.isArray(event.chambres)) {
              event.chambres.forEach(ch => unavailable.add(ch));
@@ -973,12 +982,13 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             const info = CHAMBRES_INFO[num];
             const isChecked = formData.chambres.includes(num);
             const isUnavailable = unavailableRooms.includes(num);
+            const isOriginal = existingReservation?.chambres?.includes(num);
 
             return (
-              <div key={num} className={`p-4 rounded-xl border-2 transition-all ${isUnavailable ? 'opacity-50 bg-slate-100 border-slate-200 grayscale cursor-not-allowed' : isChecked ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}>
+              <div key={num} className={`p-4 rounded-xl border-2 transition-all ${isUnavailable ? 'opacity-50 bg-slate-100 border-slate-200 grayscale cursor-not-allowed' : isChecked ? (isOriginal ? 'border-muc-blue bg-muc-blue/5' : 'border-muc-yellow bg-muc-yellow/5') : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}>
                 <label className={`flex items-center gap-3 w-full ${isUnavailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input type="checkbox" name="chambres" value={num} checked={isChecked} onChange={handleChange} disabled={isUnavailable} className="hidden" />
-                  <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
+                  <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${isChecked ? (isOriginal ? 'bg-muc-blue border-muc-blue' : 'bg-muc-yellow border-muc-yellow') : 'bg-white border-slate-300'}`}>
                     {isChecked && <div className="w-2 h-2 bg-white rounded-full"></div>}
                   </div>
                   <div className="flex-1">

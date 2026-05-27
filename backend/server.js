@@ -476,7 +476,7 @@ function generateOptionsHTML(options, repas, salles) {
     if (repasDetails.length > 0) {
       hasOptions = true;
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">&#x26A0;½ï¸ Restauration</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">🍽️ Restauration</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${repasDetails.join('')}
         </ul>
@@ -496,7 +496,7 @@ function generateOptionsHTML(options, repas, salles) {
          dateString = ` (du ${new Date(salles.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} au ${new Date(salles.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })})`;
       }
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">&#x1F4BC; Salles de réunion${dateString}</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">💼 Salles de réunion${dateString}</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${sallesSelected.map(s => `<li style="margin-bottom: 5px;">${s}</li>`).join('')}
         </ul>
@@ -516,7 +516,7 @@ function generateOptionsHTML(options, repas, salles) {
     if (optionsSelected.length > 0) {
       hasOptions = true;
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">&#x26A0;›ï¸ Options de confort</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">🛏️ Options de confort</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${optionsSelected.map(o => `<li style="margin-bottom: 5px;">${o}</li>`).join('')}
         </ul>
@@ -615,7 +615,7 @@ app.post('/api/reservations', async (req, res) => {
     if (availableIntervenants && availableIntervenants.length > 0) {
       intervenantsHTML = `
         <div style="margin-top: 20px; padding: 15px; background-color: #e8f5e9; border-left: 4px solid #28a745; border-radius: 4px;">
-          <h3 style="color: #155724; margin-top: 0; font-size: 16px;">âœ… Intervenants disponibles sur cette période :</h3>
+          <h3 style="color: #155724; margin-top: 0; font-size: 16px;">✅ Intervenants disponibles sur cette période :</h3>
           <ul style="color: #155724; margin-bottom: 0; list-style-type: none; padding-left: 0;">
             ${availableIntervenants.map(inv => `<li style="margin-bottom: 5px;"><strong>${inv.prenom} ${inv.nom}</strong> (${inv.telephone})</li>`).join('')}
           </ul>
@@ -624,7 +624,7 @@ app.post('/api/reservations', async (req, res) => {
     } else {
       intervenantsHTML = `
         <div style="margin-top: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-          <p style="color: #856404; margin: 0;">âš ï¸ Aucun intervenant n'a renseigné de disponibilité couvrant entièrement cette période.</p>
+          <p style="color: #856404; margin: 0;">⚠️ Aucun intervenant n'a renseigné de disponibilité couvrant entièrement cette période.</p>
         </div>
       `;
     }
@@ -1308,7 +1308,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
                     </table>
 
                     <div style="background-color: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 8px; font-size: 14px; color: #856404; margin-bottom: 25px;">
-                      âš ï¸ <strong>Important :</strong> Ce devis et la disponibilité associée ne sont garantis que pendant <strong>48 heures</strong>. Passé ce délai, le créneau pourra être réservé par un autre client.
+                      ⚠️ <strong>Important :</strong> Ce devis et la disponibilité associée ne sont garantis que pendant <strong>48 heures</strong>. Passé ce délai, le créneau pourra être réservé par un autre client.
                     </div>
 
                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -1534,7 +1534,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       try {
         await sendMail({
           to: devis.validePar,
-          subject: `âš¡ Devis ${devis.numeroDevis} validé par le client !`,
+          subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eeeeee; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
               <div style="text-align: center; margin-bottom: 20px;">
@@ -1555,7 +1555,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
               </div>
               
               <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
-                <p style="margin: 0; font-weight: bold; color: #856404;">&#x1F9F9; Action Requise : Affectation d'un Intervenant</p>
+                <p style="margin: 0; font-weight: bold; color: #856404;">🧹 Action Requise : Affectation d'un Intervenant</p>
                 <p style="margin: 8px 0 0 0; font-size: 14px; color: #666666;">
                   Veuillez vous connecter à  l'espace d'administration pour affecter un <strong>agent de ménage / accueil</strong> pour ce séjour.
                 </p>
@@ -1646,7 +1646,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
       try {
         await sendMail({
           to: devis.validePar,
-          subject: `âš¡ Devis ${devis.numeroDevis} validé par le client !`,
+          subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eeeeee; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
               <div style="text-align: center; margin-bottom: 20px;">
@@ -1667,7 +1667,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
               </div>
               
               <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
-                <p style="margin: 0; font-weight: bold; color: #856404;">&#x1F9F9; Action Requise : Affectation d'un Intervenant</p>
+                <p style="margin: 0; font-weight: bold; color: #856404;">🧹 Action Requise : Affectation d'un Intervenant</p>
                 <p style="margin: 8px 0 0 0; font-size: 14px; color: #666666;">
                   Veuillez vous connecter à  l'espace d'administration pour affecter un <strong>agent de ménage / accueil</strong> pour ce séjour.
                 </p>
