@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Send, X, CheckCircle, AlertTriangle, Phone, UtensilsCrossed, Info } from 'lucide-react';
@@ -1100,7 +1100,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 <div>
                   <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 15 personnes</span>
                   <span className="text-xs font-medium text-slate-500">
-                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
+                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
                   </span>
                 </div>
               </div>
@@ -1116,7 +1116,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 <div>
                   <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 12 personnes</span>
                   <span className="text-xs font-medium text-slate-500">
-                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
+                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
                   </span>
                 </div>
               </div>
@@ -1180,15 +1180,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-slate-100 hover:bg-slate-50">
             <input type="checkbox" name="opt_litsFaits" checked={formData.options.litsFaits} onChange={handleChange} className="w-4 h-4 text-muc-blue border-slate-300 rounded" />
-            <span className="text-sm font-medium text-slate-700">Lits faits à l'arrivée (5 € / pers)</span>
+            <span className="text-sm font-medium text-slate-700">Lits faits à l'arrivée (5 € / pers)</span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-slate-100 hover:bg-slate-50">
             <input type="checkbox" name="opt_lingeFourni" checked={formData.options.lingeFourni} onChange={handleChange} className="w-4 h-4 text-muc-blue border-slate-300 rounded" />
-            <span className="text-sm font-medium text-slate-700">Linge de toilette fourni (5 € / pers)</span>
+            <span className="text-sm font-medium text-slate-700">Linge de toilette fourni (5 € / pers)</span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-slate-100 hover:bg-slate-50">
             <input type="checkbox" name="opt_menage" checked={formData.options.menage} onChange={handleChange} className="w-4 h-4 text-muc-blue border-slate-300 rounded" />
-            <span className="text-sm font-medium text-slate-700">Ménage fin de séjour (50 € / chambre)</span>
+            <span className="text-sm font-medium text-slate-700">Ménage fin de séjour (50 € / chambre)</span>
           </label>
         </div>
       </div>
@@ -1275,15 +1275,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                               <div className="flex flex-col gap-1">
                                 <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
                                   <span className="text-xs font-bold text-slate-500">Adulte</span>
-                                  <span className="text-xs font-black text-slate-700">{tarifs.ADULTE} €</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ADULTE} €</span>
                                 </div>
                                 <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
                                   <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Enf. &lt;12</span>
-                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_12} €</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_12} €</span>
                                 </div>
                                 <div className="flex justify-between items-center pb-1">
                                   <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Enf. &lt;5</span>
-                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_5} €</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_5} €</span>
                                 </div>
                               </div>
                             </div>
@@ -1310,7 +1310,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                 <div className="font-black text-muc-blue text-sm mb-1.5 text-center">{tarifs.label}</div>
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
-                                    <span className="font-bold text-slate-600 whitespace-nowrap">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE} €)</span></span>
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE} €)</span></span>
                                     <input
                                       type="number"
                                       min="0"
@@ -1322,7 +1322,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                     />
                                   </div>
                                   <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
-                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12} €)</span></span>
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12} €)</span></span>
                                     <input
                                       type="number"
                                       min="0"
@@ -1334,7 +1334,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                     />
                                   </div>
                                   <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
-                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5} €)</span></span>
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5} €)</span></span>
                                     <input
                                       type="number"
                                       min="0"
@@ -1360,7 +1360,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               {calculerTotalRepas() > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex justify-between items-center">
                   <span className="text-sm font-bold text-orange-800">Total Restauration</span>
-                  <span className="text-lg font-black text-orange-900">{calculerTotalRepas().toFixed(2)} €</span>
+                  <span className="text-lg font-black text-orange-900">{calculerTotalRepas().toFixed(2)} €</span>
                 </div>
               )}
             </div>
@@ -1401,7 +1401,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               )}
             </div>
             {promoError && <p className="text-red-500 text-[10px] font-bold mt-1 ml-1">{promoError}</p>}
-            {promoApplied && <p className="text-green-600 text-[10px] font-bold mt-1 ml-1">Code appliqué : -{promoApplied.type === 'pourcentage' ? `${promoApplied.valeur}%` : `${promoApplied.valeur} €`}</p>}
+            {promoApplied && <p className="text-green-600 text-[10px] font-bold mt-1 ml-1">Code appliqué : -{promoApplied.type === 'pourcentage' ? `${promoApplied.valeur}%` : `${promoApplied.valeur} €`}</p>}
           </div>
 
           <div className="bg-muc-blue/5 p-6 rounded-2xl border-2 border-muc-blue/10">
@@ -1409,25 +1409,25 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center text-sm text-slate-700">
                 <span className="font-medium">Hébergement</span>
-                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
+                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
               {calculerTotalSalles() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
-                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Restauration</span>
-                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
+                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
                 </div>
               )}
               <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-xl font-black text-slate-900">
                 <span>Total</span>
                 <div className="text-right">
-                  {promoApplied && <span className="text-sm text-slate-400 line-through mr-2 font-normal">{(calculerPrix() / (promoApplied.type === 'pourcentage' ? (1 - promoApplied.valeur / 100) : 1) + (promoApplied.type === 'fixe' ? promoApplied.valeur : 0) + calculerTotalRepas()).toFixed(2)} €</span>}
-                  <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
+                  {promoApplied && <span className="text-sm text-slate-400 line-through mr-2 font-normal">{(calculerPrix() / (promoApplied.type === 'pourcentage' ? (1 - promoApplied.valeur / 100) : 1) + (promoApplied.type === 'fixe' ? promoApplied.valeur : 0) + calculerTotalRepas()).toFixed(2)} €</span>}
+                  <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
                 </div>
               </div>
             </div>
@@ -1435,7 +1435,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600">{calculerTotalRepas() > 0 ? "30% hébergement + 100% restauration" : "Acompte (30%)"}</span>
-                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
+                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
             <p className="text-[10px] text-slate-500 mt-3">* Inclut la taxe de séjour (4% du prix de la nuitée / adulte)</p>
@@ -1567,30 +1567,30 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="space-y-2 mb-3">
               <div className="flex justify-between items-center text-sm text-slate-700">
                 <span className="font-medium">Hébergement</span>
-                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
+                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
               {calculerTotalSalles() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
-                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Restauration</span>
-                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
+                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
                 </div>
               )}
               <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-xl font-black text-slate-900">
                 <span>Total</span>
-                <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
+                <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
             <div className="bg-white/80 rounded-xl p-3 border border-muc-blue/10">
               <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600">{calculerTotalRepas() > 0 ? "30% hébergement + 100% restauration" : "Acompte (30%)"}</span>
-                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
+                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
           </div>

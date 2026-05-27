@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Mountain, Users, ArrowRight, MapPin, Calendar, CheckCircle2, Bed, Train, Car, Bike, Info, Sparkles, Trash2, Waves, Compass, Utensils, Presentation } from 'lucide-react';
@@ -368,11 +368,11 @@ const Home = () => {
                 <p className="text-xs uppercase font-black tracking-widest text-muc-yellow mb-4">Tarifs de location</p>
                 <div className="space-y-6">
                   <div>
-                    <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="block text-4xl font-black text-white">100 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
                     <span className="text-xs text-blue-200 mt-1 block">si réservé avec le gîte</span>
                   </div>
                   <div className="border-t border-white/10 pt-4">
-                    <span className="block text-4xl font-black text-white">150 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
+                    <span className="block text-4xl font-black text-white">150 € <span className="text-sm font-bold opacity-75">/ jour</span></span>
                     <span className="text-xs text-blue-200 mt-1 block">en location seule</span>
                   </div>
                 </div>
@@ -406,16 +406,16 @@ const Home = () => {
             <div className="bg-muc-blue text-white p-10 rounded-[2.5rem] shadow-2xl hover-lift relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform"></div>
               <h3 className="text-2xl font-black mb-4 uppercase tracking-tight">Tarifs d'hébergement</h3>
-              <div className="text-6xl font-black mt-4 text-muc-yellow tracking-tighter">22 € <span className="text-2xl font-bold opacity-60 text-white uppercase tracking-normal">à</span> 25 €</div>
+              <div className="text-6xl font-black mt-4 text-muc-yellow tracking-tighter">22 € <span className="text-2xl font-bold opacity-60 text-white uppercase tracking-normal">à</span> 25 €</div>
               <p className="mt-4 text-blue-100 text-lg font-medium italic">Par personne et par nuit.</p>
               <ul className="mt-4 space-y-1.5 text-sm font-medium text-blue-100/80">
                 <li className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-muc-yellow opacity-75 shrink-0"></div>
-                  <span><strong className="text-white">22 €</strong> si la chambre est complète</span>
+                  <span><strong className="text-white">22 €</strong> si la chambre est complète</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-muc-yellow opacity-75 shrink-0"></div>
-                  <span><strong className="text-white">25 €</strong> si la chambre n'est pas complète</span>
+                  <span><strong className="text-white">25 €</strong> si la chambre n'est pas complète</span>
                 </li>
               </ul>
             </div>
