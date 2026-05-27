@@ -528,13 +528,13 @@ const Home = () => {
             <a href="https://www.millau-viaduc-tourisme.fr/" target="_blank" rel="noreferrer" className="bg-muc-yellow text-muc-blue px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
               Office de Tourisme de Millau
             </a>
-            <a href="https://www.parc-grands-causses.fr/" target="_blank" rel="noreferrer" className="bg-white text-muc-blue px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
+            <a href="https://www.parc-grands-causses.fr/" target="_blank" rel="noreferrer" className="bg-muc-yellow text-muc-blue px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
               PNR des Grands Causses
             </a>
-            <a href="https://www.mucformation.fr/" target="_blank" rel="noreferrer" className="bg-white text-muc-blue px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
+            <a href="https://www.mucformation.fr/" target="_blank" rel="noreferrer" className="bg-muc-blue text-white border-2 border-white/30 hover:border-white hover:bg-muc-blue/80 px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
               MUC Formation
             </a>
-            <a href="https://www.mucomnisports.fr/" target="_blank" rel="noreferrer" className="bg-white text-muc-blue px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
+            <a href="https://www.mucomnisports.fr/" target="_blank" rel="noreferrer" className="bg-muc-blue text-white border-2 border-white/30 hover:border-white hover:bg-muc-blue/80 px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
               MUC Omnisports
             </a>
           </div>
