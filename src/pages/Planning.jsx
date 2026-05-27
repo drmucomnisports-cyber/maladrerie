@@ -145,8 +145,8 @@ const Planning = () => {
         
         <div className="mx-12 shrink-0 flex flex-col items-center">
           <Link to="/" className="flex flex-col items-center">
-            <div className="bg-muc-blue p-3 rounded-b-2xl shadow-md -mt-1 mb-1">
-              <span className="font-black text-white tracking-tighter text-xl">MUC</span>
+            <div className="bg-white p-2 rounded-b-2xl shadow-md -mt-1 mb-1 flex items-center justify-center">
+              <img src="/logo-muc.jpg" alt="MUC Omnisports" className="h-10 w-auto object-contain" />
             </div>
             <span className="text-[10px] font-black text-muc-blue tracking-[0.2em] uppercase">Gîte de la Maladrerie</span>
           </Link>
@@ -227,7 +227,9 @@ const Planning = () => {
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8 opacity-80 border-t border-white/10 pt-12 pb-8">
              <div className="flex flex-col items-start">
-               <span className="font-black text-white tracking-tighter text-2xl">MUC</span>
+               <div className="bg-white p-2 rounded shadow-md mb-2 flex items-center justify-center">
+                 <img src="/logo-muc.jpg" alt="MUC Omnisports" className="h-8 w-auto object-contain" />
+               </div>
                <span className="text-[10px] font-black text-muc-yellow tracking-[0.2em] uppercase">La Maladrerie</span>
              </div>
              <p className="text-xs text-white uppercase tracking-[0.3em] font-medium">

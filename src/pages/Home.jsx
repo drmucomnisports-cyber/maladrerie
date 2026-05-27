@@ -97,7 +97,7 @@ const Home = () => {
         {/* Logo Central */}
         <div className="mx-12 shrink-0 flex flex-col items-center">
             <div className="bg-white p-2 rounded-b-2xl shadow-md -mt-1 mb-1 flex items-center justify-center">
-              <img src="/logo-muc.png" alt="MUC Omnisports" className="h-10 w-auto object-contain" />
+              <img src="/logo-muc.jpg" alt="MUC Omnisports" className="h-10 w-auto object-contain" />
             </div>
           <span className="text-[10px] font-bold text-muc-blue tracking-[0.2em] uppercase">Gîte de la Maladrerie</span>
         </div>

@@ -917,7 +917,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           ) : (
             <>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Client'}</label>
+                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">{isAdmin ? 'Nom Client / Groupe' : 'Nom Complet du Client'} <span className="text-red-500">*</span></label>
                 <input required type="text" name="nom" value={formData.nom} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="Ex: Jean Dupont" />
               </div>
               <div className="space-y-1">
