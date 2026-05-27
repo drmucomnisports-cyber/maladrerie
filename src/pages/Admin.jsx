@@ -54,6 +54,7 @@ const Admin = () => {
   const [clients, setClients] = useState([]);
   const [intervenants, setIntervenants] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
+  const [reservationSearch, setReservationSearch] = useState('');
   const [intervenantSearch, setIntervenantSearch] = useState('');
 
   const [selectedClient, setSelectedClient] = useState(null);
@@ -703,25 +704,46 @@ const Admin = () => {
         </div>
 
         {activeTab === 'reservations' && (
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
-                    <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservations.filter(res => !res.statut?.includes('DEVIS')).map((res) => (
-                    <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
+              <div className="w-full relative">
+                <input
+                  type="text"
+                  placeholder="Rechercher une réservation (Nom, Email)..."
+                  className="w-full pl-12 pr-6 py-4 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-muc-blue focus:ring-0 transition-all font-medium text-slate-600"
+                  value={reservationSearch}
+                  onChange={(e) => setReservationSearch(e.target.value)}
+                />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reservations.filter(res => !res.statut?.includes('DEVIS')).filter((res) => {
+                      const search = reservationSearch?.toLowerCase() || '';
+                      if (!search) return true;
+                      return (
+                        res.client?.nom?.toLowerCase().includes(search) ||
+                        res.client?.email?.toLowerCase().includes(search)
+                      );
+                    }).map((res) => (
+                      <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <td className="p-4">
                         <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
                         <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
@@ -954,6 +976,7 @@ const Admin = () => {
               </table>
             </div>
           </div>
+        </div>
         )}
 
         {activeTab === 'devis' && (
@@ -970,7 +993,7 @@ const Admin = () => {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
               </div>
               <button
-                onClick={() => navigate('/planning?mode=devis')}
+                onClick={() => setShowAddModal(true)}
                 className="w-full md:w-auto bg-muc-blue text-white px-8 py-4 rounded-xl font-black uppercase tracking-wider hover:bg-muc-blue/90 hover:scale-105 transition-all shadow-xl flex items-center justify-center gap-3"
               >
                 <PlusCircle size={24} />
@@ -1827,8 +1850,8 @@ const Admin = () => {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-y-auto max-h-[90vh] border border-slate-100">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <div>
-                <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">Ajouter une réservation</h2>
-                <p className="text-xs text-slate-500 mt-1">Saisie complète et blocage du planning</p>
+                <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">{activeTab === 'devis' ? 'Nouveau Devis' : 'Ajouter une réservation'}</h2>
+                <p className="text-xs text-slate-500 mt-1">{activeTab === 'devis' ? "Création d'un nouveau devis" : 'Saisie complète et blocage du planning'}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-2xl px-2">&times;</button>
             </div>
@@ -1836,6 +1859,7 @@ const Admin = () => {
               <ReservationForm
                 events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres }))}
                 isAdmin={true}
+                isDevis={activeTab === 'devis'}
                 onCreated={() => { setShowAddModal(false); fetchReservations(); }}
               />
             </div>
