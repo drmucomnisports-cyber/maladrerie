@@ -210,7 +210,7 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
     total += nbAdultes * (tarifPers * 0.04) * nuits;
   });
 
-  // Salles de formation
+  // Salles de réunion
   if (salles) {
     let nuitsSalles = nuits;
     if (salles.dateDebut && salles.dateFin) {
@@ -476,7 +476,7 @@ function generateOptionsHTML(options, repas, salles) {
     if (repasDetails.length > 0) {
       hasOptions = true;
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">ðŸ½ï¸ Restauration</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">&#x26A0;½ï¸ Restauration</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${repasDetails.join('')}
         </ul>
@@ -487,8 +487,8 @@ function generateOptionsHTML(options, repas, salles) {
   // Salles
   if (salles) {
     let sallesSelected = [];
-    if (salles.salle15) sallesSelected.push("Salle de formation 15 places");
-    if (salles.salle12) sallesSelected.push("Salle de formation 12 places");
+    if (salles.salle15) sallesSelected.push("Salle de réunion 15 places");
+    if (salles.salle12) sallesSelected.push("Salle de réunion 12 places");
     if (sallesSelected.length > 0) {
       hasOptions = true;
       let dateString = "";
@@ -496,7 +496,7 @@ function generateOptionsHTML(options, repas, salles) {
          dateString = ` (du ${new Date(salles.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} au ${new Date(salles.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })})`;
       }
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">ðŸ’¼ Salles de formation${dateString}</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">&#x1F4BC; Salles de réunion${dateString}</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${sallesSelected.map(s => `<li style="margin-bottom: 5px;">${s}</li>`).join('')}
         </ul>
@@ -516,7 +516,7 @@ function generateOptionsHTML(options, repas, salles) {
     if (optionsSelected.length > 0) {
       hasOptions = true;
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">ðŸ›ï¸ Options de confort</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">&#x26A0;›ï¸ Options de confort</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${optionsSelected.map(o => `<li style="margin-bottom: 5px;">${o}</li>`).join('')}
         </ul>
@@ -908,7 +908,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
 
                     ${paymentLink ? `
                       <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
-                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'Acompte (30% Hï¿½bergement + 100% Repas) :</p>
+                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'Acompte (30% Hébergement + 100% Repas) :</p>
                         <table width="100%" cellpadding="0" cellspacing="0" border="0">
                           <tr>
                             <td align="center">
@@ -1361,6 +1361,51 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
   }
 });
 
+// Mettre à jour un devis existant (Admin)
+app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const { nom, email, telephone, adressePostale, dateDebut, dateFin, chambres, chambresDetails, options, salles, repas, repasGlobal, prixTotal, prixHebergement, totalRepas, modeRestauration } = req.body;
+
+  try {
+    const devisExistant = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true }
+    });
+
+    if (!devisExistant || devisExistant.statut !== 'DEVIS_EN_ATTENTE') {
+      return res.status(400).json({ error: "Devis introuvable ou déjà validé/expiré." });
+    }
+
+    await prisma.client.update({
+      where: { id: devisExistant.clientId },
+      data: { nom, email, telephone, adressePostale }
+    });
+    
+    const devisUpdate = await prisma.reservation.update({
+      where: { id: parseInt(id) },
+      data: {
+        dateDebut: new Date(dateDebut),
+        dateFin: new Date(dateFin),
+        chambres: chambres || [],
+        chambresDetails: chambresDetails || {},
+        options: options || {},
+        salles: salles || {},
+        repas: repas || {},
+        repasGlobal: repasGlobal || {},
+        modeRestauration: modeRestauration || 'global',
+        prixTotal: prixTotal || 0,
+        prixHebergement: prixHebergement || 0
+      },
+      include: { client: true }
+    });
+
+    res.json(devisUpdate);
+  } catch (error) {
+    console.error("Erreur màj devis:", error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du devis' });
+  }
+});
+
 // Récupérer les informations d'un devis par son token (Client)
 app.get('/api/devis/info/:token', async (req, res) => {
   const { token } = req.params;
@@ -1513,7 +1558,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
               </div>
               
               <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
-                <p style="margin: 0; font-weight: bold; color: #856404;">ðŸ§¹ Action Requise : Affectation d'un Intervenant</p>
+                <p style="margin: 0; font-weight: bold; color: #856404;">&#x1F9F9; Action Requise : Affectation d'un Intervenant</p>
                 <p style="margin: 8px 0 0 0; font-size: 14px; color: #666666;">
                   Veuillez vous connecter à  l'espace d'administration pour affecter un <strong>agent de ménage / accueil</strong> pour ce séjour.
                 </p>
@@ -1625,7 +1670,7 @@ app.get('/api/devis/validate/:token', async (req, res) => {
               </div>
               
               <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
-                <p style="margin: 0; font-weight: bold; color: #856404;">ðŸ§¹ Action Requise : Affectation d'un Intervenant</p>
+                <p style="margin: 0; font-weight: bold; color: #856404;">&#x1F9F9; Action Requise : Affectation d'un Intervenant</p>
                 <p style="margin: 8px 0 0 0; font-size: 14px; color: #666666;">
                   Veuillez vous connecter à  l'espace d'administration pour affecter un <strong>agent de ménage / accueil</strong> pour ce séjour.
                 </p>
@@ -3148,7 +3193,7 @@ app.get('/api/equipe/planning', checkAuth, async (req, res) => {
     reservations.forEach(reser => {
       events.push({
         id: `res-${reser.id}`,
-        title: `ðŸ  Réservation : ${reser.client.nom}${reser.intervenant ? ` (${reser.intervenant.prenom})` : ' (Non assigné)'}`,
+        title: `&#x26A0;  Réservation : ${reser.client.nom}${reser.intervenant ? ` (${reser.intervenant.prenom})` : ' (Non assigné)'}`,
         start: new Date(reser.dateDebut),
         end: new Date(reser.dateFin),
         type: 'reservation',

@@ -337,7 +337,7 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Salles de formation */}
+          {/* Salles de réunion */}
           <div className="mt-20 bg-white text-slate-900 p-10 md:p-16 rounded-[2.5rem] shadow-2xl relative overflow-hidden border-b-8 border-muc-yellow" data-reveal="bottom">
             <div className="absolute top-0 right-0 w-64 h-64 bg-muc-blue/5 rounded-full -mr-32 -mt-32 pointer-events-none"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
@@ -347,7 +347,7 @@ const Home = () => {
                 </div>
                 <h3 className="text-3xl md:text-4xl font-black text-muc-blue uppercase tracking-tight">Location de Salles de Formation</h3>
                 <p className="text-lg text-slate-600 font-medium leading-relaxed">
-                  Nous mettons à votre disposition <strong className="text-muc-blue font-black">2 salles de formation</strong> pouvant accueillir respectivement <strong className="text-muc-blue font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
+                  Nous mettons à votre disposition <strong className="text-muc-blue font-black">2 salles de réunion</strong> pouvant accueillir respectivement <strong className="text-muc-blue font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
                 </p>
                 <div className="grid sm:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
                   <div className="space-y-2">

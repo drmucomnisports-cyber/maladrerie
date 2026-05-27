@@ -743,6 +743,11 @@ const Admin = () => {
                         )}
                         <div className="text-xs font-bold text-slate-700 mt-1">
                           👥 {res.occupants ? res.occupants.length : 0} occupant(s)
+                          {res.occupants && res.occupants.length > 0 && (
+                            <span className="font-normal text-slate-500 ml-1">
+                              ({res.occupants.filter(o => o.estAdulte).length} Adultes, {res.occupants.filter(o => !o.estAdulte).length} Enfants)
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-1.5 flex gap-1 flex-wrap font-bold">
                           {res.options?.litsFaits && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🛏️ Lits</span>}
@@ -753,19 +758,46 @@ const Admin = () => {
                       <td className="p-4">
                         <div className="flex flex-col gap-1 text-[11px] uppercase tracking-wider font-bold">
                           {(() => {
-                            const hasPtitDej = res.repasGlobal?.PETIT_DEJ || (res.repas && Object.values(res.repas).some(r => r.PETIT_DEJ && Object.keys(r.PETIT_DEJ).length > 0));
-                            const hasDej = res.repasGlobal?.DEJEUNER || (res.repas && Object.values(res.repas).some(r => r.DEJEUNER && Object.keys(r.DEJEUNER).length > 0));
-                            const hasDiner = res.repasGlobal?.DINER || (res.repas && Object.values(res.repas).some(r => r.DINER && Object.keys(r.DINER).length > 0));
+                            let totalPtitDej = 0;
+                            let totalDej = 0;
+                            let totalDiner = 0;
                             
-                            if (!hasPtitDej && !hasDej && !hasDiner) {
-                              return <span className="text-slate-400 normal-case italic font-medium">Aucune</span>;
+                            if (res.repas) {
+                              Object.values(res.repas).forEach(r => {
+                                if (r.PETIT_DEJ) {
+                                  totalPtitDej += (parseInt(r.PETIT_DEJ.ADULTE) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_12) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_5) || 0);
+                                }
+                                if (r.DEJEUNER) {
+                                  totalDej += (parseInt(r.DEJEUNER.ADULTE) || 0) + (parseInt(r.DEJEUNER.ENFANT_MOINS_12) || 0) + (parseInt(r.DEJEUNER.ENFANT_MOINS_5) || 0);
+                                }
+                                if (r.DINER) {
+                                  totalDiner += (parseInt(r.DINER.ADULTE) || 0) + (parseInt(r.DINER.ENFANT_MOINS_12) || 0) + (parseInt(r.DINER.ENFANT_MOINS_5) || 0);
+                                }
+                              });
+                            }
+                            
+                            if (totalPtitDej === 0 && totalDej === 0 && totalDiner === 0) {
+                              const hasPtitDej = res.repasGlobal?.PETIT_DEJ;
+                              const hasDej = res.repasGlobal?.DEJEUNER;
+                              const hasDiner = res.repasGlobal?.DINER;
+                              
+                              if (!hasPtitDej && !hasDej && !hasDiner) {
+                                return <span className="text-slate-400 normal-case italic font-medium">Aucune</span>;
+                              }
+                              return (
+                                <>
+                                  {hasPtitDej && <span className="text-orange-600">🥐 Petit-déj</span>}
+                                  {hasDej && <span className="text-green-600">🍲 Déjeuner</span>}
+                                  {hasDiner && <span className="text-blue-600">🍝 Dîner</span>}
+                                </>
+                              );
                             }
                             
                             return (
                               <>
-                                {hasPtitDej && <span className="text-orange-600">🥐 Petit-déj</span>}
-                                {hasDej && <span className="text-green-600">🍲 Déjeuner</span>}
-                                {hasDiner && <span className="text-blue-600">🍝 Dîner</span>}
+                                {totalPtitDej > 0 && <span className="text-orange-600">🥐 {totalPtitDej} Petit-déj</span>}
+                                {totalDej > 0 && <span className="text-green-600">🍲 {totalDej} Déjeuner(s)</span>}
+                                {totalDiner > 0 && <span className="text-blue-600">🍝 {totalDiner} Dîner(s)</span>}
                               </>
                             );
                           })()}
@@ -1008,8 +1040,19 @@ const Admin = () => {
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-1.5">
                             {res.statut === 'DEVIS_EN_ATTENTE' && (
-                              <button
-                                onClick={async () => {
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setEditingReservation(res);
+                                    setActiveTab('new-devis');
+                                  }}
+                                  className="p-1.5 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded transition-colors"
+                                  title="Modifier le devis"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  onClick={async () => {
                                   if (window.confirm('Confirmer la transformation du devis en réservation ?')) {
                                     try {
                                       const response = await fetch(`${API_URL}/api/admin/reservations/${res.id}/convert-devis`, {
@@ -1037,6 +1080,7 @@ const Admin = () => {
                               >
                                 <Check size={18} />
                               </button>
+                              </>
                             )}
                             <button
                               onClick={() => setDeleteModalId(res.id)}
@@ -1709,8 +1753,8 @@ const Admin = () => {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-y-auto max-h-[90vh] border border-slate-100">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <div>
-                <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">Modifier la réservation</h2>
-                <p className="text-xs text-slate-500 mt-1">Modification de la réservation #{editingReservation.id}</p>
+                <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">{editingReservation.statut === 'DEVIS_EN_ATTENTE' ? 'Modifier le devis' : 'Modifier la réservation'}</h2>
+                <p className="text-xs text-slate-500 mt-1">{editingReservation.statut === 'DEVIS_EN_ATTENTE' ? 'Modification du devis' : 'Modification de la réservation'} #{editingReservation.id}</p>
               </div>
               <button onClick={() => setEditingReservation(null)} className="text-slate-400 hover:text-slate-600 font-bold text-2xl px-2">&times;</button>
             </div>
@@ -1718,6 +1762,7 @@ const Admin = () => {
               <ReservationForm
                 events={reservations.map(r => ({ start: r.dateDebut, end: r.dateFin, chambres: r.chambres }))}
                 isAdmin={true}
+                isDevis={editingReservation.statut === 'DEVIS_EN_ATTENTE'}
                 existingReservation={editingReservation}
                 onCreated={() => { setEditingReservation(null); fetchReservations(); }}
               />
