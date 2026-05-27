@@ -281,11 +281,11 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
 
   // Salles de réunion
   if (salles) {
-    let nuitsSalles = nuits;
+    let nuitsSalles = nuits + 1;
     if (salles.dateDebut && salles.dateFin) {
       const startS = new Date(salles.dateDebut);
       const endS = new Date(salles.dateFin);
-      nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+      nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
     }
     const prixSalle = chambres.length > 0 ? 100 : 150;
     if (salles.salle15) total += prixSalle * nuitsSalles;
@@ -1227,12 +1227,12 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
 
         // Ajouter les salles
         if (salles) {
-          let nuitsSalles = nuits;
+          let nuitsSalles = nuits + 1;
           let datesSuffix = "";
           if (salles.dateDebut && salles.dateFin) {
             const startS = new Date(salles.dateDebut);
             const endS = new Date(salles.dateFin);
-            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
             const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             datesSuffix = ` (du ${strD} au ${strF})`;
@@ -1403,19 +1403,69 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       to: ADMIN_EMAIL,
       subject: `Nouveau devis émis : ${numeroDevis} - ${nom}`,
       html: `
-        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #333333;">
-          <tr>
-            <td style="padding: 20px; border: 1px solid #eeeeee; border-radius: 8px;">
-              <h2 style="color: #004B93; margin-top: 0;">Un nouveau devis a été envoyé</h2>
-              <p><strong>Numéro :</strong> ${numeroDevis}</p>
-              <p><strong>Client :</strong> ${nom} (${email})</p>
-              <p><strong>Période :</strong> du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
-              <p><strong>Montant :</strong> ${backendPrixTotal.toFixed(2)} €</p>
-              <p><strong>Émis par :</strong> ${admin ? admin.nom : req.user.email}</p>
-              <p style="color: #d32f2f; font-weight: bold;">Ce devis expire le ${expiration.toLocaleString('fr-FR')}.</p>
-            </td>
-          </tr>
-        </table>
+        <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 20px; text-align: center;">
+          <table width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: left;" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="background-color: #004B93; padding: 30px; text-align: center; border-bottom: 4px solid #FDB913;">
+                <h2 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">NOUVEAU DEVIS ÉMIS</h2>
+                <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 14px;">Une nouvelle proposition a été envoyée au client.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 40px 30px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding-bottom: 25px; border-bottom: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Numéro de devis</p>
+                      <p style="margin: 5px 0 0 0; color: #0f172a; font-size: 18px; font-weight: bold;">${numeroDevis}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 25px 0; border-bottom: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Informations Client</p>
+                      <p style="margin: 5px 0 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">${nom}</p>
+                      <p style="margin: 2px 0 0 0; color: #3b82f6; font-size: 14px; text-decoration: none;">${email}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 25px 0; border-bottom: 1px solid #e2e8f0;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td width="50%" valign="top">
+                            <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Période du séjour</p>
+                            <p style="margin: 5px 0 0 0; color: #0f172a; font-size: 15px; font-weight: 500;">Du ${new Date(dateDebut).toLocaleDateString('fr-FR')} <br>au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
+                          </td>
+                          <td width="50%" valign="top">
+                            <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Montant Total</p>
+                            <p style="margin: 5px 0 0 0; color: #004B93; font-size: 20px; font-weight: 900;">${backendPrixTotal.toFixed(2)} €</p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 25px 0; border-bottom: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Émis par</p>
+                      <p style="margin: 5px 0 0 0; color: #0f172a; font-size: 15px; font-weight: 500;">${admin ? admin.nom : req.user.email}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding-top: 25px; text-align: center;">
+                      <div style="background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 15px;">
+                        <p style="margin: 0; color: #dc2626; font-size: 14px; font-weight: bold;">⚠️ Ce devis expire le ${expiration.toLocaleString('fr-FR')}</p>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color: #f1f5f9; padding: 20px; text-align: center;">
+                <p style="margin: 0; color: #94a3b8; font-size: 12px;">Cet email est généré automatiquement par l'application Gîte de la Maladrerie.</p>
+              </td>
+            </tr>
+          </table>
+        </div>
       `
     });
 
@@ -1521,12 +1571,12 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
         });
 
         if (devisFinal.salles) {
-          let nuitsSalles = nuits;
+          let nuitsSalles = nuits + 1;
           let datesSuffix = "";
           if (devisFinal.salles.dateDebut && devisFinal.salles.dateFin) {
             const startS = new Date(devisFinal.salles.dateDebut);
             const endS = new Date(devisFinal.salles.dateFin);
-            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+            nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
             const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
             datesSuffix = ` (du ${strD} au ${strF})`;
@@ -1735,12 +1785,12 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
 
     // Salles
     if (devis.salles) {
-      let nuitsSalles = nuits;
+      let nuitsSalles = nuits + 1;
       let datesSuffix = "";
       if (devis.salles.dateDebut && devis.salles.dateFin) {
         const startS = new Date(devis.salles.dateDebut);
         const endS = new Date(devis.salles.dateFin);
-        nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+        nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)) + 1);
         const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
         const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
         datesSuffix = ` (du ${strD} au ${strF})`;

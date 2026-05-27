@@ -1,21 +1,21 @@
 Conditions Générales de Vente et de Location - Gîte de la Maladrerie
-Version 1.7 - Mai 2026
+Version 1.8 - Mai 2026
 
 1. Réservation et paiement de l'acompte
 Pour valider toute réservation, un acompte de 30 % du montant total doit être réglé selon les modalités suivantes :
-• Lien de paiement en ligne : règlement à effectuer dans les 48 heures suivant la réception du lien.
-• Chèque : en cas de paiement par chèque, celui-ci doit impérativement parvenir à l'établissement dans un délai de 72 heures après la réservation.
+- Lien de paiement en ligne : règlement à effectuer dans les 48 heures suivant la réception du lien.
+- Chèque : en cas de paiement par chèque, celui-ci doit impérativement parvenir à l'établissement dans un délai de 72 heures après la réservation.
 
 2. Règlement du solde
 Le solde de la prestation peut être réglé par :
-• Carte bancaire (via lien de paiement).
-• Chèque et espèces (à l'arrivée sur les lieux).
+- Carte bancaire (via lien de paiement).
+- Chèque et espèces (à l'arrivée sur les lieux).
 
 3. Annulation
 En cas d'annulation de la part du client, les conditions suivantes s'appliquent :
-• Plus de 30 jours avant l'arrivée : l'acompte de 30 % est restitué au client, déduction faite de 30 € pour frais de dossier et de gestion administrative. Ce montant de frais de dossier ne pourra en aucun cas excéder le montant total de l'acompte versé.
-• Moins de 30 jours avant l'arrivée : l'acompte de 30 % reste acquis à l'établissement et ne fera l'objet d'aucun remboursement.
-• Non-présentation ou séjour écourté : la totalité du montant du séjour reste due à l'établissement.
+- Plus de 30 jours avant l'arrivée : l'acompte de 30 % est restitué au client, déduction faite de 30 € pour frais de dossier et de gestion administrative. Ce montant de frais de dossier ne pourra en aucun cas excéder le montant total de l'acompte versé.
+- Moins de 30 jours avant l'arrivée : l'acompte de 30 % reste acquis à l'établissement et ne fera l'objet d'aucun remboursement.
+- Non-présentation ou séjour écourté : la totalité du montant du séjour reste due à l'établissement.
 Si l'annulation est du fait de l'établissement, l'intégralité des sommes versées sera remboursée au client.
 
 4. Pénalités de retard
@@ -27,9 +27,9 @@ Taxe de séjour : en sus du prix de l'hébergement, une taxe de séjour est per�
 
 6. Dépôt de garantie (Caution)
 Une empreinte bancaire d'un montant de 500 € est requise avant l'entrée dans les lieux. Cette somme n'est pas débitée au moment de la saisie, mais bloquée temporairement. Cette caution est destinée à couvrir :
-• D'éventuels dommages ou dégradations constatés sur le bâtiment ou le matériel.
-• Les manquements au règlement intérieur.
-• Les frais de remise en état ou de ménage si les locaux ne sont pas rendus propres.
+- D'éventuels dommages ou dégradations constatés sur le bâtiment ou le matériel.
+- Les manquements au règlement intérieur.
+- Les frais de remise en état ou de ménage si les locaux ne sont pas rendus propres.
 La direction se réserve le droit de conserver tout ou partie de cette somme en fonction de l'état des lieux de sortie. La caution sera intégralement libérée dans un délai de 30 jours après le départ, déduction faite des éventuels frais de réparation ou d'indemnisation.
 
 7. État des lieux et inventaire
@@ -40,15 +40,21 @@ Le groupe s'engage à respecter la tranquillité des lieux. Les nuisances sonore
 
 9. Restauration
 Pour toute commande de repas, les conditions suivantes s'appliquent :
-• Délais de commande : les commandes de repas doivent être transmises au plus tard le jeudi pour la semaine suivante.
-• Minimum de participants : la commande de repas est soumise à un minimum de 5 personnes par réservation.
-• Modalités de paiement : la commande n'est validée qu'à réception du paiement intégral des repas (100 %) en plus des 30 % d'arrhes de l'hébergement.
-• Livraison et conditionnement : les repas sont livrés le matin avant 10h (le vendredi pour les week-ends), conditionnés en bacs inox. Ils comprennent une entrée, un plat et un dessert.
-• Restrictions : il n'est pas proposé de paniers repas ni de pique-niques.
-• Grille tarifaire :
+- Délais de commande : les commandes de repas doivent être transmises au plus tard le jeudi pour la semaine suivante.
+- Minimum de participants : la commande de repas est soumise à un minimum de 5 personnes par réservation.
+- Modalités de paiement : la commande n'est validée qu'à réception du paiement intégral des repas (100 %) en plus des 30 % d'arrhes de l'hébergement.
+- Livraison et conditionnement : les repas sont livrés le matin avant 10h (le vendredi pour les week-ends), conditionnés en bacs inox. Ils comprennent une entrée, un plat et un dessert.
+- Restrictions : il n'est pas proposé de paniers repas ni de pique-niques.
+- Grille tarifaire :
   - Tarifs adulte : 6 € (petit-déjeuner), 11.5 € (déjeuner), 14 € (dîner).
   - Tarifs enfant moins de 12 ans : 5 € (petit-déjeuner), 9.5 € (déjeuner), 12 € (dîner).
   - Tarifs enfant moins de 5 ans : 4 € (petit-déjeuner), 8 € (déjeuner), 10 € (dîner).
 
-Le client reconnaît avoir pris connaissance des présentes conditions et les accepte sans réserve.
+10. Location des Salles de Réunion
+La réservation des salles de réunion obéit aux règles de tarification suivantes :
+- Périodes de location :
+  - Hors vacances scolaires : la location est possible du vendredi au dimanche. Le vendredi compte comme une journée entière (mise à disposition dès 17h), ainsi que le samedi et le dimanche. Une location du vendredi au dimanche correspond donc à 3 jours facturés.
+  - Vacances scolaires : la location est possible tous les jours de la semaine.
+- Horaires de location : La location d'une salle prend effet de 9h le matin jusqu'à 9h le lendemain matin. Exception pour le vendredi hors vacances scolaires, où la salle est disponible à partir de 17h jusqu'au lendemain 9h, comptant pour un jour de location.
 
+Le client reconnaît avoir pris connaissance des présentes conditions et les accepte sans réserve.
