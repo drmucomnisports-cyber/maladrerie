@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Mountain, Users, ArrowRight, MapPin, Calendar, CheckCircle2, Bed, Train, Car, Bike, Info, Sparkles, Trash2, Waves, Compass, Utensils, Presentation } from 'lucide-react';
@@ -525,10 +525,10 @@ const Home = () => {
           </div>
 
           <div className="flex flex-wrap justify-center gap-6 mb-20" data-reveal="bottom">
-            <a href="https://www.millau-viaduc-tourisme.fr/" target="_blank" rel="noreferrer" className="bg-muc-yellow text-white border-2 border-white/30 hover:border-white hover:bg-yellow-400 px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
+            <a href="https://www.millau-viaduc-tourisme.fr/" target="_blank" rel="noreferrer" className="bg-muc-blue text-white border-2 border-white/30 hover:border-white hover:bg-muc-blue/80 px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
               Office de Tourisme de Millau
             </a>
-            <a href="https://www.parc-grands-causses.fr/" target="_blank" rel="noreferrer" className="bg-muc-yellow text-white border-2 border-white/30 hover:border-white hover:bg-yellow-400 px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
+            <a href="https://www.parc-grands-causses.fr/" target="_blank" rel="noreferrer" className="bg-muc-blue text-white border-2 border-white/30 hover:border-white hover:bg-muc-blue/80 px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
               PNR des Grands Causses
             </a>
             <a href="https://www.mucformation.fr/" target="_blank" rel="noreferrer" className="bg-muc-blue text-white border-2 border-white/30 hover:border-white hover:bg-muc-blue/80 px-8 py-3 rounded-full hover:scale-105 transition-all font-black uppercase tracking-widest text-sm shadow-xl">
