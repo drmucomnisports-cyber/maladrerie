@@ -1,17 +1,21 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const CGV = () => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-muc-blue text-white py-20 px-6">
-      <div className="max-w-4xl mx-auto bg-white/5 backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/10 shadow-2xl">
+    <div className="min-h-screen bg-[#004B93] text-white pt-24 pb-32">
+      <div className="max-w-4xl mx-auto px-6">
         <Link to="/" className="inline-flex items-center gap-2 text-muc-yellow hover:gap-4 transition-all mb-8 font-bold uppercase tracking-widest text-sm">
           <ArrowLeft size={20} /> Retour à l'accueil
         </Link>
         
         <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter">Conditions Générales de Vente et de Location</h1>
-        <p className="text-slate-400 mb-12">Gîte de la Maladrerie - Version 1.7 - Mai 2026</p>
+        <p className="text-slate-400 mb-12">Gîte de la Maladrerie - Version 1.8 - Mai 2026</p>
         
         <div className="space-y-12 text-white/80 leading-relaxed text-sm">
           <section>
@@ -87,6 +91,20 @@ const CGV = () => {
               <li><strong>Tarifs adulte :</strong> 6 € (petit-déjeuner), 11.5 € (déjeuner), 14 € (dîner).</li>
               <li><strong>Tarifs enfant moins de 12 ans :</strong> 5 € (petit-déjeuner), 9.5 € (déjeuner), 12 € (dîner).</li>
               <li><strong>Tarifs enfant moins de 5 ans :</strong> 4 € (petit-déjeuner), 8 € (déjeuner), 10 € (dîner).</li>
+            </ul>
+          </section>
+          
+          <section>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">10. Location des Salles de Réunion</h2>
+            <p>La réservation des salles de réunion obéit aux règles de tarification suivantes :</p>
+            <ul className="mt-4 space-y-2 list-disc list-inside">
+              <li><strong>Périodes de location :</strong>
+                <ul className="ml-6 mt-2 space-y-1 list-[circle] list-inside">
+                  <li>Hors vacances scolaires : la location est possible du vendredi au dimanche. Le vendredi compte comme une journée entière (mise à disposition dès 17h), ainsi que le samedi et le dimanche. Une location du vendredi au dimanche correspond donc à 3 jours facturés.</li>
+                  <li>Vacances scolaires : la location est possible tous les jours de la semaine.</li>
+                </ul>
+              </li>
+              <li><strong>Horaires de location :</strong> La location d'une salle prend effet de 9h le matin jusqu'à 9h le lendemain matin. Exception pour le vendredi hors vacances scolaires, où la salle est disponible à partir de 17h jusqu'au lendemain 9h, comptant pour un jour de location.</li>
             </ul>
           </section>
           
