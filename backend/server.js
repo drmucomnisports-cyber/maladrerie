@@ -2248,6 +2248,7 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
     const reservations = await prisma.reservation.findMany({
       include: { 
         client: true,
+        occupants: true,
         missions: {
           include: { intervenant: true }
         }
