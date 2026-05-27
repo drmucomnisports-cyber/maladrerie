@@ -408,6 +408,16 @@ const Home = () => {
               <h3 className="text-2xl font-black mb-4 uppercase tracking-tight">Tarifs d'hébergement</h3>
               <div className="text-6xl font-black mt-4 text-muc-yellow tracking-tighter">22 € <span className="text-2xl font-bold opacity-60 text-white uppercase tracking-normal">à</span> 25 €</div>
               <p className="mt-4 text-blue-100 text-lg font-medium italic">Par personne et par nuit.</p>
+              <ul className="mt-4 space-y-1.5 text-sm font-medium text-blue-100/80">
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-muc-yellow opacity-75 shrink-0"></div>
+                  <span><strong className="text-white">22 €</strong> si la chambre est complète</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-muc-yellow opacity-75 shrink-0"></div>
+                  <span><strong className="text-white">25 €</strong> si la chambre n'est pas complète</span>
+                </li>
+              </ul>
             </div>
           </div>
 
