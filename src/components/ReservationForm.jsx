@@ -130,7 +130,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         dateDebut: new Date(existingReservation.dateDebut).toISOString().split('T')[0],
         dateFin: new Date(existingReservation.dateFin).toISOString().split('T')[0],
         chambres: existingReservation.chambres || [],
-        chambresDetails: existingReservation.chambresDetails || {},
+        chambresDetails: Object.keys(existingReservation.chambresDetails || {}).reduce((acc, chId) => {
+          const d = existingReservation.chambresDetails[chId];
+          acc[chId] = {
+            adultes: d.adultes || 0,
+            mineurs: d.mineurs || d.enfants || 0,
+            enfants: d.mineurs || d.enfants || 0
+          };
+          return acc;
+        }, {}),
         options: existingReservation.options || { litsFaits: false, lingeFourni: false, menage: false },
         salles: existingReservation.salles || { salle15: false, salle12: false, dateDebut: '', dateFin: '' },
         occupants: existingReservation.occupants || [],
@@ -318,7 +326,16 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   }, [formData.dateDebut, formData.dateFin]);
 
   const getChambresDetailsDistribues = () => {
-    return formData.chambresDetails;
+    const mapped = {};
+    if (formData.chambresDetails) {
+      Object.entries(formData.chambresDetails).forEach(([chId, details]) => {
+        mapped[chId] = {
+          ...details,
+          enfants: details.mineurs || 0
+        };
+      });
+    }
+    return mapped;
   };
 
   const generateFakeOccupants = () => {
@@ -831,7 +848,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         repas: computedRepas,
         promoCode: promoApplied?.code,
         adminEmail: adminUser?.email,
-        adminName: adminUser?.nom
+        adminName: adminUser?.nom,
+        sendEmail: formData.sendEmail
       } : {
         ...formData,
         chambresDetails: mappedChambresDetails,
@@ -982,7 +1000,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           <div className="space-y-1">
             <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">E-mail <span className="text-red-500">*</span></label>
             <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" placeholder="jean@exemple.com" />
-            {isAdmin && !isDevis && (
+            {((isAdmin && !isDevis) || (isDevis && existingReservation)) && (
               <label className="flex items-center gap-2 mt-2 ml-1 cursor-pointer w-max">
                 <input 
                   type="checkbox" 
@@ -990,7 +1008,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   onChange={(e) => setFormData(prev => ({...prev, sendEmail: e.target.checked}))}
                   className="w-4 h-4 rounded accent-[#004B93]" 
                 />
-                <span className="text-xs font-semibold text-slate-600">Envoyer un e-mail de confirmation</span>
+                <span className="text-xs font-semibold text-slate-600">
+                  {isDevis ? 'Envoyer un e-mail avec le devis mis à jour' : 'Envoyer un e-mail de confirmation'}
+                </span>
               </label>
             )}
           </div>
@@ -1080,7 +1100,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 <div>
                   <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 15 personnes</span>
                   <span className="text-xs font-medium text-slate-500">
-                    {formData.chambres.length > 0 ? '100&nbsp;€' : '150&nbsp;€'} / jour
+                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
                   </span>
                 </div>
               </div>
@@ -1096,7 +1116,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 <div>
                   <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 12 personnes</span>
                   <span className="text-xs font-medium text-slate-500">
-                    {formData.chambres.length > 0 ? '100&nbsp;€' : '150&nbsp;€'} / jour
+                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
                   </span>
                 </div>
               </div>
@@ -1160,15 +1180,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-slate-100 hover:bg-slate-50">
             <input type="checkbox" name="opt_litsFaits" checked={formData.options.litsFaits} onChange={handleChange} className="w-4 h-4 text-muc-blue border-slate-300 rounded" />
-            <span className="text-sm font-medium text-slate-700">Lits faits à l'arrivée (5&nbsp;€ / pers)</span>
+            <span className="text-sm font-medium text-slate-700">Lits faits à l'arrivée (5 € / pers)</span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-slate-100 hover:bg-slate-50">
             <input type="checkbox" name="opt_lingeFourni" checked={formData.options.lingeFourni} onChange={handleChange} className="w-4 h-4 text-muc-blue border-slate-300 rounded" />
-            <span className="text-sm font-medium text-slate-700">Linge de toilette fourni (5&nbsp;€ / pers)</span>
+            <span className="text-sm font-medium text-slate-700">Linge de toilette fourni (5 € / pers)</span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-slate-100 hover:bg-slate-50">
             <input type="checkbox" name="opt_menage" checked={formData.options.menage} onChange={handleChange} className="w-4 h-4 text-muc-blue border-slate-300 rounded" />
-            <span className="text-sm font-medium text-slate-700">Ménage fin de séjour (50&nbsp;€ / chambre)</span>
+            <span className="text-sm font-medium text-slate-700">Ménage fin de séjour (50 € / chambre)</span>
           </label>
         </div>
       </div>
@@ -1255,15 +1275,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                               <div className="flex flex-col gap-1">
                                 <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
                                   <span className="text-xs font-bold text-slate-500">Adulte</span>
-                                  <span className="text-xs font-black text-slate-700">{tarifs.ADULTE}&nbsp;€</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ADULTE} €</span>
                                 </div>
                                 <div className="flex justify-between items-center border-b border-slate-200/50 pb-1">
                                   <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Enf. &lt;12</span>
-                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_12}&nbsp;€</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_12} €</span>
                                 </div>
                                 <div className="flex justify-between items-center pb-1">
                                   <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Enf. &lt;5</span>
-                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_5}&nbsp;€</span>
+                                  <span className="text-xs font-black text-slate-700">{tarifs.ENFANT_MOINS_5} €</span>
                                 </div>
                               </div>
                             </div>
@@ -1290,7 +1310,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                 <div className="font-black text-muc-blue text-sm mb-1.5 text-center">{tarifs.label}</div>
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
-                                    <span className="font-bold text-slate-600 whitespace-nowrap">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE}&nbsp;€)</span></span>
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Adultes <span className="font-normal text-slate-400">({tarifs.ADULTE} €)</span></span>
                                     <input
                                       type="number"
                                       min="0"
@@ -1302,7 +1322,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                     />
                                   </div>
                                   <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
-                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12}&nbsp;€)</span></span>
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;12 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_12} €)</span></span>
                                     <input
                                       type="number"
                                       min="0"
@@ -1314,7 +1334,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                     />
                                   </div>
                                   <div className="flex items-center justify-between text-xs bg-white p-2 rounded border border-slate-100">
-                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5}&nbsp;€)</span></span>
+                                    <span className="font-bold text-slate-600 whitespace-nowrap">Enf. &lt;5 <span className="font-normal text-slate-400">({tarifs.ENFANT_MOINS_5} €)</span></span>
                                     <input
                                       type="number"
                                       min="0"
@@ -1340,7 +1360,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               {calculerTotalRepas() > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex justify-between items-center">
                   <span className="text-sm font-bold text-orange-800">Total Restauration</span>
-                  <span className="text-lg font-black text-orange-900">{calculerTotalRepas().toFixed(2)}&nbsp;€</span>
+                  <span className="text-lg font-black text-orange-900">{calculerTotalRepas().toFixed(2)} €</span>
                 </div>
               )}
             </div>
@@ -1381,7 +1401,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               )}
             </div>
             {promoError && <p className="text-red-500 text-[10px] font-bold mt-1 ml-1">{promoError}</p>}
-            {promoApplied && <p className="text-green-600 text-[10px] font-bold mt-1 ml-1">Code appliqué : -{promoApplied.type === 'pourcentage' ? `${promoApplied.valeur}%` : `${promoApplied.valeur}&nbsp;€`}</p>}
+            {promoApplied && <p className="text-green-600 text-[10px] font-bold mt-1 ml-1">Code appliqué : -{promoApplied.type === 'pourcentage' ? `${promoApplied.valeur}%` : `${promoApplied.valeur} €`}</p>}
           </div>
 
           <div className="bg-muc-blue/5 p-6 rounded-2xl border-2 border-muc-blue/10">
@@ -1389,25 +1409,25 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center text-sm text-slate-700">
                 <span className="font-medium">Hébergement</span>
-                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)}&nbsp;€</span>
+                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
               {calculerTotalSalles() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
-                  <span className="font-bold">{calculerTotalSalles().toFixed(2)}&nbsp;€</span>
+                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Restauration</span>
-                  <span className="font-bold">{calculerTotalRepas().toFixed(2)}&nbsp;€</span>
+                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
                 </div>
               )}
               <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-xl font-black text-slate-900">
                 <span>Total</span>
                 <div className="text-right">
-                  {promoApplied && <span className="text-sm text-slate-400 line-through mr-2 font-normal">{(calculerPrix() / (promoApplied.type === 'pourcentage' ? (1 - promoApplied.valeur / 100) : 1) + (promoApplied.type === 'fixe' ? promoApplied.valeur : 0) + calculerTotalRepas()).toFixed(2)}&nbsp;€</span>}
-                  <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)}&nbsp;€</span>
+                  {promoApplied && <span className="text-sm text-slate-400 line-through mr-2 font-normal">{(calculerPrix() / (promoApplied.type === 'pourcentage' ? (1 - promoApplied.valeur / 100) : 1) + (promoApplied.type === 'fixe' ? promoApplied.valeur : 0) + calculerTotalRepas()).toFixed(2)} €</span>}
+                  <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
                 </div>
               </div>
             </div>
@@ -1415,7 +1435,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
               <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600">{calculerTotalRepas() > 0 ? "30% hébergement + 100% restauration" : "Acompte (30%)"}</span>
-                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)}&nbsp;€</span>
+                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
             <p className="text-[10px] text-slate-500 mt-3">* Inclut la taxe de séjour (4% du prix de la nuitée / adulte)</p>
@@ -1547,30 +1567,30 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <div className="space-y-2 mb-3">
               <div className="flex justify-between items-center text-sm text-slate-700">
                 <span className="font-medium">Hébergement</span>
-                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)}&nbsp;€</span>
+                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
               {calculerTotalSalles() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
-                  <span className="font-bold">{calculerTotalSalles().toFixed(2)}&nbsp;€</span>
+                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Restauration</span>
-                  <span className="font-bold">{calculerTotalRepas().toFixed(2)}&nbsp;€</span>
+                  <span className="font-bold">{calculerTotalRepas().toFixed(2)} €</span>
                 </div>
               )}
               <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-xl font-black text-slate-900">
                 <span>Total</span>
-                <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)}&nbsp;€</span>
+                <span>{(calculerPrix() + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
             <div className="bg-white/80 rounded-xl p-3 border border-muc-blue/10">
               <p className="text-xs font-black uppercase text-muc-blue tracking-wider mb-1">Arrhes à régler</p>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600">{calculerTotalRepas() > 0 ? "30% hébergement + 100% restauration" : "Acompte (30%)"}</span>
-                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)}&nbsp;€</span>
+                <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
           </div>
