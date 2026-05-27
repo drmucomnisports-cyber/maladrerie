@@ -894,7 +894,7 @@ const Admin = () => {
                         <div className="text-xs font-bold text-slate-600">{res.validePar || '-'}</div>
                       </td>
                       <td className="p-4 text-right">
-                        <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
+                        <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')} à {new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-1.5">
@@ -1123,7 +1123,7 @@ const Admin = () => {
                           </span>
                         </td>
                         <td className="p-4 text-right">
-                          <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')}</div>
+                          <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')} à {new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-1.5">

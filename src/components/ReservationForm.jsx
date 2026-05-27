@@ -105,8 +105,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         salles: existingReservation.salles || { salle15: false, salle12: false, dateDebut: '', dateFin: '' },
         occupants: existingReservation.occupants || [],
         repas: existingReservation.repas || {},
-        modeRestauration: 'global',
-        repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false },
+        modeRestauration: existingReservation.modeRestauration || 'global',
+        repasGlobal: existingReservation.repasGlobal || { PETIT_DEJ: false, DEJEUNER: false, DINER: false },
         sendEmail: true
       });
       // Skip the dates step if we are editing
@@ -614,6 +614,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
     // Générer automatiquement les occupants en fonction des adultes/enfants renseignés
     const newOccupants = [];
+    const existingAdults = formData.occupants.filter(o => o.estAdulte);
+    const existingMineurs = formData.occupants.filter(o => !o.estAdulte);
+    let nextAdultIdx = 0;
+    let nextMineurIdx = 0;
+
     for (const chId of formData.chambres) {
       const details = formData.chambresDetails[chId];
       const nbAdultes = parseInt(details?.adultes || 0);
@@ -621,11 +626,19 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       
       // Ajouter les adultes
       for (let i = 0; i < nbAdultes; i++) {
-        newOccupants.push({ nom: '', prenom: '', estAdulte: true, age: '', nationalite: true });
+        if (nextAdultIdx < existingAdults.length) {
+          newOccupants.push(existingAdults[nextAdultIdx++]);
+        } else {
+          newOccupants.push({ nom: '', prenom: '', estAdulte: true, age: '', nationalite: true });
+        }
       }
       // Ajouter les mineurs
       for (let i = 0; i < nbMineurs; i++) {
-        newOccupants.push({ nom: '', prenom: '', estAdulte: false, age: '', nationalite: true });
+        if (nextMineurIdx < existingMineurs.length) {
+          newOccupants.push(existingMineurs[nextMineurIdx++]);
+        } else {
+          newOccupants.push({ nom: '', prenom: '', estAdulte: false, age: '', nationalite: true });
+        }
       }
     }
     const computedRepas = getComputedRepas();
