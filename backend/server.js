@@ -1403,6 +1403,58 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
   }
 });
 
+// Télécharger le devis en PDF (Admin)
+app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const devis = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true }
+    });
+
+    if (!devis) {
+      return res.status(404).json({ error: "Devis introuvable" });
+    }
+
+    const { generateDevisPDF } = require('./utils/generateDevisPDF');
+    
+    // Convertir les détails en lignes si non présentes, pour que le PDF fonctionne
+    if (!devis.detailsLignes) {
+      devis.detailsLignes = [];
+      if (devis.prixHebergement > 0) {
+        devis.detailsLignes.push({
+           designation: "Hébergement / Salles",
+           nbPersonnes: 1,
+           tarifParPersonne: devis.prixHebergement,
+           nuits: 1,
+           total: devis.prixHebergement
+        });
+      }
+      if (devis.repasGlobal && Object.keys(devis.repasGlobal).length > 0) {
+        devis.detailsLignes.push({
+           designation: "Restauration",
+           nbPersonnes: 1,
+           tarifParPersonne: devis.totalRepas || 0,
+           nuits: 1,
+           total: devis.totalRepas || 0
+        });
+      }
+    }
+
+    const pdfBuffer = await generateDevisPDF(devis);
+    
+    const safeNomClient = devis.client.nom.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const pdfFileName = `Devis_${devis.numeroDevis}_${safeNomClient}.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${pdfFileName}"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Erreur téléchargement PDF devis:", error);
+    res.status(500).json({ error: 'Erreur lors du téléchargement du PDF' });
+  }
+});
+
 // Récupérer les informations d'un devis par son token (Client)
 app.get('/api/devis/info/:token', async (req, res) => {
   const { token } = req.params;

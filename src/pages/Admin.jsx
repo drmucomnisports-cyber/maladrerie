@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3 } from 'lucide-react';
+import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
@@ -985,7 +985,8 @@ const Admin = () => {
                     <tr className="bg-slate-50 border-b border-slate-100">
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prospect</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Chambres</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Expire le</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
@@ -1018,14 +1019,89 @@ const Admin = () => {
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="flex flex-wrap gap-1">
-                            {res.chambres?.map(id => (
-                              <span key={id} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase">
-                                {CHAMBRES_NAMES[id] || `Ch. ${id}`}
-                              </span>
-                            ))}
+                        <div className="text-sm font-bold text-muc-blue">
+                          {res.chambres?.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
+                        </div>
+                        {res.salles && (
+                          <div className="text-sm font-bold text-indigo-600 mt-1 flex flex-col">
+                            {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
+                            {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
                           </div>
-                        </td>
+                        )}
+                        {(() => {
+                          let totalAdultes = 0;
+                          let totalEnfants = 0;
+                          if (res.occupants && res.occupants.length > 0) {
+                            totalAdultes = res.occupants.filter(o => o.estAdulte).length;
+                            totalEnfants = res.occupants.filter(o => !o.estAdulte).length;
+                          } else if (res.chambresDetails) {
+                            Object.values(res.chambresDetails).forEach(ch => {
+                              totalAdultes += parseInt(ch.adultes || 0);
+                              totalEnfants += parseInt(ch.mineurs || ch.enfants || 0);
+                            });
+                          }
+                          const total = totalAdultes + totalEnfants;
+                          if (total === 0) return <div className="text-xs font-bold text-slate-700 mt-1">👥 0 occupant</div>;
+                          return (
+                            <div className="text-xs font-bold text-slate-700 mt-1 bg-slate-100 px-2 py-1 rounded inline-block">
+                              👥 {total} occupant{total > 1 ? 's' : ''} <span className="font-normal text-slate-500 ml-1">({totalAdultes} Adultes, {totalEnfants} Enfants)</span>
+                            </div>
+                          );
+                        })()}
+                        <div className="text-[10px] text-slate-500 mt-1.5 flex gap-1 flex-wrap font-bold">
+                          {res.options?.litsFaits && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🛏️ Lits</span>}
+                          {res.options?.lingeFourni && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧴 Linge</span>}
+                          {res.options?.menage && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧹 Ménage</span>}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1 text-[11px] uppercase tracking-wider font-bold">
+                          {(() => {
+                            let totalPtitDej = 0;
+                            let totalDej = 0;
+                            let totalDiner = 0;
+                            
+                            if (res.repas) {
+                              Object.values(res.repas).forEach(r => {
+                                if (r.PETIT_DEJ) {
+                                  totalPtitDej += (parseInt(r.PETIT_DEJ.ADULTE) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_12) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_5) || 0);
+                                }
+                                if (r.DEJEUNER) {
+                                  totalDej += (parseInt(r.DEJEUNER.ADULTE) || 0) + (parseInt(r.DEJEUNER.ENFANT_MOINS_12) || 0) + (parseInt(r.DEJEUNER.ENFANT_MOINS_5) || 0);
+                                }
+                                if (r.DINER) {
+                                  totalDiner += (parseInt(r.DINER.ADULTE) || 0) + (parseInt(r.DINER.ENFANT_MOINS_12) || 0) + (parseInt(r.DINER.ENFANT_MOINS_5) || 0);
+                                }
+                              });
+                            }
+                            
+                            if (totalPtitDej === 0 && totalDej === 0 && totalDiner === 0) {
+                              const hasPtitDej = res.repasGlobal?.PETIT_DEJ;
+                              const hasDej = res.repasGlobal?.DEJEUNER;
+                              const hasDiner = res.repasGlobal?.DINER;
+                              
+                              if (!hasPtitDej && !hasDej && !hasDiner) {
+                                return <span className="text-slate-400 normal-case italic font-medium">Aucune</span>;
+                              }
+                              return (
+                                <>
+                                  {hasPtitDej && <span className="text-orange-600">🥐 Petit-déj</span>}
+                                  {hasDej && <span className="text-green-600">🍲 Déjeuner</span>}
+                                  {hasDiner && <span className="text-blue-600">🍝 Dîner</span>}
+                                </>
+                              );
+                            }
+                            
+                            return (
+                              <>
+                                {totalPtitDej > 0 && <span className="text-orange-600">🥐 {totalPtitDej} Petit-déj</span>}
+                                {totalDej > 0 && <span className="text-green-600">🍲 {totalDej} Déjeuner(s)</span>}
+                                {totalDiner > 0 && <span className="text-blue-600">🍝 {totalDiner} Dîner(s)</span>}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </td>
                         <td className="p-4">
                           <div className="font-black text-muc-blue">{res.prixTotal}€</div>
                         </td>
@@ -1062,6 +1138,13 @@ const Admin = () => {
                                   title="Modifier le devis"
                                 >
                                   <Edit3 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => window.open(`${API_URL}/api/admin/devis/${res.id}/pdf?token=${token}`, '_blank')}
+                                  className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded transition-colors"
+                                  title="Visualiser le PDF"
+                                >
+                                  <FileText size={14} />
                                 </button>
                                 <button
                                   onClick={async () => {
