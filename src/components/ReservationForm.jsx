@@ -1126,14 +1126,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           {(formData.salles?.salle15 || formData.salles?.salle12) && (
             <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
               <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-1 block">Dates de réservation pour la salle</label>
-              <p className="text-[11px] text-slate-500 mb-3 italic ml-1">Note : La location prend effet à partir de 17h le jour d'arrivée, jusqu'à minuit le jour du départ.</p>
+              <p className="text-[11px] text-slate-500 mb-3 italic ml-1">Note : La location prend effet de 9h à 9h le lendemain (sauf le vendredi hors vacances : dès 17h).</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée Salle (dès 17h)</label>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée Salle</label>
                   <input type="date" name="salleDateDebut" value={formData.salles?.dateDebut || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateDebut: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Départ Salle (jusqu'à minuit)</label>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Départ Salle (jusqu'à 9h le lendemain)</label>
                   <input type="date" name="salleDateFin" value={formData.salles?.dateFin || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateFin: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
                 </div>
               </div>

@@ -360,7 +360,7 @@ const Home = () => {
                     <p className="font-bold text-muc-blue uppercase text-xs tracking-wider flex items-center gap-2">
                       <Calendar size={18} className="text-muc-yellow" /> Conditions d'accès
                     </p>
-                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Disponibles uniquement les week-ends (dès le vendredi 17h) et pendant les vacances scolaires de Millau.</p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">Vendredi (hors vac.) : dès 17h jusqu'à 9h le samedi. Week-ends et vacances (zone C) : de 9h à 9h le lendemain.</p>
                   </div>
                 </div>
               </div>
