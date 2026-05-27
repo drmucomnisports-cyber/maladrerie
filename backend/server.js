@@ -3363,7 +3363,7 @@ cron.schedule('0 9 * * *', async () => {
         cancel_url: `${FRONTEND_URL}/payment-cancel`,
         metadata: {
           reservationId: reser.id.toString(),
-          typePaiement: 'solde'
+          paymentType: 'solde'
         }
       });
 
