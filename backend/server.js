@@ -1391,10 +1391,7 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
         options: options || {},
         salles: salles || {},
         repas: repas || {},
-        repasGlobal: repasGlobal || {},
-        modeRestauration: modeRestauration || 'global',
-        prixTotal: prixTotal || 0,
-        prixHebergement: prixHebergement || 0
+        prixTotal: prixTotal || 0
       },
       include: { client: true }
     });
