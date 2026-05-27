@@ -88,6 +88,36 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
       }
 
+      let deducedMode = existingReservation.modeRestauration || 'global';
+      let deducedGlobal = existingReservation.repasGlobal || { PETIT_DEJ: false, DEJEUNER: false, DINER: false };
+      
+      if (!existingReservation.modeRestauration && existingReservation.repas && Object.keys(existingReservation.repas).length > 0) {
+        const datesRepas = Object.keys(existingReservation.repas);
+        const firstDay = existingReservation.repas[datesRepas[0]];
+        
+        const hasPetitDej = !!firstDay.PETIT_DEJ;
+        const hasDejeuner = !!firstDay.DEJEUNER;
+        const hasDiner = !!firstDay.DINER;
+        
+        let isUniform = true;
+        for (let i = 1; i < datesRepas.length; i++) {
+          const day = existingReservation.repas[datesRepas[i]];
+          if (!!day.PETIT_DEJ !== hasPetitDej || !!day.DEJEUNER !== hasDejeuner || !!day.DINER !== hasDiner) {
+            isUniform = false;
+            break;
+          }
+        }
+        
+        if (isUniform && (hasPetitDej || hasDejeuner || hasDiner)) {
+          deducedMode = 'global';
+          deducedGlobal = { PETIT_DEJ: hasPetitDej, DEJEUNER: hasDejeuner, DINER: hasDiner };
+        } else {
+          deducedMode = 'carte';
+        }
+      } else if (!existingReservation.modeRestauration && (!existingReservation.repas || Object.keys(existingReservation.repas).length === 0)) {
+        deducedMode = 'global';
+      }
+
       setFormData({
         nom,
         prenom,
@@ -105,8 +135,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         salles: existingReservation.salles || { salle15: false, salle12: false, dateDebut: '', dateFin: '' },
         occupants: existingReservation.occupants || [],
         repas: existingReservation.repas || {},
-        modeRestauration: existingReservation.modeRestauration || 'global',
-        repasGlobal: existingReservation.repasGlobal || { PETIT_DEJ: false, DEJEUNER: false, DINER: false },
+        modeRestauration: deducedMode,
+        repasGlobal: deducedGlobal,
         sendEmail: true
       });
       // Skip the dates step if we are editing
