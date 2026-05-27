@@ -24,6 +24,17 @@ async function generateDevisPDF(data) {
 
             // --- HEADER ---
             doc.rect(0, 0, 612, 100).fill('#004B93');
+            
+            try {
+                const logoPath = path.join(__dirname, '../../public/logo-muc.png');
+                if (fs.existsSync(logoPath)) {
+                    // Positionné en haut à droite pour ne pas casser la mise en forme (x: 500, y: 20)
+                    doc.image(logoPath, 500, 20, { width: 60 });
+                }
+            } catch (err) {
+                console.error("Erreur d'ajout du logo au PDF :", err);
+            }
+
             doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(22).text('GÎTE DE LA MALADRERIE', 50, 40);
             doc.fontSize(10).font('Helvetica').text('MUC OMNISPORTS', 50, 65);
             
