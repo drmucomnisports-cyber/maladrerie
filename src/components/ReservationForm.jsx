@@ -562,6 +562,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   const goToStep2 = (e) => {
     e.preventDefault();
     setErrorMsg('');
+    if (!formData.nom || !formData.email || !formData.telephone) {
+      triggerError("Veuillez renseigner toutes les informations de contact obligatoires (Nom, Email, Téléphone).");
+      return;
+    }
     if (!formData.dateDebut || !formData.dateFin) {
       triggerError("Veuillez sélectionner des dates.");
       return;
@@ -953,11 +957,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <div className="space-y-1">
-          <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée (à partir de 17h)</label>
+          <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée (à partir de 17h) <span className="text-red-500">*</span></label>
           <input required type="date" name="dateDebut" value={formData.dateDebut} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Départ (avant 11h)</label>
+          <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Départ (avant 11h) <span className="text-red-500">*</span></label>
           <input required type="date" name="dateFin" value={formData.dateFin} onChange={handleChange} className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium" />
         </div>
       </div>

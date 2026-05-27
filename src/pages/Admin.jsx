@@ -741,14 +741,26 @@ const Admin = () => {
                             {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
                           </div>
                         )}
-                        <div className="text-xs font-bold text-slate-700 mt-1">
-                          👥 {res.occupants ? res.occupants.length : 0} occupant(s)
-                          {res.occupants && res.occupants.length > 0 && (
-                            <span className="font-normal text-slate-500 ml-1">
-                              ({res.occupants.filter(o => o.estAdulte).length} Adultes, {res.occupants.filter(o => !o.estAdulte).length} Enfants)
-                            </span>
-                          )}
-                        </div>
+                        {(() => {
+                          let totalAdultes = 0;
+                          let totalEnfants = 0;
+                          if (res.occupants && res.occupants.length > 0) {
+                            totalAdultes = res.occupants.filter(o => o.estAdulte).length;
+                            totalEnfants = res.occupants.filter(o => !o.estAdulte).length;
+                          } else if (res.chambresDetails) {
+                            Object.values(res.chambresDetails).forEach(ch => {
+                              totalAdultes += parseInt(ch.adultes || 0);
+                              totalEnfants += parseInt(ch.mineurs || ch.enfants || 0);
+                            });
+                          }
+                          const total = totalAdultes + totalEnfants;
+                          if (total === 0) return <div className="text-xs font-bold text-slate-700 mt-1">👥 0 occupant</div>;
+                          return (
+                            <div className="text-xs font-bold text-slate-700 mt-1 bg-slate-100 px-2 py-1 rounded inline-block">
+                              👥 {total} occupant{total > 1 ? 's' : ''} <span className="font-normal text-slate-500 ml-1">({totalAdultes} Adultes, {totalEnfants} Enfants)</span>
+                            </div>
+                          );
+                        })()}
                         <div className="text-[10px] text-slate-500 mt-1.5 flex gap-1 flex-wrap font-bold">
                           {res.options?.litsFaits && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🛏️ Lits</span>}
                           {res.options?.lingeFourni && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧴 Linge</span>}
@@ -1049,7 +1061,7 @@ const Admin = () => {
                                   className="p-1.5 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded transition-colors"
                                   title="Modifier le devis"
                                 >
-                                  <Edit2 size={14} />
+                                  <Edit3 size={14} />
                                 </button>
                                 <button
                                   onClick={async () => {

@@ -96,9 +96,9 @@ const Home = () => {
 
         {/* Logo Central */}
         <div className="mx-12 shrink-0 flex flex-col items-center">
-          <div className="bg-muc-blue p-3 rounded-b-2xl shadow-md -mt-1 mb-1">
-            <span className="font-bold text-white tracking-tighter text-xl">MUC</span>
-          </div>
+            <div className="bg-white p-2 rounded-b-2xl shadow-md -mt-1 mb-1 flex items-center justify-center">
+              <img src="/logo-muc.png" alt="MUC Omnisports" className="h-10 w-auto object-contain" />
+            </div>
           <span className="text-[10px] font-bold text-muc-blue tracking-[0.2em] uppercase">Gîte de la Maladrerie</span>
         </div>
 
@@ -345,7 +345,7 @@ const Home = () => {
                 <div className="bg-muc-blue text-white inline-block px-4 py-1 font-black text-sm uppercase tracking-widest skew-x-[-15deg]">
                   <span className="inline-block skew-x-[15deg]">Espace Travail & Séminaires</span>
                 </div>
-                <h3 className="text-3xl md:text-4xl font-black text-muc-blue uppercase tracking-tight">Location de Salles de Formation</h3>
+                <h3 className="text-3xl md:text-4xl font-black text-muc-blue uppercase tracking-tight">Location de Salles de Réunion</h3>
                 <p className="text-lg text-slate-600 font-medium leading-relaxed">
                   Nous mettons à votre disposition <strong className="text-muc-blue font-black">2 salles de réunion</strong> pouvant accueillir respectivement <strong className="text-muc-blue font-black">15 et 12 personnes</strong>. Parfaitement adaptées pour vos réunions, séminaires ou sessions de travail.
                 </p>
