@@ -399,10 +399,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       const tarifPers = occupants >= info.lits ? 22 : 25;
       total += occupants * tarifPers * nuits;
       
-      // Taxe de séjour : 4% du prix de la nuitée par adulte (+18 ans)
+      // Taxe de séjour : 4% du prix de la nuitée par adulte (+18 ans) + 10% part départementale = 4.4%
       // Note: Adultes dans chambresDetails sont ≥13 ans pour le tarif, 
-      // mais ici on applique 4% sur le prix de la nuitée par adulte.
-      total += nbAdultes * tarifPers * nuits * 0.04;
+      // mais ici on applique 4.4% sur le prix de la nuitée par adulte.
+      total += nbAdultes * tarifPers * nuits * 0.044;
     });
 
     const totalPersonnes = totalAdultes + totalMineurs;
@@ -1439,7 +1439,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 <span className="text-lg font-black text-muc-blue">{(calculerPrix() * 0.3 + calculerTotalRepas()).toFixed(2)} €</span>
               </div>
             </div>
-            <p className="text-[10px] text-slate-500 mt-3">* Inclut la taxe de séjour (4% du prix de la nuitée / adulte)</p>
+            <p className="text-[10px] text-slate-500 mt-3">* Inclut la taxe de séjour (4% + 10% part départementale, soit 4.4% du prix de la nuitée / adulte)</p>
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -276,7 +276,7 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
     const tarifPers = occupants >= capacite ? 22 : 25;
     total += occupants * tarifPers * nuits;
     // Taxe de séjour : 4% du prix de la nuitée par adulte
-    total += nbAdultes * (tarifPers * 0.04) * nuits;
+    total += nbAdultes * (tarifPers * 0.044) * nuits;
   });
 
   // Salles de réunion
@@ -1117,7 +1117,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
 
     const totalPersonnes = totalAdultes + totalMineurs;
     const tarifMoyen = totalPrixBase / ((totalPersonnes || 1) * nuits);
-    const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.04) * nuits;
+    const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.044) * nuits;
     
     const prixSejour = totalPrixBase;
 
@@ -1299,7 +1299,7 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       })(),
       taxeSejourDetails: {
         adultes: totalAdultes,
-        taux: 0.04,
+        taux: 0.044,
         nuits: nuits,
         base: tarifMoyen,
         total: taxeSejourCalculee
@@ -1552,7 +1552,7 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
 
         const totalPersonnes = totalAdultes + totalMineurs;
         const tarifMoyen = totalPrixBase / ((totalPersonnes || 1) * nuits);
-        const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.04) * nuits;
+        const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.044) * nuits;
 
         const detailsLignes = devisFinal.chambres.map(chId => {
           const details = chDetails[chId] || { adultes: 0, enfants: 0 };
@@ -1631,7 +1631,7 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
           chambres: devisFinal.chambres.map(cid => CHAMBRES_NAMES[cid] || `Chambre ${cid}`),
           nuits,
           detailsLignes,
-          taxeSejourDetails: { adultes: totalAdultes, taux: 0.04, nuits, base: tarifMoyen, total: taxeSejourCalculee },
+          taxeSejourDetails: { adultes: totalAdultes, taux: 0.044, nuits, base: tarifMoyen, total: taxeSejourCalculee },
           options: devisOptions,
           prixTotal: devisFinal.prixTotal,
           montantAcompte: Math.round((Math.max(0, devisFinal.prixTotal - calculerTotalRepasServeur(devisFinal.repas)) * 0.3 + calculerTotalRepasServeur(devisFinal.repas)) * 100) / 100,
@@ -1765,7 +1765,7 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
 
     const totalPersonnes = totalAdultes + totalMineurs;
     const tarifMoyen = totalPrixBase / ((totalPersonnes || 1) * nuits);
-    const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.04) * nuits;
+    const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.044) * nuits;
 
     const detailsLignes = devis.chambres.map(chId => {
       const details = chambresDetails[chId] || { adultes: 0, enfants: 0 };
@@ -1876,7 +1876,7 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
 
     const taxeSejourDetails = {
       adultes: totalAdultes,
-      taux: 0.04,
+      taux: 0.044,
       nuits: nuits,
       base: tarifMoyen,
       total: taxeSejourCalculee

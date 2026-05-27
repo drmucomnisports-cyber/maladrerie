@@ -1359,6 +1359,30 @@ const Admin = () => {
                       </div>
                       <p className="text-xs text-slate-500">Chambres : {res.chambres.join(', ')}</p>
                       <p className="text-xs text-slate-500">Prix Total : {res.prixTotal ? `${res.prixTotal} €` : 'N/A'}</p>
+                      {(() => {
+                        let taxe = 0;
+                        if (res.dateDebut && res.dateFin) {
+                          const nuits = Math.max(1, Math.ceil((new Date(res.dateFin) - new Date(res.dateDebut)) / (1000 * 60 * 60 * 24)));
+                          let nbAdultes = 0;
+                          let nbOccupants = 0;
+                          if (res.occupants && res.occupants.length > 0) {
+                            nbAdultes = res.occupants.filter(o => o.estAdulte).length;
+                            nbOccupants = res.occupants.length;
+                          } else if (res.chambresDetails && Object.keys(res.chambresDetails).length > 0) {
+                            Object.values(res.chambresDetails).forEach(room => {
+                              nbAdultes += parseInt(room.adultes || 0);
+                              nbOccupants += parseInt(room.adultes || 0) + parseInt(room.mineurs || 0);
+                            });
+                          }
+                          if (nbAdultes > 0 && res.chambres && res.chambres.length > 0) {
+                             const tarifPers = (nbOccupants >= res.chambres.length * 4) ? 22 : 25;
+                             taxe = nbAdultes * tarifPers * nuits * 0.044;
+                          }
+                        }
+                        return taxe > 0 ? (
+                          <p className="text-xs text-slate-500 font-bold mt-1 text-muc-blue/80">Dont taxe de séjour (estimée) : {taxe.toFixed(2)} €</p>
+                        ) : null;
+                      })()}
                       {res.occupants && res.occupants.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-slate-50">
                           <p className="text-xs font-bold text-slate-700 mb-1">Occupants:</p>
