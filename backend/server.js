@@ -14,6 +14,70 @@ const stripe = require('stripe')(stripeSecretKey);
 const prisma = new PrismaClient();
 const app = express();
 
+const generateFeedbackHTML = (title, message, isSuccess = true) => {
+  const themeColor = isSuccess ? '#22c55e' : '#ef4444';
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;900&display=swap" rel="stylesheet">
+      <style>
+        body { 
+          font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+          background-color: #f8fafc; 
+          background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+          background-size: 20px 20px;
+          display: flex; 
+          justify-content: center; 
+          align-items: center; 
+          min-height: 100vh; 
+          margin: 0; 
+          color: #334155; 
+        }
+        .card { 
+          background-color: white; 
+          border-radius: 24px; 
+          padding: 40px; 
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); 
+          max-width: 500px; 
+          width: 90%; 
+          text-align: center; 
+          border-top: 8px solid ${themeColor}; 
+        }
+        h1 { color: ${themeColor}; font-weight: 900; font-size: 28px; margin-top: 0; text-transform: uppercase; letter-spacing: -0.025em; }
+        p { font-size: 16px; line-height: 1.6; font-weight: 500; margin-bottom: 30px; }
+        .btn { 
+          display: inline-block; 
+          background-color: #032e5f; 
+          color: white; 
+          border: none; 
+          padding: 14px 28px; 
+          border-radius: 12px; 
+          font-weight: 900; 
+          font-size: 14px; 
+          text-transform: uppercase; 
+          letter-spacing: 0.05em; 
+          cursor: pointer; 
+          transition: transform 0.2s, background-color 0.2s; 
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        }
+        .btn:hover { background-color: #021f42; transform: translateY(-2px); }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>${title}</h1>
+        <p>${message}</p>
+        <button class="btn" onclick="window.close()">Fermer cette fenêtre</button>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -938,13 +1002,11 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
       `
     });
 
-    res.send(`
-      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h1 style="color: #28a745;">Réservation acceptée !</h1>
-        <p>Le client <strong>${reservation.client.nom}</strong> a été prévenu par e-mail avec un lien de paiement Stripe.</p>
-        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;">Fermer cette fenêtre</button>
-      </div>
-    `);
+    res.send(generateFeedbackHTML(
+      "Réservation acceptée !",
+      `Le client <strong>${reservation.client.nom}</strong> a été prévenu par e-mail avec un lien de paiement Stripe.`,
+      true
+    ));
   } catch (error) {
     console.error(error);
     res.status(500).send("Erreur lors de l'acceptation");
@@ -997,13 +1059,11 @@ app.get('/api/reservations/:id/reject', checkAuth, async (req, res) => {
       `
     });
 
-    res.send(`
-      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h1 style="color: #dc3545;">Réservation refusée</h1>
-        <p>Le client <strong>${reservation.client.nom}</strong> a été informé par e-mail.</p>
-        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;">Fermer cette fenêtre</button>
-      </div>
-    `);
+    res.send(generateFeedbackHTML(
+      "Réservation refusée",
+      `Le client <strong>${reservation.client.nom}</strong> a été informé par e-mail.`,
+      false
+    ));
   } catch (error) {
     console.error(error);
     res.status(500).send("Erreur lors du refus");
@@ -3027,13 +3087,11 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/accept', async (req, 
       console.error("Erreur envoi email admin acceptation mission:", err);
     }
 
-    res.send(`
-      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h1 style="color: #28a745;">Missions acceptées !</h1>
-        <p>Merci ${intervenant ? intervenant.prenom : ''}, toutes vos missions pour cette réservation ont bien été acceptées.</p>
-        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;">Fermer cette fenêtre</button>
-      </div>
-    `);
+    res.send(generateFeedbackHTML(
+      "Missions acceptées !",
+      `Merci ${intervenant ? intervenant.prenom : ''}, toutes vos missions pour cette réservation ont bien été acceptées.`,
+      true
+    ));
   } catch (error) {
     console.error(error);
     res.status(500).send("Erreur lors de l'acceptation");
@@ -3071,13 +3129,11 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/reject', async (req, 
     } catch (err) {
       console.error("Erreur envoi email admin refus mission:", err);
     }
-    res.send(`
-      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h1 style="color: #dc3545;">Missions refusées</h1>
-        <p>Merci ${intervenant ? intervenant.prenom : ''}, nous avons bien noté que vous déclinez les missions pour cette réservation.</p>
-        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;">Fermer cette fenêtre</button>
-      </div>
-    `);
+    res.send(generateFeedbackHTML(
+      "Missions refusées",
+      `Merci ${intervenant ? intervenant.prenom : ''}, nous avons bien noté que vous déclinez les missions pour cette réservation.`,
+      false
+    ));
   } catch (error) {
     console.error(error);
     res.status(500).send("Erreur lors du refus");
