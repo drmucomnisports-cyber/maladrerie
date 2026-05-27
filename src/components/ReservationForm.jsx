@@ -549,13 +549,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     setPromoError('');
     try {
       const res = await fetch(`${API_URL}/api/promo-codes/validate`, {
-        method: httpMethod,
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: promoCode,
           date: formData.dateDebut
         })
-      });const data = await res.json();
+      });
+      const data = await res.json();
       if (res.ok) {
         setPromoApplied(data);
       } else {
