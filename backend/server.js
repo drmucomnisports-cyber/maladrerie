@@ -1408,13 +1408,12 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
   }
 });
 
-// Télécharger le devis en PDF (Admin)
 app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const devis = await prisma.reservation.findUnique({
       where: { id: parseInt(id) },
-      include: { client: true }
+      include: { client: true, occupants: true }
     });
 
     if (!devis) {
@@ -1422,31 +1421,201 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
     }
 
     const { generateDevisPDF } = require('./utils/generateDevisPDF');
+
+    const start = new Date(devis.dateDebut);
+    const end = new Date(devis.dateFin);
+    const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    const year = new Date(devis.createdAt).getFullYear();
+    const refClient = `C-${year}-${devis.clientId}`;
+
+    // Trouver l'administrateur
+    const adminEmail = devis.validePar || req.user.email;
+    const admin = await prisma.adminAccount.findUnique({
+      where: { email: adminEmail }
+    });
+    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
+    const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
+    const resolvedAdminEmail = admin ? admin.email : adminEmail;
+    const resolvedAdminTel = admin ? (admin.telephone || '04 99 58 35 35') : '04 99 58 35 35';
+
+    let totalAdultes = 0;
+    let totalMineurs = 0;
+    let totalPrixBase = 0;
     
-    // Convertir les détails en lignes si non présentes, pour que le PDF fonctionne
-    if (!devis.detailsLignes) {
-      devis.detailsLignes = [];
-      if (devis.prixHebergement > 0) {
-        devis.detailsLignes.push({
-           designation: "Hébergement / Salles",
-           nbPersonnes: 1,
-           tarifParPersonne: devis.prixHebergement,
-           nuits: 1,
-           total: devis.prixHebergement
+    const chambresDetails = devis.chambresDetails || {};
+    devis.chambres.forEach(chId => {
+      const details = chambresDetails[chId] || { adultes: 0, enfants: 0 };
+      const nbAdultes = parseInt(details.adultes || 0);
+      const nbMineurs = parseInt(details.enfants || 0);
+      const occupantsCount = nbAdultes + nbMineurs;
+      const capacite = CHAMBRES_CAPACITE[chId] || 5;
+      const tarifPers = occupantsCount >= capacite ? 22 : 25;
+      
+      totalAdultes += nbAdultes;
+      totalMineurs += nbMineurs;
+      totalPrixBase += occupantsCount * tarifPers * nuits;
+    });
+
+    const totalPersonnes = totalAdultes + totalMineurs;
+    const tarifMoyen = totalPrixBase / ((totalPersonnes || 1) * nuits);
+    const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.04) * nuits;
+
+    const detailsLignes = devis.chambres.map(chId => {
+      const details = chambresDetails[chId] || { adultes: 0, enfants: 0 };
+      const nbAdultes = parseInt(details.adultes || 0);
+      const nbMineurs = parseInt(details.enfants || 0);
+      const occupantsCount = nbAdultes + nbMineurs;
+      const capacite = CHAMBRES_CAPACITE[chId] || 5;
+      const tarifPers = occupantsCount >= capacite ? 22 : 25;
+      return {
+        designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} (${nbAdultes} ad. + ${nbMineurs} enf.)`,
+        nbPersonnes: occupantsCount,
+        tarifParPersonne: tarifPers,
+        nuits: nuits,
+        total: occupantsCount * tarifPers * nuits
+      };
+    });
+
+    // Salles
+    if (devis.salles) {
+      let nuitsSalles = nuits;
+      let datesSuffix = "";
+      if (devis.salles.dateDebut && devis.salles.dateFin) {
+        const startS = new Date(devis.salles.dateDebut);
+        const endS = new Date(devis.salles.dateFin);
+        nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+        const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        datesSuffix = ` (du ${strD} au ${strF})`;
+      }
+      const prixSalle = devis.chambres.length > 0 ? 100 : 150;
+      if (devis.salles.salle15) {
+        detailsLignes.push({
+          designation: `Location Salle 15 personnes${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: prixSalle,
+          nuits: nuitsSalles,
+          total: prixSalle * nuitsSalles
         });
       }
-      if (devis.repasGlobal && Object.keys(devis.repasGlobal).length > 0) {
-        devis.detailsLignes.push({
-           designation: "Restauration",
-           nbPersonnes: 1,
-           tarifParPersonne: devis.totalRepas || 0,
-           nuits: 1,
-           total: devis.totalRepas || 0
+      if (devis.salles.salle12) {
+        detailsLignes.push({
+          designation: `Location Salle 12 personnes${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: prixSalle,
+          nuits: nuitsSalles,
+          total: prixSalle * nuitsSalles
         });
       }
     }
 
-    const pdfBuffer = await generateDevisPDF(devis);
+    // Repas
+    if (devis.repas) {
+      let totalPDJ = { adulte: 0, enfant12: 0, enfant5: 0 };
+      let totalDEJ = { adulte: 0, enfant12: 0, enfant5: 0 };
+      let totalDIN = { adulte: 0, enfant12: 0, enfant5: 0 };
+
+      Object.values(devis.repas).forEach(dayRepas => {
+        if (dayRepas.PETIT_DEJ) {
+          totalPDJ.adulte += parseInt(dayRepas.PETIT_DEJ.ADULTE || 0);
+          totalPDJ.enfant12 += parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0);
+          totalPDJ.enfant5 += parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0);
+        }
+        if (dayRepas.DEJEUNER) {
+          totalDEJ.adulte += parseInt(dayRepas.DEJEUNER.ADULTE || 0);
+          totalDEJ.enfant12 += parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0);
+          totalDEJ.enfant5 += parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0);
+        }
+        if (dayRepas.DINER) {
+          totalDIN.adulte += parseInt(dayRepas.DINER.ADULTE || 0);
+          totalDIN.enfant12 += parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0);
+          totalDIN.enfant5 += parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0);
+        }
+      });
+
+      if (totalPDJ.adulte > 0) detailsLignes.push({ designation: 'Petits-déjeuners (Adulte)', nbPersonnes: totalPDJ.adulte, tarifParPersonne: 6, nuits: 1, total: totalPDJ.adulte * 6 });
+      if (totalPDJ.enfant12 > 0) detailsLignes.push({ designation: 'Petits-déjeuners (Enfant -12 ans)', nbPersonnes: totalPDJ.enfant12, tarifParPersonne: 5, nuits: 1, total: totalPDJ.enfant12 * 5 });
+      if (totalPDJ.enfant5 > 0) detailsLignes.push({ designation: 'Petits-déjeuners (Enfant -5 ans)', nbPersonnes: totalPDJ.enfant5, tarifParPersonne: 4, nuits: 1, total: totalPDJ.enfant5 * 4 });
+
+      if (totalDEJ.adulte > 0) detailsLignes.push({ designation: 'Déjeuners (Adulte)', nbPersonnes: totalDEJ.adulte, tarifParPersonne: 11.5, nuits: 1, total: totalDEJ.adulte * 11.5 });
+      if (totalDEJ.enfant12 > 0) detailsLignes.push({ designation: 'Déjeuners (Enfant -12 ans)', nbPersonnes: totalDEJ.enfant12, tarifParPersonne: 9.5, nuits: 1, total: totalDEJ.enfant12 * 9.5 });
+      if (totalDEJ.enfant5 > 0) detailsLignes.push({ designation: 'Déjeuners (Enfant -5 ans)', nbPersonnes: totalDEJ.enfant5, tarifParPersonne: 8, nuits: 1, total: totalDEJ.enfant5 * 8 });
+
+      if (totalDIN.adulte > 0) detailsLignes.push({ designation: 'Dîners (Adulte)', nbPersonnes: totalDIN.adulte, tarifParPersonne: 14, nuits: 1, total: totalDIN.adulte * 14 });
+      if (totalDIN.enfant12 > 0) detailsLignes.push({ designation: 'Dîners (Enfant -12 ans)', nbPersonnes: totalDIN.enfant12, tarifParPersonne: 12, nuits: 1, total: totalDIN.enfant12 * 12 });
+      if (totalDIN.enfant5 > 0) detailsLignes.push({ designation: 'Dîners (Enfant -5 ans)', nbPersonnes: totalDIN.enfant5, tarifParPersonne: 10, nuits: 1, total: totalDIN.enfant5 * 10 });
+    }
+
+    // Options
+    const detailsOptions = devis.options ? Object.entries(devis.options).filter(([k,v]) => v).map(([k,v]) => {
+      let optPrix = 0;
+      let optNom = '';
+      let qte = 1;
+      if (k === 'menage') {
+        optNom = 'Ménage fin de séjour';
+        optPrix = 50;
+        qte = devis.chambres.length;
+      } else if (k === 'litsFaits') {
+        optNom = 'Lits faits à l\'arrivée';
+        optPrix = 5;
+        qte = (devis.occupants && devis.occupants.length) || totalPersonnes || 1;
+      } else if (k === 'lingeFourni') {
+        optNom = 'Linge de toilette fourni';
+        optPrix = 5;
+        qte = (devis.occupants && devis.occupants.length) || totalPersonnes || 1;
+      }
+      return { nom: optNom, pu: optPrix, qte: qte, total: optPrix * qte };
+    }) : [];
+
+    const taxeSejourDetails = {
+      adultes: totalAdultes,
+      taux: 0.04,
+      nuits: nuits,
+      base: tarifMoyen,
+      total: taxeSejourCalculee
+    };
+
+    let promoMontant = 0;
+    if (devis.codePromo) {
+      const promo = await prisma.promoCode.findUnique({ where: { code: devis.codePromo.toUpperCase() } });
+      if (promo && promo.actif) {
+        if (promo.type === 'pourcentage') {
+          const ratio = 1 - (promo.valeur / 100);
+          if (ratio > 0) {
+            const prixSansPromo = devis.prixTotal / ratio;
+            promoMontant = prixSansPromo - devis.prixTotal;
+          }
+        } else {
+          promoMontant = promo.valeur;
+        }
+      }
+    }
+
+    const pdfData = {
+      numeroDevis: devis.numeroDevis,
+      refClient,
+      dateDebut: devis.dateDebut,
+      dateFin: devis.dateFin,
+      expireLe: devis.expireLe,
+      clientNom: devis.client.nom,
+      clientEmail: devis.client.email,
+      clientTel: devis.client.telephone,
+      clientAdresse: devis.client.adressePostale,
+      adminNom: resolvedAdminNom,
+      adminEmail: resolvedAdminEmail,
+      adminTel: resolvedAdminTel,
+      chambres: devis.chambres.map(id => CHAMBRES_NAMES[id] || `Chambre ${id}`),
+      nuits,
+      detailsLignes,
+      options: detailsOptions,
+      taxeSejourDetails,
+      prixTotal: devis.prixTotal,
+      montantAcompte: devis.montantAcompte || (Math.round((Math.max(0, devis.prixTotal - calculerTotalRepasServeur(devis.repas)) * 0.3 + calculerTotalRepasServeur(devis.repas)) * 100) / 100),
+      promoMontant,
+      codePromo: devis.codePromo
+    };
+
+    const pdfBuffer = await generateDevisPDF(pdfData);
     
     const safeNomClient = devis.client.nom.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const pdfFileName = `Devis_${devis.numeroDevis}_${safeNomClient}.pdf`;
