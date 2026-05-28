@@ -659,6 +659,25 @@ const Admin = () => {
     );
   }
 
+  const taxesSejourParMois = reservations
+    .filter(r => (r.statut === 'RESERVE' || r.statut === 'TERMINE') && r.taxeSejour > 0)
+    .reduce((acc, r) => {
+      const date = new Date(r.dateDebut); // Use check-in date as requested by user
+      const monthYear = date.toISOString().substring(0, 7); // YYYY-MM
+      if (!acc[monthYear]) {
+        acc[monthYear] = {
+          label: date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' }),
+          total: 0
+        };
+      }
+      acc[monthYear].total += r.taxeSejour;
+      return acc;
+    }, {});
+
+  const taxesSejourArray = Object.entries(taxesSejourParMois)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([_, data]) => data);
+
   return (
     <div className="min-h-screen bg-[#F8F8F8] font-sans p-4 md:p-8">
       <div className="w-full max-w-[96%] mx-auto relative">
@@ -838,7 +857,10 @@ const Admin = () => {
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-sm font-black text-slate-800">{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</div>
+                        <div className="text-sm font-black text-slate-800">
+                          {res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}
+                          {res.taxeSejour > 0 && <div className="text-[10px] text-slate-500 font-normal italic mt-0.5">dont {res.taxeSejour.toFixed(2)} € de taxe de séjour</div>}
+                        </div>
                         <div className="flex flex-col gap-1 mt-2">
                           <div className="flex items-center justify-between text-[10px]">
                             <span className="text-slate-500 font-bold uppercase">Acompte (30%)</span>
@@ -1480,6 +1502,21 @@ const Admin = () => {
             <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
               <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs mb-2">Rémunération Totale (Missions)</h3>
               <p className="text-4xl font-black text-muc-blue">{finances?.remunerationTotale ? finances.remunerationTotale.toFixed(2) : '0.00'} €</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden mt-6 mb-6">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-black text-slate-800 uppercase tracking-widest">Taxe de Séjour à reverser</h3>
+              <div className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold">Basé sur le mois d'arrivée</div>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {taxesSejourArray.length > 0 ? taxesSejourArray.map((t, idx) => (
+                <div key={idx} className="flex justify-between items-center p-4 border border-amber-100 rounded-xl bg-amber-50">
+                  <span className="text-sm font-bold text-amber-900 capitalize">{t.label}</span>
+                  <span className="text-lg font-black text-amber-600">{t.total.toFixed(2)} €</span>
+                </div>
+              )) : <p className="text-sm text-slate-500 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
             </div>
           </div>
 

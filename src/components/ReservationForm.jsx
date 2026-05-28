@@ -425,6 +425,30 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     return total;
   };
 
+  const calculerTaxeSejour = () => {
+    if (!formData.dateDebut || !formData.dateFin) return 0;
+    const start = new Date(formData.dateDebut);
+    const end = new Date(formData.dateFin);
+    const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    if (nuits <= 0) return 0;
+
+    let taxeTotal = 0;
+    const detailsSource = isDevis ? getChambresDetailsDistribues() : formData.chambresDetails;
+
+    formData.chambres.forEach(chId => {
+      const details = detailsSource[chId] || { adultes: 0, mineurs: 0 };
+      const info = CHAMBRES_INFO[chId];
+      const nbAdultes = parseInt(details.adultes || 0);
+      const nbMineurs = parseInt(details.mineurs || 0);
+      const occupants = nbAdultes + nbMineurs;
+      
+      const tarifPers = occupants >= info.lits ? 22 : 25;
+      taxeTotal += nbAdultes * tarifPers * nuits * 0.044;
+    });
+
+    return taxeTotal;
+  };
+
   // Vérifie si la commande de repas est encore ouverte (avant le jeudi S-1)
   const isRepasCommandeOuverte = () => {
     if (!formData.dateDebut) return false;
@@ -1409,7 +1433,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <h3 className="text-sm font-black uppercase text-muc-blue tracking-widest mb-4">Récapitulatif</h3>
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center text-sm text-slate-700">
-                <span className="font-medium">Hébergement</span>
+                <div className="flex flex-col">
+                  <span className="font-medium">Hébergement</span>
+                  {calculerTaxeSejour() > 0 && <span className="text-[10px] text-slate-500 italic">dont taxe de séjour : {calculerTaxeSejour().toFixed(2)} €</span>}
+                </div>
                 <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
               {calculerTotalSalles() > 0 && (
@@ -1567,7 +1594,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
             <h3 className="text-sm font-black uppercase text-muc-blue tracking-widest mb-3">Récapitulatif final</h3>
             <div className="space-y-2 mb-3">
               <div className="flex justify-between items-center text-sm text-slate-700">
-                <span className="font-medium">Hébergement</span>
+                <div className="flex flex-col">
+                  <span className="font-medium">Hébergement</span>
+                  {calculerTaxeSejour() > 0 && <span className="text-[10px] text-slate-500 italic">dont taxe de séjour : {calculerTaxeSejour().toFixed(2)} €</span>}
+                </div>
                 <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
               {calculerTotalSalles() > 0 && (
