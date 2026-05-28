@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -1354,12 +1354,12 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
                 <tr>
                   <td style="padding: 40px; color: #333333; line-height: 1.6;">
                     <h2 style="color: #004B93; margin-top: 0;">Bonjour ${nom},</h2>
-                    <p>Suite à  votre demande, nous avons le plaisir de vous transmettre notre proposition tarifaire pour votre séjour au gîte.</p>
+                    <p>Suite à votre demande, nous avons le plaisir de vous transmettre notre proposition tarifaire pour votre séjour au gîte.</p>
                     <p>Veuillez trouver ci-joint votre devis détaillé au format PDF, incluant nos conditions générales de vente.</p>
 
                     <table width="100%" cellpadding="10" cellspacing="0" border="0" style="background-color: #f9f9f9; border-radius: 8px; margin: 25px 0;">
                       <tr>
-                        <td width="40%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">NÂ° de devis</td>
+                        <td width="40%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">N° de devis</td>
                         <td style="border-bottom: 1px solid #eeeeee;">${numeroDevis}</td>
                       </tr>
                       <tr>
