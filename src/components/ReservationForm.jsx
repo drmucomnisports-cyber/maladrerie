@@ -1527,7 +1527,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                             className="w-full px-2 py-2.5 rounded-xl border border-slate-200 focus:border-muc-yellow bg-white outline-none text-sm transition-all" 
                           />
                         </div>
-                        <div className={`space-y-1 ${occ.estAdulte ? 'md:col-span-6' : 'md:col-span-5'}`}>
+                        <div className={`space-y-1 ${occ.estAdulte ? 'md:col-span-6' : 'md:col-span-4'}`}>
                           <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Prénom {occ.estAdulte && <span className="text-red-500">*</span>}</label>
                           <input 
                             required={occ.estAdulte} 
@@ -1539,7 +1539,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                           />
                         </div>
                         {!occ.estAdulte && (
-                          <div className="space-y-1 md:col-span-2">
+                          <div className="space-y-1 md:col-span-3">
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Âge <span className="text-red-500">*</span></label>
                             <input 
                               required 
