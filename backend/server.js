@@ -339,6 +339,40 @@ const brevo = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY || process.env.SMTP_PASS 
 });
 
+const getStripeDescription = (res, isCaution = false) => {
+  let taxe = 0;
+  if (res.dateDebut && res.dateFin) {
+    const start = new Date(res.dateDebut);
+    const end = new Date(res.dateFin);
+    const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    let nbAdultes = 0;
+    let nbOccupants = 0;
+    if (res.occupants && res.occupants.length > 0) {
+      nbAdultes = res.occupants.filter(o => o.estAdulte).length;
+      nbOccupants = res.occupants.length;
+    } else if (res.chambresDetails && Object.keys(res.chambresDetails).length > 0) {
+      Object.values(res.chambresDetails).forEach(room => {
+        nbAdultes += parseInt(room.adultes || 0);
+        nbOccupants += parseInt(room.adultes || 0) + parseInt(room.mineurs || 0);
+      });
+    }
+    if (nbAdultes > 0 && res.chambres && res.chambres.length > 0) {
+       const tarifPers = (nbOccupants >= res.chambres.length * 4) ? 22 : 25;
+       taxe = nbAdultes * tarifPers * nuits * 0.044;
+    }
+  }
+  const clientNom = res.client ? res.client.nom : (res.clientNom || '');
+  const nbChambres = res.chambres ? res.chambres.length : 0;
+  let text = `${clientNom}\nChambre(s) : ${nbChambres}\nDu ${new Date(res.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(res.dateFin).toLocaleDateString('fr-FR')}`;
+  
+  if (isCaution) {
+    text += '\nCe montant ne sera pas prélevé.';
+  } else {
+    text += `\nTaxe de séjour incluse dans le prix total : ${taxe.toFixed(2)} €`;
+  }
+  return text;
+};
+
 const sendMail = async (options) => {
   try {
     const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
@@ -889,13 +923,14 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
             currency: 'eur',
             product_data: {
               name: repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
-              description: `Client: ${existingReservation.client.nom}\nDu ${new Date(existingReservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(existingReservation.dateFin).toLocaleDateString('fr-FR')}\n${existingReservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`,
+              description: getStripeDescription(existingReservation),
             },
             unit_amount: Math.round(montantAcompte * 100), // En centimes
           },
           quantity: 1,
         }],
         mode: 'payment',
+        billing_address_collection: 'required',
         success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${FRONTEND_URL}/payment-cancel`,
         metadata: {
@@ -2035,13 +2070,14 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           currency: 'eur',
           product_data: { 
             name: repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
-            description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres?.length || 0} chambre(s)\nTaxe de séjour incluse dans le prix total.`
+            description: getStripeDescription(devis)
           },
           unit_amount: Math.round(montantAcompte * 100),
         },
         quantity: 1,
       }],
       mode: 'payment',
+        billing_address_collection: 'required',
       success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: { reservationId: devis.id.toString(), paymentType: 'ACOMPTE' }
@@ -2147,13 +2183,14 @@ app.get('/api/devis/validate/:token', async (req, res) => {
           currency: 'eur',
           product_data: { 
             name: repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
-            description: `Client: ${devis.client.nom}\nSéjour: du ${new Date(devis.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(devis.dateFin).toLocaleDateString('fr-FR')}\n${devis.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
+            description: getStripeDescription(devis)
           },
           unit_amount: Math.round(montantAcompte * 100),
         },
         quantity: 1,
       }],
       mode: 'payment',
+        billing_address_collection: 'required',
       success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: { reservationId: devis.id.toString(), paymentType: 'ACOMPTE' }
@@ -2305,13 +2342,14 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
           currency: 'eur',
           product_data: {
             name: 'Solde du séjour - Gîte de La Maladrerie',
-            description: `Client: ${reservation.client.nom}\nDu ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`,
+            description: getStripeDescription(reservation),
           },
           unit_amount: Math.round(montantSoldeCalcule * 100),
         },
         quantity: 1,
       }],
       mode: 'payment',
+        billing_address_collection: 'required',
       success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: {
@@ -2400,13 +2438,14 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
           currency: 'eur',
           product_data: {
             name: 'Caution - Empreinte bancaire (Gîte de La Maladrerie)',
-            description: `Client: ${reservation.client.nom}\nDu ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nCe montant ne sera pas prélevé.`,
+            description: getStripeDescription(reservation, true),
           },
           unit_amount: 50000, // 500€
         },
         quantity: 1,
       }],
       mode: 'payment',
+        billing_address_collection: 'required',
       payment_intent_data: {
         capture_method: 'manual', // Autorise sans capturer
       },
@@ -2841,13 +2880,14 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
           currency: 'eur',
           product_data: { 
             name: repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
-            description: `Client: ${reservation.client.nom}\nSéjour: du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}\n${reservation.chambres.length} chambre(s)\nTaxe de séjour incluse dans le prix total.`
+            description: getStripeDescription(reservation)
           },
           unit_amount: Math.round(montantAcompte * 100),
         },
         quantity: 1,
       }],
       mode: 'payment',
+        billing_address_collection: 'required',
       success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/payment-cancel`,
       metadata: { reservationId: reservation.id.toString(), paymentType: 'ACOMPTE' }
@@ -3923,7 +3963,7 @@ cron.schedule('0 9 * * *', async () => {
               currency: 'eur',
               product_data: {
                 name: `Solde - Séjour au Gîte de la Maladrerie`,
-                description: `Du ${new Date(reser.dateDebut).toLocaleDateString()} au ${new Date(reser.dateFin).toLocaleDateString()}`,
+                description: getStripeDescription(reser),
               },
               unit_amount: Math.round(reser.montantSolde * 100),
             },
@@ -3931,6 +3971,7 @@ cron.schedule('0 9 * * *', async () => {
           },
         ],
         mode: 'payment',
+        billing_address_collection: 'required',
         success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${FRONTEND_URL}/payment-cancel`,
         metadata: {
