@@ -1034,7 +1034,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   className="w-4 h-4 rounded accent-[#004B93]" 
                 />
                 <span className="text-xs font-semibold text-slate-600">
-                  {isDevis ? 'Envoyer un e-mail avec le devis' : (existingReservation ? 'Notifier le client de cette modification par e-mail' : 'Envoyer l\\'e-mail de confirmation d\\'enregistrement au client')}
+                  {isDevis ? 'Envoyer un e-mail avec le devis' : (existingReservation ? 'Notifier le client de cette modification par e-mail' : "Envoyer l'e-mail de confirmation d'enregistrement au client")}
                 </span>
               </label>
             )}
