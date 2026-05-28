@@ -86,6 +86,7 @@ const Admin = () => {
 
   // Paiement manuel
   const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
+  const [paymentMenuResId, setPaymentMenuResId] = useState(null);
   const [manualPaymentRes, setManualPaymentRes] = useState(null);
   const [manualPaymentForm, setManualPaymentForm] = useState({ montant: '', mode: 'ESPECES', typePaiement: 'ACOMPTE' });
 
@@ -955,7 +956,7 @@ const Admin = () => {
                           {res.statut === 'RESERVE' && (
                             <>
                               {res.statutPaiement !== 'PAYE' && (
-                                <button onClick={() => triggerPaymentAction(res.id, 'solde')} className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Demander le solde">
+                                <button onClick={() => setPaymentMenuResId(res.id)} className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Demander un paiement">
                                   <CreditCard size={18} />
                                 </button>
                               )}
@@ -2006,6 +2007,47 @@ const Admin = () => {
           </div>
         </div>
       )}
+      {/* Modale Menu Paiement */}
+      {paymentMenuResId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPaymentMenuResId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-muc-blue p-6 text-white flex justify-between items-center">
+              <h3 className="text-xl font-black uppercase tracking-tight">Demander un paiement</h3>
+              <button onClick={() => setPaymentMenuResId(null)} className="text-white/70 hover:text-white">&times;</button>
+            </div>
+            <div className="p-6 space-y-3">
+              <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'acompte'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-muc-yellow/10 border-2 border-slate-100 hover:border-muc-yellow rounded-xl transition-all group">
+                <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-muc-yellow flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
+                  <CreditCard size={20} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="block font-bold text-slate-800">Les arrhes (30%)</span>
+                  <span className="block text-xs text-slate-500">Envoyer le lien d'acompte</span>
+                </div>
+              </button>
+              <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'solde'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-muc-blue/10 border-2 border-slate-100 hover:border-muc-blue rounded-xl transition-all group">
+                <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-muc-blue flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
+                  <CreditCard size={20} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="block font-bold text-slate-800">Le solde</span>
+                  <span className="block text-xs text-slate-500">Envoyer le lien du solde</span>
+                </div>
+              </button>
+              <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'totalite'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-emerald-500/10 border-2 border-slate-100 hover:border-emerald-500 rounded-xl transition-all group">
+                <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-emerald-500 flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
+                  <CreditCard size={20} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="block font-bold text-slate-800">La totalité (100%)</span>
+                  <span className="block text-xs text-slate-500">Envoyer le lien du montant total</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modale Paiement Manuel */}
       {showManualPaymentModal && manualPaymentRes && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
