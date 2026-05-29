@@ -118,17 +118,35 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
     
     if(reservationId) {
                if (paymentType === 'acompte') {
+          let balancePaymentLink = '';
+          let stripeSoldeId = null;
+          
+          try {
+            const reservationDb = await prisma.reservation.findUnique({
+              where: { id: parseInt(reservationId) },
+              include: { client: true }
+            });
+            if (reservationDb) {
+              const soldeSession = await createStripeSessionForReservation(reservationDb, 'solde');
+              stripeSoldeId = soldeSession.id;
+              balancePaymentLink = soldeSession.url;
+            }
+          } catch (err) {
+            console.error("Erreur génération automatique du lien de solde lors du paiement de l'acompte:", err);
+          }
+
           const reservation = await prisma.reservation.update({
             where: { id: parseInt(reservationId) },
             data: { 
               statutPaiement: 'ACOMPTE_PAYE',
-              statut: 'RESERVE'
+              statut: 'RESERVE',
+              stripeSoldeId: stripeSoldeId || undefined
             },
             include: { client: true, intervenant: true }
           });
           console.log(`Acompte payé pour la réservation ${reservationId}`);
           await sendCuisineEmailIfNeeded(reservationId);
-          await sendPaymentConfirmationEmails(reservation, 'acompte', session.amount_total / 100);
+          await sendPaymentConfirmationEmails(reservation, 'acompte', session.amount_total / 100, balancePaymentLink);
           
           // Incrémenter l'usage du code promo si présent
           if (reservation.codePromo) {
@@ -532,7 +550,7 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
 };
 
 // Fonction pour envoyer des e-mails de confirmation de paiement (Client + Admin)
-const sendPaymentConfirmationEmails = async (reservation, paymentType, amount) => {
+const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, balancePaymentLink = '') => {
   try {
     const isCaution = paymentType.toLowerCase() === 'caution';
     const isAcompte = paymentType.toLowerCase() === 'acompte';
@@ -541,6 +559,7 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount) =
     let typeLabel = '';
     let descriptionText = '';
     let cgvReference = '';
+    const soldeRestant = (reservation.prixTotal || 0) - amount;
 
     if (isCaution) {
       typeLabel = 'Dépôt de garantie (Caution)';
@@ -549,7 +568,12 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount) =
     } else if (isAcompte) {
       typeLabel = "Acompte (30%)";
       descriptionText = `Le paiement de l'acompte de 30% d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Vos dates de séjour sont désormais réservées.`;
-      cgvReference = `Le solde restant de votre séjour (70%) devra être réglé au plus tard 7 jours avant votre arrivée. Vous recevrez un lien de paiement automatique par e-mail à cette date.`;
+      cgvReference = `Le solde restant de votre séjour (70%) d'un montant de <strong>${soldeRestant.toFixed(2)} €</strong> devra être réglé au plus tard 7 jours avant votre arrivée.`;
+      if (balancePaymentLink) {
+        cgvReference += ` Vous pouvez dès à présent le régler en utilisant le lien ci-dessous.`;
+      } else {
+        cgvReference += ` Vous recevrez un lien de paiement automatique par e-mail à cette date.`;
+      }
     } else if (isSolde) {
       typeLabel = "Solde du séjour";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Votre réservation est désormais entièrement payée !`;
@@ -589,6 +613,19 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount) =
                       <p style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 15px; border-radius: 8px; font-size: 13px; color: #856404; margin-top: 20px;">
                         📢 <strong>Important :</strong> ${cgvReference}
                       </p>
+                      
+                      ${(isAcompte && balancePaymentLink) ? `
+                        <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
+                          <p style="font-weight: bold; margin: 0 0 15px 0; color: #004B93;">Régler dès maintenant le solde restant (${soldeRestant.toFixed(2)} €) :</p>
+                          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td align="center">
+                                <a href="${balancePaymentLink}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block;">Payer le solde de ${soldeRestant.toFixed(2)} €</a>
+                              </td>
+                            </tr>
+                          </table>
+                        </div>
+                      ` : ''}
 
                       <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
                     </td>
@@ -684,6 +721,60 @@ app.get('/api/reservations', async (req, res) => {
     res.status(500).json({ error: 'Erreur lors de la récupération des réservations' });
   }
 });
+
+// --- HELPER STRIPE : Créer une session de paiement Stripe ---
+async function createStripeSessionForReservation(reservation, paymentType) {
+  const stripeCustomerId = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
+  
+  let amount = 0;
+  let productName = '';
+  
+  if (paymentType === 'acompte') {
+    const repasTotal = calculerTotalRepasServeur(reservation.repas);
+    const montantHebergement = Math.max(0, (reservation.prixTotal || 0) - repasTotal);
+    amount = reservation.montantAcompte ? reservation.montantAcompte : Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+    productName = repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie';
+  } else if (paymentType === 'solde') {
+    amount = reservation.montantSolde ? reservation.montantSolde : ((reservation.prixTotal || 0) - (reservation.montantAcompte || 0));
+    productName = 'Solde du séjour - Gîte de La Maladrerie';
+  } else if (paymentType === 'totalite') {
+    amount = reservation.prixTotal || 0;
+    productName = 'Paiement total du séjour - Gîte de La Maladrerie';
+  }
+  
+  const params = {
+    payment_method_types: ['card'],
+    allow_promotion_codes: true,
+    line_items: [{
+      price_data: {
+        currency: 'eur',
+        product_data: {
+          name: productName,
+          description: getStripeDescription(reservation),
+        },
+        unit_amount: Math.round(amount * 100),
+      },
+      quantity: 1,
+    }],
+    mode: 'payment',
+    billing_address_collection: 'required',
+    success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${FRONTEND_URL}/payment-cancel`,
+    metadata: {
+      reservationId: reservation.id.toString(),
+      paymentType: paymentType
+    }
+  };
+  
+  if (stripeCustomerId) {
+    params.customer = stripeCustomerId;
+  } else if (reservation.client.email && reservation.client.email !== 'N/A') {
+    params.customer_email = reservation.client.email;
+  }
+  
+  const session = await stripe.checkout.sessions.create(params);
+  return session;
+}
 
 // --- HELPER : Calculer le total des repas ---
 function calculerTotalRepasServeur(repas) {
@@ -1074,6 +1165,13 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
       return res.status(404).send("Réservation introuvable");
     }
 
+    const checkInDate = new Date(existingReservation.dateDebut);
+    const today = new Date();
+    checkInDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const daysDiff = Math.ceil((checkInDate - today) / (1000 * 60 * 60 * 24));
+    const isLastMinuteStay = daysDiff < 10;
+
     let paymentLink = null;
     let stripeSessionId = null;
     
@@ -1084,37 +1182,10 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     const montantAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
     const montantSolde = Math.round((montantTotal - montantAcompte) * 100) / 100;
 
+    const paymentType = isLastMinuteStay ? 'totalite' : 'acompte';
+
     if (montantTotal > 0 && process.env.STRIPE_SECRET_KEY) {
-      const stripeCustomerId = await getOrCreateStripeCustomer(existingReservation.client.email, existingReservation.client.nom);
-      const sessionParams = {
-        payment_method_types: ['card'],
-        allow_promotion_codes: true,
-        line_items: [{
-          price_data: {
-            currency: 'eur',
-            product_data: {
-              name: repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
-              description: getStripeDescription(existingReservation),
-            },
-            unit_amount: Math.round(montantAcompte * 100), // En centimes
-          },
-          quantity: 1,
-        }],
-        mode: 'payment',
-        billing_address_collection: 'required',
-        success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${FRONTEND_URL}/payment-cancel`,
-        metadata: {
-          reservationId: existingReservation.id.toString(),
-          paymentType: 'acompte'
-        }
-      };
-      if (stripeCustomerId) {
-        sessionParams.customer = stripeCustomerId;
-      } else if (existingReservation.client.email && existingReservation.client.email !== 'N/A') {
-        sessionParams.customer_email = existingReservation.client.email;
-      }
-      const session = await stripe.checkout.sessions.create(sessionParams);
+      const session = await createStripeSessionForReservation(existingReservation, paymentType);
       paymentLink = session.url;
       stripeSessionId = session.id;
     }
@@ -1123,9 +1194,10 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
       where: { id: parseInt(id) },
       data: { 
         statut: 'RESERVE',
-        montantAcompte: montantAcompte,
-        montantSolde: montantSolde,
-        stripeAcompteId: stripeSessionId,
+        montantAcompte: isLastMinuteStay ? 0 : montantAcompte,
+        montantSolde: isLastMinuteStay ? montantTotal : montantSolde,
+        stripeAcompteId: isLastMinuteStay ? null : stripeSessionId,
+        stripeSoldeId: isLastMinuteStay ? stripeSessionId : null,
         validePar: req.user?.email || 'Admin'
       },
       include: { client: true }
@@ -1183,15 +1255,23 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
 
                     ${paymentLink ? `
                       <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
-                        <p style="font-weight: bold; margin: 0 0 15px 0;">Pour finaliser votre réservation, veuillez procéder au règlement de l'Acompte (30% Hébergement + 100% Repas) :</p>
+                        <p style="font-weight: bold; margin: 0 0 15px 0;">
+                          ${isLastMinuteStay 
+                            ? "Celle-ci étant effectuée moins de 10 jours avant la date d'arrivée, le règlement de la totalité du séjour est requis pour confirmer définitivement votre réservation :" 
+                            : "Pour finaliser votre réservation, veuillez procéder au règlement de l'Acompte (30% Hébergement + 100% Repas) :"}
+                        </p>
                         <table width="100%" cellpadding="0" cellspacing="0" border="0">
                           <tr>
                             <td align="center">
-                              <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer l'acompte de ${montantAcompte.toFixed(2)} €</a>
+                              <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">
+                                ${isLastMinuteStay 
+                                  ? `Régler la totalité de ${montantTotal.toFixed(2)} €` 
+                                  : `Payer l'acompte de ${montantAcompte.toFixed(2)} €`}
+                              </a>
                             </td>
                           </tr>
                         </table>
-                        <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">Le solde de ${montantSolde.toFixed(2)} € sera à  régler une semaine avant votre arrivée.</p>
+                        ${!isLastMinuteStay ? `<p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">Le solde de ${montantSolde.toFixed(2)} € sera à régler une semaine avant votre arrivée.</p>` : ''}
                       </div>
                     ` : '<p>Votre réservation est confirmée. Le règlement se fera selon les modalités convenues.</p>'}
                     
@@ -3687,38 +3767,134 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
       include: { client: true, occupants: true }
     });
 
+    let paymentLink = '';
+    let updatedReservation = reservation;
+    let montantAPayer = 0;
+    let paymentLabel = '';
+    
     if (sendEmail && email && email !== 'N/A') {
       try {
+        const checkInDate = new Date(dateDebut);
+        const today = new Date();
+        checkInDate.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        const daysDiff = Math.ceil((checkInDate - today) / (1000 * 60 * 60 * 24));
+        const isLastMinuteStay = daysDiff < 10;
+        
+        const paymentType = isLastMinuteStay ? 'totalite' : 'acompte';
+        const session = await createStripeSessionForReservation(reservation, paymentType);
+        paymentLink = session.url;
+        
+        if (isLastMinuteStay) {
+          montantAPayer = reservation.prixTotal || 0;
+          paymentLabel = 'la totalité';
+          updatedReservation = await prisma.reservation.update({
+            where: { id: reservation.id },
+            data: { 
+              stripeSoldeId: session.id,
+              montantAcompte: 0,
+              montantSolde: montantAPayer
+            },
+            include: { client: true, occupants: true }
+          });
+        } else {
+          const repasTotal = calculerTotalRepasServeur(reservation.repas);
+          const montantHebergement = Math.max(0, (reservation.prixTotal || 0) - repasTotal);
+          montantAPayer = reservation.montantAcompte ? reservation.montantAcompte : Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+          paymentLabel = "l'acompte";
+          updatedReservation = await prisma.reservation.update({
+            where: { id: reservation.id },
+            data: { 
+              stripeAcompteId: session.id,
+              montantAcompte: montantAPayer,
+              montantSolde: Math.round(((reservation.prixTotal || 0) - montantAPayer) * 100) / 100
+            },
+            include: { client: true, occupants: true }
+          });
+        }
+      } catch (stripeErr) {
+        console.error("Erreur génération lien Stripe pour réservation manuelle:", stripeErr);
+      }
+
+      try {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const linkHtml = collectOccupantsEmail ? `
-          <p>Afin de finaliser les démarches administratives réglementaires, merci de renseigner les détails des voyageurs de votre groupe en cliquant sur le lien ci-dessous :</p>
-          <table width="100%" cellpadding="20" cellspacing="0" border="0" style="text-align: center; margin: 25px 0;">
-            <tr>
-              <td>
-                <a href="${frontendUrl}/reservation/occupants?token=${token}" style="background-color: #004B93; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Saisir les occupants du groupe</a>
-              </td>
-            </tr>
-          </table>
-        ` : `
-          <p>Si un paiement est requis, vous recevrez prochainement un e-mail avec un lien sécurisé pour procéder au règlement.</p>
-        `;
+        const checkInDate = new Date(dateDebut);
+        const today = new Date();
+        checkInDate.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        const daysDiff = Math.ceil((checkInDate - today) / (1000 * 60 * 60 * 24));
+        const isLastMinuteStay = daysDiff < 10;
+        
+        let paymentSectionHtml = '';
+        if (paymentLink) {
+          paymentSectionHtml = `
+            <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
+              <p style="font-weight: bold; margin: 0 0 15px 0; color: #333;">
+                ${isLastMinuteStay 
+                  ? "Votre séjour étant prévu dans moins de 10 jours, le règlement de la totalité est requis pour confirmer définitivement votre réservation :" 
+                  : "Afin de finaliser et confirmer votre réservation, veuillez procéder au règlement de l'acompte (30% Hébergement + 100% Repas) :"}
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block;">
+                      Régler ${paymentLabel} de ${montantAPayer.toFixed(2)} €
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              ${!isLastMinuteStay ? `<p style="margin: 15px 0 0 0; font-size: 13px; color: #666;">Le solde restant de ${((reservation.prixTotal || 0) - montantAPayer).toFixed(2)} € devra être réglé au plus tard 7 jours avant votre arrivée.</p>` : ''}
+            </div>
+          `;
+        } else {
+          paymentSectionHtml = `
+            <p>Si un paiement est requis, vous recevrez prochainement un e-mail avec un lien sécurisé pour procéder au règlement.</p>
+          `;
+        }
+
+        const occupantsSectionHtml = collectOccupantsEmail ? `
+          <div style="background-color: #e8f4fd; border: 1px solid #b3d7f2; padding: 20px; border-radius: 8px; margin: 25px 0; text-align: center;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #004B93;">Détails des occupants :</p>
+            <p style="margin: 0 0 15px 0; font-size: 14px; color: #555;">Afin de finaliser les démarches administratives réglementaires, merci de renseigner les détails des voyageurs de votre groupe en cliquant sur le bouton ci-dessous :</p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center">
+                  <a href="${frontendUrl}/reservation/occupants?token=${token}" style="background-color: #004B93; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Saisir les occupants du groupe</a>
+                </td>
+              </tr>
+            </table>
+          </div>
+        ` : '';
 
         await sendMail({
           to: email,
           subject: "Confirmation d'enregistrement de votre réservation - Gîte de La Maladrerie",
           html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-              <div style="background-color: #004B93; padding: 20px; text-align: center;">
-                <h1 style="color: white; margin: 0;">Gîte de La Maladrerie</h1>
-              </div>
-              <div style="padding: 20px;">
-                <h2 style="color: #004B93;">Bonjour ${nom},</h2>
-                <p>Nous vous confirmons que votre réservation a bien été enregistrée par notre équipe pour un séjour du <strong>${new Date(dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
-                ${linkHtml}
-                <br>
-                <p>À très bientôt,<br>L'équipe du Gîte de La Maladrerie</p>
-              </div>
-            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+              <tr>
+                <td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                    <tr>
+                      <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                        <h2 style="color: #004B93; margin-top: 0;">Bonjour ${nom},</h2>
+                        <p>Nous vous confirmons que votre réservation a bien été enregistrée par notre équipe pour un séjour du <strong>${new Date(dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
+                        
+                        ${paymentSectionHtml}
+                        ${occupantsSectionHtml}
+                        
+                        <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                      </td>
+                    </tr>
+                    <tr><td style="background-color: #FDB913; height: 5px;"></td></tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
           `
         });
       } catch (mailErr) {
@@ -4281,68 +4457,163 @@ app.post('/api/reservations/:id/capture-caution', checkAuth, async (req, res) =>
   }
 });
 
-// ===== CRON JOB : RAPPEL DE SOLDE AUTOMATIQUE =====
-// S'exécute tous les jours à  09:00
+// ===== CRON JOB : RAPPEL DE SOLDE AUTOMATIQUE, RAPPELS J-10 ET J-7, ANNULATION J-6 =====
+// S'exécute tous les jours à 09:00
 cron.schedule('0 9 * * *', async () => {
-  console.log("Exécution du Cron Job : Vérification des soldes à  régler...");
+  console.log("Exécution du Cron Job : Rappels de soldes et annulations automatiques...");
   try {
     const today = new Date();
-    // J+7
-    const targetDate = new Date();
-    targetDate.setDate(today.getDate() + 7);
-    targetDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
 
-    const targetDateEnd = new Date(targetDate);
-    targetDateEnd.setHours(23, 59, 59, 999);
+    // --- 1. ANNULATIONS AUTOMATIQUES (J+6 avant l'arrivée) ---
+    // Si la date d'arrivée est dans 6 jours et que le séjour n'est pas réglé, on annule.
+    const cancelDateStart = new Date(today);
+    cancelDateStart.setDate(today.getDate() + 6);
+    const cancelDateEnd = new Date(cancelDateStart);
+    cancelDateEnd.setHours(23, 59, 59, 999);
 
-    const reservations = await prisma.reservation.findMany({
+    const toCancel = await prisma.reservation.findMany({
       where: {
         statut: 'RESERVE',
-        statutPaiement: 'ACOMPTE_PAYE',
-        dateDebut: {
-          gte: targetDate,
-          lte: targetDateEnd
-        }
+        statutPaiement: { not: 'PAYE' },
+        dateDebut: { gte: cancelDateStart, lte: cancelDateEnd }
       },
       include: { client: true }
     });
 
-    console.log(`${reservations.length} réservation(s) concernée(s) par un rappel de solde.`);
-
-    for (const reser of reservations) {
-      if (!reser.montantSolde || reser.montantSolde <= 0) continue;
-
-      // Générer lien de paiement Stripe pour le solde
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        allow_promotion_codes: true,
-        line_items: [
-          {
-            price_data: {
-              currency: 'eur',
-              product_data: {
-                name: `Solde - Séjour au Gîte de la Maladrerie`,
-                description: getStripeDescription(reser),
-              },
-              unit_amount: Math.round(reser.montantSolde * 100),
-            },
-            quantity: 1,
-          },
-        ],
-        mode: 'payment',
-        billing_address_collection: 'required',
-        success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${FRONTEND_URL}/payment-cancel`,
-        metadata: {
-          reservationId: reser.id.toString(),
-          paymentType: 'solde'
-        }
+    for (const reser of toCancel) {
+      await prisma.reservation.update({
+        where: { id: reser.id },
+        data: { statut: 'REFUSEE', validePar: 'Système (Solde non payé)' }
       });
 
-      // Envoyer l'email
       await sendMail({
         to: reser.client.email,
-        subject: "Rappel automatique : Règlement du solde - Gîte de La Maladrerie",
+        subject: "Annulation de votre réservation - Solde non réglé - Gîte de La Maladrerie",
+        html: `
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                  <tr>
+                    <td style="background-color: #dc3545; padding: 30px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                      <h2 style="color: #dc3545; margin-top: 0;">Bonjour ${reser.client.nom},</h2>
+                      <p>Nous vous informons que votre réservation pour le séjour du <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reser.dateFin).toLocaleDateString('fr-FR')}</strong> a été annulée.</p>
+                      <p>En effet, le règlement du solde restant de votre réservation n'a pas été reçu dans le délai requis (7 jours avant votre arrivée).</p>
+                      <p>Les dates de séjour correspondantes sont à nouveau disponibles à la location.</p>
+                      <p>Nous restons à votre disposition pour tout complément d'information.</p>
+                      <p style="margin-top: 30px;">Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                    </td>
+                  </tr>
+                  <tr><td style="background-color: #dc3545; height: 5px;"></td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        `
+      });
+      console.log(`Réservation ${reser.id} annulée automatiquement (non payée à J+6)`);
+    }
+
+    // --- 2. RAPPELS DERNIER AVERTISSEMENT (J+7 avant l'arrivée) ---
+    const warningDateStart = new Date(today);
+    warningDateStart.setDate(today.getDate() + 7);
+    const warningDateEnd = new Date(warningDateStart);
+    warningDateEnd.setHours(23, 59, 59, 999);
+
+    const toWarn = await prisma.reservation.findMany({
+      where: {
+        statut: 'RESERVE',
+        statutPaiement: { not: 'PAYE' },
+        dateDebut: { gte: warningDateStart, lte: warningDateEnd }
+      },
+      include: { client: true }
+    });
+
+    for (const reser of toWarn) {
+      const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : 'totalite';
+      const session = await createStripeSessionForReservation(reser, paymentType);
+      
+      const montant = paymentType === 'solde' 
+        ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
+        : (reser.prixTotal || 0);
+
+      await sendMail({
+        to: reser.client.email,
+        subject: "⚠️ DERNIER RAPPEL : Règlement de votre séjour - Gîte de La Maladrerie",
+        html: `
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                  <tr>
+                    <td style="background-color: #FDB913; padding: 30px; text-align: center;">
+                      <h1 style="color: #004B93; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                      <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reser.client.nom},</h2>
+                      <p>Votre séjour commence le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong> (dans 7 jours).</p>
+                      <p style="color: #856404; font-weight: bold;">⚠️ Ceci est notre dernier rappel de paiement pour finaliser votre séjour.</p>
+                      <p>Il vous reste à régler le montant de <strong>${montant.toFixed(2)} €</strong> correspondant au ${paymentType === 'solde' ? 'solde' : 'totalité'} de votre réservation.</p>
+                      
+                      <div style="background-color: #fff3cd; border: 1px solid #ffe082; padding: 15px; border-radius: 8px; font-size: 14px; color: #856404; margin: 20px 0; font-weight: bold;">
+                        IMPORTANT : Si le paiement n'est pas effectué dans la journée (avant ce soir à 23h59), votre réservation sera automatiquement annulée et les dates libérées.
+                      </div>
+                      
+                      <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
+                        <tr>
+                          <td>
+                            <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le paiement de ${montant.toFixed(2)} €</a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p>À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                    </td>
+                  </tr>
+                  <tr><td style="background-color: #FDB913; height: 5px;"></td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        `
+      });
+      console.log(`Dernier rappel (J+7) envoyé pour la réservation ${reser.id}`);
+    }
+
+    // --- 3. PREMIERS RAPPELS DE SOLDE (J+10 avant l'arrivée) ---
+    const reminderDateStart = new Date(today);
+    reminderDateStart.setDate(today.getDate() + 10);
+    const reminderDateEnd = new Date(reminderDateStart);
+    reminderDateEnd.setHours(23, 59, 59, 999);
+
+    const toRemind = await prisma.reservation.findMany({
+      where: {
+        statut: 'RESERVE',
+        statutPaiement: { not: 'PAYE' },
+        dateDebut: { gte: reminderDateStart, lte: reminderDateEnd }
+      },
+      include: { client: true }
+    });
+
+    for (const reser of toRemind) {
+      const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : 'totalite';
+      const session = await createStripeSessionForReservation(reser, paymentType);
+      
+      const montant = paymentType === 'solde' 
+        ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
+        : (reser.prixTotal || 0);
+
+      await sendMail({
+        to: reser.client.email,
+        subject: "Rappel : Règlement de votre séjour - Gîte de La Maladrerie",
         html: `
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
             <tr>
@@ -4356,36 +4627,34 @@ cron.schedule('0 9 * * *', async () => {
                   <tr>
                     <td style="padding: 40px; color: #333333; line-height: 1.6;">
                       <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reser.client.nom},</h2>
-                      <p>Votre séjour approche ! Il débutera le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong>.</p>
-                      <p>Conformément à  nos conditions, le solde de votre réservation (<strong>${reser.montantSolde.toFixed(2)} €</strong>) doit être réglé au plus tard 7 jours avant votre arrivée.</p>
+                      <p>Votre séjour approche et débutera le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong> (dans 10 jours).</p>
+                      <p>Nous vous rappelons que votre réservation ne sera définitive que lorsque le solde restant de <strong>${montant.toFixed(2)} €</strong> aura été réglé.</p>
+                      <p>Merci de procéder au règlement en cliquant sur le lien ci-dessous :</p>
                       
                       <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
                         <tr>
                           <td>
-                            <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le solde de ${reser.montantSolde.toFixed(2)} €</a>
+                            <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le solde de ${montant.toFixed(2)} €</a>
                           </td>
                         </tr>
                       </table>
                       
-                      <p>Une fois le solde réglé, vous recevrez un autre lien sécurisé pour procéder à  l'empreinte bancaire (caution de 500 €).</p>
-                      <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                      <p>Conformément à nos conditions, le solde doit être réglé au plus tard 7 jours avant votre séjour.</p>
+                      <p>À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
                     </td>
                   </tr>
-                  <tr>
-                    <td style="background-color: #FDB913; height: 5px;"></td>
-                  </tr>
+                  <tr><td style="background-color: #FDB913; height: 5px;"></td></tr>
                 </table>
               </td>
             </tr>
           </table>
         `
       });
-
-      console.log(`Rappel de solde envoyé pour la réservation ${reser.id}`);
+      console.log(`Rappel J+10 envoyé pour la réservation ${reser.id}`);
     }
 
   } catch (error) {
-    console.error("Erreur lors de l'exécution du Cron Job de rappel :", error);
+    console.error("Erreur lors de l'exécution du Cron Job de rappels/annulations :", error);
   }
 });
 
