@@ -775,7 +775,7 @@ const Admin = () => {
                       </td>
                       <td className="p-4">
                         <div className="text-sm font-bold text-muc-blue">
-                          {res.chambres?.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
+                          {(res.chambres || []).map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
                         </div>
                         {res.salles && (
                           <div className="text-sm font-bold text-indigo-600 mt-1 flex flex-col">
@@ -1066,7 +1066,7 @@ const Admin = () => {
                         </td>
                         <td className="p-4">
                         <div className="text-sm font-bold text-muc-blue">
-                          {res.chambres?.map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
+                          {(res.chambres || []).map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
                         </div>
                         {res.salles && (
                           <div className="text-sm font-bold text-indigo-600 mt-1 flex flex-col">
@@ -1380,7 +1380,7 @@ const Admin = () => {
                         <span className="text-sm font-bold text-muc-blue">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')} au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</span>
                         <span className="text-xs px-2 py-1 bg-slate-100 rounded-md uppercase font-bold text-slate-600">{res.statut}</span>
                       </div>
-                      <p className="text-xs text-slate-500">Chambres : {res.chambres.join(', ')}</p>
+                      <p className="text-xs text-slate-500">Chambres : {(res.chambres || []).join(', ')}</p>
                       <p className="text-xs text-slate-500">Prix Total : {res.prixTotal ? `${res.prixTotal} €` : 'N/A'}</p>
                       {(() => {
                         let taxe = 0;

@@ -59,17 +59,19 @@ const Planning = () => {
         if(Array.isArray(data)) {
           const formattedEvents = data.map(r => {
             let title = '';
+            const chambresStr = (r.chambres || []).join(', ');
+            
             if (r.statut === 'RESERVE') {
-              title = `Réservé (Ch. ${r.chambres.join(', ')})`;
+              title = `Réservé (Ch. ${chambresStr})`;
             } else if (r.statut === 'DEVIS_EN_ATTENTE') {
               let hoursLeft = 48;
               if (r.expireLe) {
                 const diffMs = new Date(r.expireLe) - new Date();
                 hoursLeft = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
               }
-              title = `En attente de validation (expire dans ${hoursLeft}h) (Ch. ${r.chambres.join(', ')})`;
+              title = `En attente de validation (expire dans ${hoursLeft}h) (Ch. ${chambresStr})`;
             } else {
-              title = `Attente (Ch. ${r.chambres.join(', ')})`;
+              title = `Attente (Ch. ${chambresStr})`;
             }
 
             return {
@@ -78,7 +80,7 @@ const Planning = () => {
               end: new Date(r.dateFin),
               allDay: true,
               statut: r.statut,
-              chambres: r.chambres,
+              chambres: r.chambres || [],
               expireLe: r.expireLe
             };
           });
