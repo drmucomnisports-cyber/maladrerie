@@ -1224,7 +1224,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       </div>
 
       {/* ── BLOC RESTAURATION ── */}
-      {formData.dateDebut && formData.dateFin && formData.chambres.length > 0 && (
+      {formData.dateDebut && formData.dateFin && (formData.chambres.length > 0 || formData.salles?.salle15 || formData.salles?.salle12) && (
         <div className="pt-4 border-t border-slate-100">
           <div className="flex items-center gap-2 mb-4">
             <UtensilsCrossed size={18} className="text-muc-blue" />
@@ -1290,7 +1290,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              disabled={nombreTotalOccupants < 5}
+                              disabled={!isAdmin && nombreTotalOccupants < 5}
                               onChange={() => setFormData(prev => ({
                                 ...prev,
                                 repasGlobal: { ...prev.repasGlobal, [typeRepas]: !prev.repasGlobal[typeRepas] }
@@ -1344,7 +1344,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                     <input
                                       type="number"
                                       min="0"
-                                      disabled={nombreTotalOccupants < 5}
+                                      disabled={!isAdmin && nombreTotalOccupants < 5}
                                       value={repasData.ADULTE || ''}
                                       onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ADULTE', e.target.value)}
                                       className="w-16 p-1.5 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white shadow-inner"
@@ -1356,7 +1356,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                     <input
                                       type="number"
                                       min="0"
-                                      disabled={nombreTotalOccupants < 5}
+                                      disabled={!isAdmin && nombreTotalOccupants < 5}
                                       value={repasData.ENFANT_MOINS_12 || ''}
                                       onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_12', e.target.value)}
                                       className="w-16 p-1.5 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white shadow-inner"
@@ -1368,7 +1368,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                                     <input
                                       type="number"
                                       min="0"
-                                      disabled={nombreTotalOccupants < 5}
+                                      disabled={!isAdmin && nombreTotalOccupants < 5}
                                       value={repasData.ENFANT_MOINS_5 || ''}
                                       onChange={(e) => handleRepasCarteChange(dateStr, typeRepas, 'ENFANT_MOINS_5', e.target.value)}
                                       className="w-16 p-1.5 text-center text-sm font-bold border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white shadow-inner"
@@ -1398,7 +1398,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         </div>
       )}
 
-      {formData.dateDebut && formData.dateFin && formData.chambres.length > 0 && (
+      {formData.dateDebut && formData.dateFin && (formData.chambres.length > 0 || formData.salles?.salle15 || formData.salles?.salle12) && (
         <div className="space-y-4">
           <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
             <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-2 block">Code Promo</label>
