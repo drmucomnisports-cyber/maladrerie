@@ -4198,6 +4198,50 @@ cron.schedule('0 9 * * *', async () => {
   }
 });
 
+// Endpoint pour récupérer le statut d'une session Stripe de paiement
+app.get('/api/stripe/session-status/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session Stripe introuvable' });
+    }
+
+    const reservationId = session.metadata?.reservationId;
+    const paymentType = session.metadata?.paymentType ? session.metadata.paymentType.toLowerCase() : 'inconnu';
+
+    let reservation = null;
+    if (reservationId) {
+      reservation = await prisma.reservation.findUnique({
+        where: { id: parseInt(reservationId) },
+        include: { client: true }
+      });
+    }
+
+    res.json({
+      paymentStatus: session.payment_status,
+      amountTotal: session.amount_total ? session.amount_total / 100 : 0,
+      paymentType,
+      customerDetails: {
+        name: session.customer_details?.name || reservation?.client?.nom || '',
+        email: session.customer_details?.email || reservation?.client?.email || ''
+      },
+      reservation: reservation ? {
+        id: reservation.id,
+        numeroDevis: reservation.numeroDevis,
+        dateDebut: reservation.dateDebut,
+        dateFin: reservation.dateFin,
+        chambres: reservation.chambres,
+        montantTotal: reservation.prixTotal,
+        statutPaiement: reservation.statutPaiement
+      } : null
+    });
+  } catch (error) {
+    console.error("Erreur récupération statut session Stripe:", error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des informations de paiement' });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);

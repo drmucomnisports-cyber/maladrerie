@@ -10,6 +10,7 @@ import MentionsLegales from './pages/MentionsLegales';
 import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
 import CGV from './pages/CGV';
 import DevisValidate from './pages/DevisValidate';
+import PaymentSuccess from './pages/PaymentSuccess';
 
 function App() {
   return (
@@ -26,9 +27,11 @@ function App() {
         <Route path="/cgv" element={<CGV />} />
         <Route path="/admin-login" element={<Login />} />
         <Route path="/devis/validate" element={<DevisValidate />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
       </Routes>
     </Router>
   );
 }
+
 
 export default App;
