@@ -273,7 +273,7 @@ const getMissionDetail = (m, dateDebut, dateFin) => {
   return `${details} <br/><span style="color: #666; font-size: 13px;">(Rémunération : ${m.montant.toFixed(2)} €)</span>`;
 };
 
-const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 8, 5: 6, 6: 5 };
+const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5 };
 const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Chambre 4", 5: "Chambre 5", 6: "Chambre 6" };
 
 const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, options, promoCode, repas, salles) => {
@@ -2918,7 +2918,7 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 8, 5: 6, 6: 5 };
+    const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5 };
     const reservationsWithTaxe = reservations.map(r => {
       let taxe = 0;
       if (r.dateDebut && r.dateFin && r.chambres && r.chambres.length > 0) {

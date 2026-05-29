@@ -8,8 +8,8 @@ const CHAMBRES_INFO = {
   1: { num: 1, name: 'Chambre PMR', lits: 5, etage: 'RDC' },
   2: { num: 2, name: 'Chambre standard', lits: 6, etage: '1er étage' },
   3: { num: 3, name: 'Chambre standard', lits: 6, etage: '1er étage' },
-  4: { num: 4, name: 'Grande chambre', lits: 8, etage: '2e étage' },
-  5: { num: 5, name: 'Chambre standard', lits: 6, etage: '2e étage' },
+  4: { num: 4, name: 'Grande chambre', lits: 7, etage: '2e étage' },
+  5: { num: 5, name: 'Grande chambre', lits: 7, etage: '2e étage' },
   6: { num: 6, name: 'Chambre standard', lits: 5, etage: '2e étage' }
 };
 

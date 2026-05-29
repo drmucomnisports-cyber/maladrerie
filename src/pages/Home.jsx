@@ -174,9 +174,9 @@ const Home = () => {
           
           <div className="p-10 rounded-[2.5rem] bg-white border-l-8 border-muc-blue shadow-lg hover-lift relative overflow-hidden" data-reveal="left">
             <Users className="text-muc-blue mb-6" size={32} />
-            <h3 className="text-2xl font-black mb-4 text-muc-blue uppercase tracking-tight">38 Lits</h3>
+            <h3 className="text-2xl font-black mb-4 text-muc-blue uppercase tracking-tight">36 Lits</h3>
             <p className="text-slate-600 leading-relaxed font-medium">
-              6 chambres spacieuses (5, 6 ou 8 lits) dont une chambre PMR de 5 lits. Idéal pour groupes et sportifs.
+              6 chambres spacieuses (5, 6 ou 7 lits) dont une chambre PMR de 5 lits. Idéal pour groupes et sportifs.
             </p>
           </div>
 
