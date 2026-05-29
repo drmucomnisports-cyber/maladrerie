@@ -928,9 +928,21 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         const roomNames = formData.chambres.map(id => CHAMBRES_INFO[id]?.name || `Chambre ${id}`).join(', ');
         let message = '';
         if (existingReservation) {
-          message = 'La réservation a été mise à jour avec succès.';
+          if (isDevis) {
+            if (formData.sendEmail !== false) {
+              message = `Le devis a été mis à jour et envoyé à ${formData.email} avec succès.`;
+            } else {
+              message = `Le devis a été mis à jour avec succès (aucun e-mail n'a été envoyé).`;
+            }
+          } else {
+            message = 'La réservation a été mise à jour avec succès.';
+          }
         } else if (isDevis) {
-          message = `Le devis pour ${roomNames} a été généré et envoyé à ${formData.email}. Il est valable pendant 48 heures.`;
+          if (formData.sendEmail !== false) {
+            message = `Le devis pour ${roomNames} a été généré et envoyé à ${formData.email}. Il est valable pendant 48 heures.`;
+          } else {
+            message = `Le devis pour ${roomNames} a été généré avec succès. Il est valable pendant 48 heures (aucun e-mail n'a été envoyé).`;
+          }
         } else if (isAdmin) {
           message = 'La réservation a bien été enregistrée.';
         } else {
@@ -950,17 +962,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
         setStep(1);
         
-        if (onCreated) {
-          onCreated();
-        }
-
-        setTimeout(() => {
-          if (isDevis || isAdmin || existingReservation) {
-            navigate('/admin');
-          } else {
+        if (!isAdmin) {
+          setTimeout(() => {
+            if (onCreated) {
+              onCreated();
+            }
             navigate('/');
-          }
-        }, 3000);
+          }, 3000);
+        }
       } else {
         const errData = await res.json();
         triggerError(errData.error || "Une erreur est survenue lors de l'envoi.");
@@ -1699,11 +1708,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                 setIsLastMinute(false);
                 setLastMinuteWarning('');
                 if (isAdmin) {
-                  onCreated();
                   navigate('/admin');
+                  if (onCreated) onCreated();
                 } else {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                   navigate('/');
+                  if (onCreated) onCreated();
                 }
               }} 
               className="bg-[#004B93] text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-800 transition-colors w-full uppercase tracking-wider"
