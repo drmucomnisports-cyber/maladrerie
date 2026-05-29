@@ -49,7 +49,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       DEJEUNER: false,
       DINER: false
     },
-    sendEmail: true
+    sendEmail: true,
+    collectOccupantsEmail: false
   });
 
   // Grille tarifaire restauration
@@ -269,6 +270,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
   };
 
   const areDatesValidForSalles = (checkSpecificDates = false) => {
+    if (isAdmin) return true; // Admins can bypass date validations for salles!
     const startStr = checkSpecificDates ? (formData.salles?.dateDebut || formData.dateDebut) : formData.dateDebut;
     const endStr = checkSpecificDates ? (formData.salles?.dateFin || formData.dateFin) : formData.dateFin;
     if (!startStr || !endStr) return false;
@@ -451,6 +453,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
   // Vérifie si la commande de repas est encore ouverte (avant le jeudi S-1)
   const isRepasCommandeOuverte = () => {
+    if (isAdmin) return true; // Admins can bypass meal booking windows!
     if (!formData.dateDebut) return false;
     const debut = new Date(formData.dateDebut);
     const dayOfWeek = debut.getDay(); // 0=dim
@@ -715,7 +718,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     }
     const computedRepas = getComputedRepas();
     const hasRepasChecked = Object.keys(computedRepas).some(date => Object.keys(computedRepas[date]).length > 0);
-    if (hasRepasChecked) {
+    if (hasRepasChecked && !isAdmin) { // Bypassed for admins!
       let maxLunchOrDinner = 0;
       let invalidService = false;
       
@@ -805,17 +808,19 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         }
       }
     } else {
-      for (let occ of formData.occupants) {
-        if (occ.estAdulte) {
-          if (!occ.nom?.trim() || !occ.prenom?.trim()) {
-            triggerError("Veuillez remplir les noms et prénoms de tous les adultes.");
-            return;
-          }
-        } else {
-          // Nom et prénom optionnels pour les mineurs, mais l'âge est obligatoire
-          if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 0 || occ.age >= 18) {
-            triggerError("Veuillez indiquer un âge valide pour tous les mineurs (moins de 18 ans).");
-            return;
+      if (!formData.collectOccupantsEmail) {
+        for (let occ of formData.occupants) {
+          if (occ.estAdulte) {
+            if (!occ.nom?.trim() || !occ.prenom?.trim()) {
+              triggerError("Veuillez remplir les noms et prénoms de tous les adultes.");
+              return;
+            }
+          } else {
+            // Nom et prénom optionnels pour les mineurs, mais l'âge est obligatoire
+            if (occ.age === '' || occ.age === undefined || occ.age === null || isNaN(occ.age) || occ.age < 0 || occ.age >= 18) {
+              triggerError("Veuillez indiquer un âge valide pour tous les mineurs (moins de 18 ans).");
+              return;
+            }
           }
         }
       }
@@ -824,7 +829,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     const computedRepas = getComputedRepas();
     const hasRepasCommandes = Object.keys(computedRepas).some(date => Object.keys(computedRepas[date]).length > 0);
 
-    if (hasRepasCommandes) {
+    if (hasRepasCommandes && !isAdmin) { // Bypassed for admins!
       let maxLunchOrDinner = 0;
       Object.values(computedRepas).forEach(dayRepas => {
         let lunchCount = 0;
@@ -1500,8 +1505,29 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
           <div className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm">
             <h3 className="text-lg font-black text-slate-800 mb-4 uppercase tracking-tight">Détails des occupants</h3>
-            <div className="space-y-6">
-              {(() => {
+            
+            {isAdmin && (
+              <label className="flex items-center gap-2 mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-xl cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  name="collectOccupantsEmail"
+                  checked={formData.collectOccupantsEmail || false}
+                  onChange={(e) => setFormData(prev => ({ ...prev, collectOccupantsEmail: e.target.checked }))}
+                  className="w-4 h-4 rounded accent-[#004B93]" 
+                />
+                <span className="text-xs font-bold text-slate-700">
+                  Laisser le client renseigner les occupants lui-même (envoie un e-mail avec un lien sécurisé)
+                </span>
+              </label>
+            )}
+
+            {formData.collectOccupantsEmail ? (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">
+                ℹ️ Un lien de saisie sécurisé sera envoyé par e-mail à <strong>{formData.email}</strong> pour qu'il puisse compléter les informations de son groupe.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {(() => {
                 let adultCount = 0;
                 let childCount = 0;
                 return formData.occupants.map((occ, idx) => {
@@ -1587,7 +1613,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   );
                 });
               })()}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-muc-blue/5 p-6 rounded-2xl border-2 border-muc-blue/10">

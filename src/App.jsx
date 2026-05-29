@@ -11,6 +11,7 @@ import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
 import CGV from './pages/CGV';
 import DevisValidate from './pages/DevisValidate';
 import PaymentSuccess from './pages/PaymentSuccess';
+import OccupantsCollect from './pages/OccupantsCollect';
 
 function App() {
   return (
@@ -28,10 +29,12 @@ function App() {
         <Route path="/admin-login" element={<Login />} />
         <Route path="/devis/validate" element={<DevisValidate />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/reservation/occupants" element={<OccupantsCollect />} />
       </Routes>
     </Router>
   );
 }
+
 
 
 export default App;

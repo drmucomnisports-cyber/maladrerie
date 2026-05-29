@@ -3627,9 +3627,12 @@ app.put('/api/admin/profile', checkAuth, async (req, res) => {
 });
 
 // Création manuelle d'une réservation
+// Création manuelle d'une réservation
 app.post('/api/admin/reservations', checkAuth, async (req, res) => {
-  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, repas, salles, promoCode, prixTotal, structure, sendEmail } = req.body;
+  const { nom, email, telephone, adressePostale, occupants, dateDebut, dateFin, chambres, chambresDetails, options, repas, salles, promoCode, prixTotal, structure, sendEmail, collectOccupantsEmail } = req.body;
   try {
+    const token = collectOccupantsEmail ? require('crypto').randomBytes(24).toString('hex') : null;
+    
     const reservation = await prisma.reservation.create({
       data: {
         dateDebut: new Date(dateDebut),
@@ -3647,10 +3650,11 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
         statutPaiement: 'EN_ATTENTE',
         structure: structure || null,
         validePar: req.user.email,
+        tokenDevis: token,
         client: {
           create: { nom, email: email || 'N/A', telephone: telephone || 'N/A', adressePostale: adressePostale || null }
         },
-        occupants: occupants && occupants.length > 0 ? {
+        occupants: (!collectOccupantsEmail && occupants && occupants.length > 0) ? {
           create: occupants.map(occ => {
             const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
             let occNom = occ.nom;
@@ -3683,6 +3687,20 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
 
     if (sendEmail && email && email !== 'N/A') {
       try {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const linkHtml = collectOccupantsEmail ? `
+          <p>Afin de finaliser les démarches administratives réglementaires, merci de renseigner les détails des voyageurs de votre groupe en cliquant sur le lien ci-dessous :</p>
+          <table width="100%" cellpadding="20" cellspacing="0" border="0" style="text-align: center; margin: 25px 0;">
+            <tr>
+              <td>
+                <a href="${frontendUrl}/reservation/occupants?token=${token}" style="background-color: #004B93; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Saisir les occupants du groupe</a>
+              </td>
+            </tr>
+          </table>
+        ` : `
+          <p>Si un paiement est requis, vous recevrez prochainement un e-mail avec un lien sécurisé pour procéder au règlement.</p>
+        `;
+
         await sendMail({
           to: email,
           subject: "Confirmation d'enregistrement de votre réservation - Gîte de La Maladrerie",
@@ -3694,22 +3712,22 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
               <div style="padding: 20px;">
                 <h2 style="color: #004B93;">Bonjour ${nom},</h2>
                 <p>Nous vous confirmons que votre réservation a bien été enregistrée par notre équipe pour un séjour du <strong>${new Date(dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
-                <p>Si un paiement est requis, vous recevrez prochainement un e-mail avec un lien sécurisé pour procéder au règlement.</p>
+                ${linkHtml}
                 <br>
                 <p>À très bientôt,<br>L'équipe du Gîte de La Maladrerie</p>
               </div>
             </div>
           `
         });
-      } catch (err) {
-        console.error("Erreur lors de l'envoi de l'e-mail de confirmation manuelle:", err);
+      } catch (mailErr) {
+        console.error("Erreur envoi email confirmation réservation manuelle:", mailErr);
       }
     }
 
     res.json(reservation);
   } catch (error) {
-    console.error("Erreur création manuelle:", error);
-    res.status(500).json({ error: 'Erreur lors de la création manuelle' });
+    console.error(error);
+    res.status(500).json({ error: 'Erreur lors de la création de la réservation' });
   }
 });
 
@@ -4410,6 +4428,114 @@ app.get('/api/stripe/session-status/:sessionId', async (req, res) => {
   } catch (error) {
     console.error("Erreur récupération statut session Stripe:", error);
     res.status(500).json({ error: 'Erreur lors de la récupération des informations de paiement' });
+  }
+});
+
+// Endpoint pour récupérer les infos de la réservation pour la saisie des occupants par le client
+app.get('/api/reservation/occupants/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenDevis: token },
+      include: { client: true, occupants: true }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Lien de saisie des occupants invalide ou expiré." });
+    }
+
+    // Calculer les totaux attendus à partir de chambresDetails
+    let totalAdultes = 0;
+    let totalMineurs = 0;
+    
+    if (reservation.chambresDetails && typeof reservation.chambresDetails === 'object') {
+      Object.values(reservation.chambresDetails).forEach(ch => {
+        totalAdultes += parseInt(ch.adultes || 0);
+        totalMineurs += parseInt(ch.enfants || ch.mineurs || 0);
+      });
+    }
+
+    res.json({
+      id: reservation.id,
+      clientNom: reservation.client.nom,
+      dateDebut: reservation.dateDebut,
+      dateFin: reservation.dateFin,
+      totalAdultes,
+      totalMineurs,
+      occupants: reservation.occupants || []
+    });
+  } catch (error) {
+    console.error("Erreur récupération infos occupants:", error);
+    res.status(500).json({ error: "Erreur serveur lors de la récupération des détails." });
+  }
+});
+
+// Endpoint pour enregistrer les occupants saisis par le client
+app.post('/api/reservation/occupants/:token', async (req, res) => {
+  const { token } = req.params;
+  const { occupants } = req.body;
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenDevis: token }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable ou lien expiré." });
+    }
+
+    if (occupants && Array.isArray(occupants)) {
+      // 1. Supprimer les occupants existants
+      await prisma.occupant.deleteMany({
+        where: { reservationId: reservation.id }
+      });
+
+      // 2. Créer les nouveaux occupants
+      await prisma.occupant.createMany({
+        data: occupants.map(occ => {
+          const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+          let occNom = occ.nom;
+          let occPrenom = occ.prenom;
+          
+          if (!estAdulte && (!occNom?.trim() && !occPrenom?.trim())) {
+            occNom = "Mineur";
+            occPrenom = "";
+          }
+          
+          const age = (occ.age !== undefined && occ.age !== null && occ.age !== '') ? parseInt(occ.age) : null;
+          let nationalite = occ.nationalite;
+          if (nationalite === true || nationalite === 'true') {
+            nationalite = 'Française';
+          } else if (nationalite === false || nationalite === 'false') {
+            nationalite = 'Étrangère';
+          } else if (!nationalite) {
+            nationalite = 'Française';
+          }
+
+          return {
+            reservationId: reservation.id,
+            nom: occNom || '',
+            prenom: occPrenom || '',
+            estAdulte,
+            age,
+            nationalite
+          };
+        })
+      });
+
+      // 3. Optionnel : Expire le token pour que le lien ne puisse plus être utilisé
+      await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { tokenDevis: null }
+      });
+
+      res.json({ success: true, message: "Les occupants ont été enregistrés avec succès." });
+    } else {
+      res.status(400).json({ error: "Données des occupants invalides." });
+    }
+  } catch (error) {
+    console.error("Erreur enregistrement occupants:", error);
+    res.status(500).json({ error: "Erreur serveur lors de la validation des occupants." });
   }
 });
 
