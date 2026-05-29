@@ -59,7 +59,8 @@ const Planning = () => {
         if(Array.isArray(data)) {
           const formattedEvents = data.map(r => {
             let title = '';
-            const chambresStr = (r.chambres || []).join(', ');
+            const chambresArray = Array.isArray(r.chambres) ? r.chambres : [];
+            const chambresStr = chambresArray.join(', ');
             
             if (r.statut === 'RESERVE') {
               title = `Réservé (Ch. ${chambresStr})`;
@@ -80,7 +81,7 @@ const Planning = () => {
               end: new Date(r.dateFin),
               allDay: true,
               statut: r.statut,
-              chambres: r.chambres || [],
+              chambres: chambresArray,
               expireLe: r.expireLe
             };
           });

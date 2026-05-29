@@ -246,7 +246,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         return { ...prev, chambres: validChambres, chambresDetails: newDetails };
       });
     } else {
-      setUnavailableRooms([]);
+      setUnavailableRoomsMap({});
     }
   }, [formData.dateDebut, formData.dateFin, events]);
 
