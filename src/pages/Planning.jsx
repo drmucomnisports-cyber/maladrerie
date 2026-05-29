@@ -57,18 +57,31 @@ const Planning = () => {
       .then(res => res.json())
       .then(data => {
         if(Array.isArray(data)) {
-          const formattedEvents = data.map(r => ({
-            title: r.statut === 'RESERVE' 
-              ? `Réservé (Ch. ${r.chambres.join(', ')})` 
-              : r.statut === 'DEVIS_EN_ATTENTE'
-                ? `Devis en cours (Ch. ${r.chambres.join(', ')})`
-                : `Attente (Ch. ${r.chambres.join(', ')})`,
-            start: new Date(r.dateDebut),
-            end: new Date(r.dateFin),
-            allDay: true,
-            statut: r.statut,
-            chambres: r.chambres
-          }));
+          const formattedEvents = data.map(r => {
+            let title = '';
+            if (r.statut === 'RESERVE') {
+              title = `Réservé (Ch. ${r.chambres.join(', ')})`;
+            } else if (r.statut === 'DEVIS_EN_ATTENTE') {
+              let hoursLeft = 48;
+              if (r.expireLe) {
+                const diffMs = new Date(r.expireLe) - new Date();
+                hoursLeft = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+              }
+              title = `En attente de validation (expire dans ${hoursLeft}h) (Ch. ${r.chambres.join(', ')})`;
+            } else {
+              title = `Attente (Ch. ${r.chambres.join(', ')})`;
+            }
+
+            return {
+              title,
+              start: new Date(r.dateDebut),
+              end: new Date(r.dateFin),
+              allDay: true,
+              statut: r.statut,
+              chambres: r.chambres,
+              expireLe: r.expireLe
+            };
+          });
           setEvents(formattedEvents);
         }
       })

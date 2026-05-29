@@ -202,7 +202,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     });
   }, [formData.dateDebut, formData.dateFin]);
 
-  const [unavailableRooms, setUnavailableRooms] = useState([]);
+  const [unavailableRoomsMap, setUnavailableRoomsMap] = useState({});
 
   // Check availability when dates change
   useEffect(() => {
@@ -210,7 +210,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       const start = new Date(formData.dateDebut);
       const end = new Date(formData.dateFin);
       
-      const unavailable = new Set();
+      const unavailableMap = {};
       events.forEach(event => {
         if (existingReservation && (event.id === existingReservation.id || event.id === `res-${existingReservation.id}`)) return;
         
@@ -219,16 +219,21 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
         if (start < evEnd && end > evStart) {
            if (event.chambres && Array.isArray(event.chambres)) {
-             event.chambres.forEach(ch => unavailable.add(ch));
+             event.chambres.forEach(ch => {
+               // Prioritize RESERVE over DEVIS_EN_ATTENTE
+               if (!unavailableMap[ch] || unavailableMap[ch].statut === 'DEVIS_EN_ATTENTE') {
+                 unavailableMap[ch] = event;
+               }
+             });
            }
         }
       });
 
-      setUnavailableRooms(Array.from(unavailable));
+      setUnavailableRoomsMap(unavailableMap);
 
       // Remove selected rooms that became unavailable
       setFormData(prev => {
-        const validChambres = prev.chambres.filter(ch => !unavailable.has(ch));
+        const validChambres = prev.chambres.filter(ch => !unavailableMap[ch]);
         if (validChambres.length === prev.chambres.length) return prev; // no change
 
         const newDetails = { ...prev.chambresDetails };
@@ -1083,8 +1088,19 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
           {[1, 2, 3, 4, 5, 6].map(num => {
             const info = CHAMBRES_INFO[num];
             const isChecked = formData.chambres.includes(num);
-            const isUnavailable = unavailableRooms.includes(num);
+            const unavailableEvent = unavailableRoomsMap[num];
+            const isUnavailable = !!unavailableEvent;
             const isOriginal = existingReservation?.chambres?.includes(num);
+
+            let unavailableText = "(Indisponible)";
+            if (unavailableEvent?.statut === 'DEVIS_EN_ATTENTE') {
+              let hoursLeft = 48;
+              if (unavailableEvent.expireLe) {
+                const diffMs = new Date(unavailableEvent.expireLe) - new Date();
+                hoursLeft = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+              }
+              unavailableText = `(En attente de validation du devis - expire dans ${hoursLeft}h)`;
+            }
 
             return (
               <div key={num} className={`p-4 rounded-xl border-2 transition-all ${isUnavailable ? 'opacity-50 bg-slate-100 border-slate-200 grayscale cursor-not-allowed' : isChecked ? (isOriginal ? 'border-muc-blue bg-muc-blue/5' : 'border-muc-yellow bg-muc-yellow/5') : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}>
@@ -1095,7 +1111,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
                   </div>
                   <div className="flex-1">
                     <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">
-                        Ch. {num} - {info.name} {isUnavailable && <span className="text-red-500 text-xs ml-2">(Indisponible)</span>}
+                        Ch. {num} - {info.name} {isUnavailable && <span className="text-red-500 text-[10px] ml-2 font-bold">{unavailableText}</span>}
                     </span>
                     <span className="text-xs font-medium text-slate-500">{info.lits} lits • {info.etage}</span>
                   </div>

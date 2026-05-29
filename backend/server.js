@@ -705,22 +705,34 @@ async function getOrCreateStripeCustomer(email, nom) {
 }
 
 
-// Obtenir toutes les réservations approuvées pour le calendrier
+// Obtenir toutes les réservations approuvées et devis en attente pour le calendrier
 app.get('/api/reservations', async (req, res) => {
   try {
     const reservations = await prisma.reservation.findMany({
       where: {
-        statut: 'RESERVE'
+        OR: [
+          { statut: 'RESERVE' },
+          { statut: 'DEVIS_EN_ATTENTE' }
+        ]
       },
       include: {
         client: true
       }
     });
-    res.json(reservations);
+    // Filter out expired devis explicitly just in case the cron job hasn't run yet
+    const validReservations = reservations.filter(r => {
+      if (r.statut === 'DEVIS_EN_ATTENTE') {
+        if (!r.expireLe) return false;
+        if (new Date(r.expireLe) < new Date()) return false;
+      }
+      return true;
+    });
+    res.json(validReservations);
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la récupération des réservations' });
   }
 });
+
 
 // --- HELPER STRIPE : Créer une session de paiement Stripe ---
 async function createStripeSessionForReservation(reservation, paymentType) {
