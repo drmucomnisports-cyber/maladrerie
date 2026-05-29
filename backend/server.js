@@ -117,31 +117,52 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
     const paymentType = session.metadata?.paymentType?.toLowerCase(); // 'acompte', 'solde', 'caution'
     
     if(reservationId) {
-       if (paymentType === 'acompte') {
-         const reservation = await prisma.reservation.update({
-           where: { id: parseInt(reservationId) },
-           data: { 
-             statutPaiement: 'ACOMPTE_PAYE',
-             statut: 'RESERVE'
-           },
-           include: { client: true, intervenant: true }
-         });
-         console.log(`Acompte payé pour la réservation ${reservationId}`);
-         await sendCuisineEmailIfNeeded(reservationId);
-         
-         // Incrémenter l'usage du code promo si présent
-         if (reservation.codePromo) {
-           try {
-             await prisma.promoCode.update({
-               where: { code: reservation.codePromo.toUpperCase() },
-               data: { usageActuel: { increment: 1 } }
-             });
-             console.log(`Usage incrémenté pour le code promo: ${reservation.codePromo}`);
-           } catch (promoErr) {
-             console.error("Erreur incrémentation code promo:", promoErr.message);
-           }
-         }
-       } else if (paymentType === 'solde') {
+               if (paymentType === 'acompte') {
+          const reservation = await prisma.reservation.update({
+            where: { id: parseInt(reservationId) },
+            data: { 
+              statutPaiement: 'ACOMPTE_PAYE',
+              statut: 'RESERVE'
+            },
+            include: { client: true, intervenant: true }
+          });
+          console.log(`Acompte payé pour la réservation ${reservationId}`);
+          await sendCuisineEmailIfNeeded(reservationId);
+          await sendPaymentConfirmationEmails(reservation, 'acompte', session.amount_total / 100);
+          
+          // Incrémenter l'usage du code promo si présent
+          if (reservation.codePromo) {
+            try {
+              await prisma.promoCode.update({
+                where: { code: reservation.codePromo.toUpperCase() },
+                data: { usageActuel: { increment: 1 } }
+              });
+              console.log(`Usage incrémenté pour le code promo: ${reservation.codePromo}`);
+            } catch (promoErr) {
+              console.error("Erreur incrémentation code promo:", promoErr.message);
+            }
+          }
+        } else if (paymentType === 'solde' || paymentType === 'totalite') {
+          const reservation = await prisma.reservation.update({
+            where: { id: parseInt(reservationId) },
+            data: { statutPaiement: 'PAYE' },
+            include: { client: true, intervenant: true }
+          });
+          console.log(`Solde/Totalité payé pour la réservation ${reservationId}`);
+          await sendCuisineEmailIfNeeded(reservationId);
+          await sendPaymentConfirmationEmails(reservation, paymentType, session.amount_total / 100);
+        } else if (paymentType === 'caution') {
+          const reservation = await prisma.reservation.update({
+            where: { id: parseInt(reservationId) },
+            data: { 
+              statutCaution: 'DEPOSEE',
+              stripeCautionId: session.payment_intent // Stocke l'ID du PaymentIntent pour une capture ultérieure si besoin
+            },
+            include: { client: true, intervenant: true }
+          });
+          console.log(`Caution déposée (PaymentIntent autorisé) pour la réservation ${reservationId}`);
+          await sendPaymentConfirmationEmails(reservation, 'caution', session.amount_total / 100);
+        } else if (paymentType === 'solde') {
          const reservation = await prisma.reservation.update({
            where: { id: parseInt(reservationId) },
            data: { statutPaiement: 'PAYE' },
@@ -407,6 +428,30 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
     if (!reservation) return;
     if (!reservation.repas || Object.keys(reservation.repas).length === 0) return;
     if (reservation.cuisineEmailEnvoye) return;
+
+    // Vérifier si des repas ont été réellement commandés (quantités > 0)
+    let hasMealsOrdered = false;
+    for (const dayRepas of Object.values(reservation.repas)) {
+      if (dayRepas) {
+        const pd = dayRepas.PETIT_DEJ;
+        const dj = dayRepas.DEJEUNER;
+        const dn = dayRepas.DINER;
+        
+        const hasPd = pd && ((pd.ADULTE || 0) > 0 || (pd.ENFANT_MOINS_12 || 0) > 0 || (pd.ENFANT_MOINS_5 || 0) > 0);
+        const hasDj = dj && ((dj.ADULTE || 0) > 0 || (dj.ENFANT_MOINS_12 || 0) > 0 || (dj.ENFANT_MOINS_5 || 0) > 0);
+        const hasDn = dn && ((dn.ADULTE || 0) > 0 || (dn.ENFANT_MOINS_12 || 0) > 0 || (dn.ENFANT_MOINS_5 || 0) > 0);
+        
+        if (hasPd || hasDj || hasDn) {
+          hasMealsOrdered = true;
+          break;
+        }
+      }
+    }
+    
+    if (!hasMealsOrdered) {
+      console.log("Aucun repas commandé pour la réservation " + reservationId + ". Pas d'envoi d'email cuisine.");
+      return;
+    }
     
     const validStatuses = ['ACCEPTEE', 'RESERVE', 'CONFIRMEE'];
     const validPayStatuses = ['ACOMPTE_PAYE', 'PAYE'];
@@ -438,20 +483,27 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
     
     let mealDetailsHTML = '<ul>';
     Object.entries(reservation.repas).forEach(([dateStr, dayRepas]) => {
-      mealDetailsHTML += `<li><strong>${new Date(dateStr).toLocaleDateString('fr-FR')}</strong>:`;
-      if (dayRepas.PETIT_DEJ) {
-        const p = dayRepas.PETIT_DEJ;
-        mealDetailsHTML += ` Petit-déj: ${p.ADULTE || 0} Adulte(s), ${(p.ENFANT_MOINS_12 || 0) + (p.ENFANT_MOINS_5 || 0)} Enfant(s).`;
+      // Vérifier si ce jour précis a des repas
+      const pd = dayRepas.PETIT_DEJ;
+      const dj = dayRepas.DEJEUNER;
+      const dn = dayRepas.DINER;
+      const hasPd = pd && ((pd.ADULTE || 0) > 0 || (pd.ENFANT_MOINS_12 || 0) > 0 || (pd.ENFANT_MOINS_5 || 0) > 0);
+      const hasDj = dj && ((dj.ADULTE || 0) > 0 || (dj.ENFANT_MOINS_12 || 0) > 0 || (dj.ENFANT_MOINS_5 || 0) > 0);
+      const hasDn = dn && ((dn.ADULTE || 0) > 0 || (dn.ENFANT_MOINS_12 || 0) > 0 || (dn.ENFANT_MOINS_5 || 0) > 0);
+
+      if (hasPd || hasDj || hasDn) {
+        mealDetailsHTML += `<li><strong>${new Date(dateStr).toLocaleDateString('fr-FR')}</strong>:`;
+        if (hasPd) {
+          mealDetailsHTML += ` Petit-déj: ${pd.ADULTE || 0} Adulte(s), ${(pd.ENFANT_MOINS_12 || 0) + (pd.ENFANT_MOINS_5 || 0)} Enfant(s).`;
+        }
+        if (hasDj) {
+          mealDetailsHTML += ` Déjeuner: ${dj.ADULTE || 0} Adulte(s), ${(dj.ENFANT_MOINS_12 || 0) + (dj.ENFANT_MOINS_5 || 0)} Enfant(s).`;
+        }
+        if (hasDn) {
+          mealDetailsHTML += ` Dîner: ${dn.ADULTE || 0} Adulte(s), ${(dn.ENFANT_MOINS_12 || 0) + (dn.ENFANT_MOINS_5 || 0)} Enfant(s).`;
+        }
+        mealDetailsHTML += `</li>`;
       }
-      if (dayRepas.DEJEUNER) {
-        const d = dayRepas.DEJEUNER;
-        mealDetailsHTML += ` Déjeuner: ${d.ADULTE || 0} Adulte(s), ${(d.ENFANT_MOINS_12 || 0) + (d.ENFANT_MOINS_5 || 0)} Enfant(s).`;
-      }
-      if (dayRepas.DINER) {
-        const di = dayRepas.DINER;
-        mealDetailsHTML += ` Dîner: ${di.ADULTE || 0} Adulte(s), ${(di.ENFANT_MOINS_12 || 0) + (di.ENFANT_MOINS_5 || 0)} Enfant(s).`;
-      }
-      mealDetailsHTML += `</li>`;
     });
     mealDetailsHTML += '</ul>';
 
@@ -476,6 +528,125 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
     console.log("Email cuisine envoyé avec succès pour la réservation " + reservation.id);
   } catch (error) {
     console.error("Erreur lors de l'envoi de l'email cuisine:", error);
+  }
+};
+
+// Fonction pour envoyer des e-mails de confirmation de paiement (Client + Admin)
+const sendPaymentConfirmationEmails = async (reservation, paymentType, amount) => {
+  try {
+    const isCaution = paymentType.toLowerCase() === 'caution';
+    const isAcompte = paymentType.toLowerCase() === 'acompte';
+    const isSolde = paymentType.toLowerCase() === 'solde' || paymentType.toLowerCase() === 'totalite';
+
+    let typeLabel = '';
+    let descriptionText = '';
+    let cgvReference = '';
+
+    if (isCaution) {
+      typeLabel = 'Dépôt de garantie (Caution)';
+      descriptionText = `Une empreinte bancaire temporaire de <strong>${amount.toFixed(2)} €</strong> a été enregistrée à titre de caution. Aucun montant n'a été débité de votre compte.`;
+      cgvReference = `Conformément à l'Article 8 de nos CGV, cette caution est destinée à couvrir les éventuels dommages, manquements au règlement intérieur, ou frais de ménage. Elle sera automatiquement annulée/libérée dans un délai de 30 jours maximum après votre départ.`;
+    } else if (isAcompte) {
+      typeLabel = "Acompte (30%)";
+      descriptionText = `Le paiement de l'acompte de 30% d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Vos dates de séjour sont désormais réservées.`;
+      cgvReference = `Le solde restant de votre séjour (70%) devra être réglé au plus tard 7 jours avant votre arrivée. Vous recevrez un lien de paiement automatique par e-mail à cette date.`;
+    } else if (isSolde) {
+      typeLabel = "Solde du séjour";
+      descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Votre réservation est désormais entièrement payée !`;
+      cgvReference = `Avant votre entrée dans les lieux, il vous sera demandé d'effectuer l'empreinte bancaire pour le dépôt de garantie (caution de 500 €). Si ce n'est pas déjà fait, vous recevrez un lien de paiement dédié quelques jours avant votre arrivée.`;
+    }
+
+    const dDebut = new Date(reservation.dateDebut).toLocaleDateString('fr-FR');
+    const dFin = new Date(reservation.dateFin).toLocaleDateString('fr-FR');
+
+    // 1. Email pour le Client
+    if (reservation.client?.email && reservation.client?.email !== 'N/A') {
+      await sendMail({
+        to: reservation.client.email,
+        subject: `Confirmation de paiement - ${typeLabel} - Gîte de la Maladrerie`,
+        html: `
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                  <tr>
+                    <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                      <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+                      <p>Nous vous remercions pour votre transaction.</p>
+                      
+                      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #004B93;">
+                        <p style="margin: 0 0 10px 0;"><strong>Type de transaction :</strong> ${typeLabel}</p>
+                        <p style="margin: 0 0 10px 0;"><strong>Montant :</strong> ${amount.toFixed(2)} €</p>
+                        <p style="margin: 0;"><strong>Séjour :</strong> du ${dDebut} au ${dFin}</p>
+                      </div>
+
+                      <p>${descriptionText}</p>
+                      <p style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 15px; border-radius: 8px; font-size: 13px; color: #856404; margin-top: 20px;">
+                        📢 <strong>Important :</strong> ${cgvReference}
+                      </p>
+
+                      <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background-color: #FDB913; height: 5px;"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        `
+      });
+    }
+
+    // 2. Email pour l'Administrateur
+    const adminEmail = process.env.ADMIN_EMAIL || 'david.roujet@mucomnisports.fr';
+    await sendMail({
+      to: adminEmail,
+      subject: `💰 Nouveau paiement reçu - ${typeLabel} (${reservation.client?.nom || 'Client'})`,
+      html: `
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 20px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: bold;">Paiement Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 30px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0;">Nouveau paiement enregistré</h2>
+                    <p>Un paiement vient d'être validé en ligne via Stripe :</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #004B93;">
+                      <p style="margin: 0 0 10px 0;"><strong>Client :</strong> ${reservation.client?.nom || 'Non spécifié'} (${reservation.client?.email || 'N/A'})</p>
+                      <p style="margin: 0 0 10px 0;"><strong>Type de transaction :</strong> ${typeLabel}</p>
+                      <p style="margin: 0 0 10px 0;"><strong>Montant :</strong> ${amount.toFixed(2)} €</p>
+                      <p style="margin: 0 0 10px 0;"><strong>Séjour :</strong> du ${dDebut} au ${dFin}</p>
+                      <p style="margin: 0;"><strong>Référence devis :</strong> ${reservation.numeroDevis || 'N/A'}</p>
+                    </div>
+
+                    <p>Vous pouvez consulter et gérer cette réservation directement dans votre espace administratif.</p>
+                    <p style="margin-top: 30px;"><strong>Notification système - Maladrerie</strong></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #FDB913; height: 5px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'envoi des e-mails de confirmation de paiement:", error);
   }
 };
 
