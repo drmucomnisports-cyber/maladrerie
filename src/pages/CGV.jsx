@@ -55,7 +55,7 @@ const CGV = () => {
           <section>
             <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">5. Régime fiscal et tarifs</h2>
             <p>Les tarifs appliqués sont ceux indiqués sur le devis accepté par le client ou lors de la réservation en ligne effectuée par ce dernier. Les tarifs précis des nuitées ne sont pas détaillés dans les présentes conditions générales et figurent directement sur les outils de réservation.</p>
-            <p className="mt-4"><strong>Taxe de séjour :</strong> en sus du prix de l'hébergement, une taxe de séjour est perçue pour le compte de la collectivité. Son montant est fixé à 4% du prix de la nuitée par personne majeure (dans la limite du plafond légal). Elle sera calculée lors de la facturation finale.</p>
+            <p className="mt-4"><strong>Taxe de séjour :</strong> en sus du prix de l'hébergement, une taxe de séjour est perçue pour le compte de la collectivité. Son montant est fixé à 4 % du prix de la nuitée par personne majeure, auquel s'ajoute la taxe additionnelle départementale de 10 % (soit un taux global de 4,4 % du prix de la nuitée par adulte). Elle sera calculée lors de la facturation finale.</p>
           </section>
 
           <section>

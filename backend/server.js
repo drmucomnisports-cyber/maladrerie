@@ -1742,6 +1742,7 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
         let totalAdultes = 0;
         let totalMineurs = 0;
         let totalPrixBase = 0;
+        let taxeSejourCalculee = 0;
         
         const chDetails = devisFinal.chambresDetails || {};
         devisFinal.chambres.forEach(chId => {
@@ -1755,11 +1756,11 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
           totalAdultes += nbAdultes;
           totalMineurs += nbMineurs;
           totalPrixBase += occupantsCount * tarifPers * nuits;
+          taxeSejourCalculee += nbAdultes * tarifPers * nuits * 0.044;
         });
 
         const totalPersonnes = totalAdultes + totalMineurs;
-        const tarifMoyen = totalPrixBase / ((totalPersonnes || 1) * nuits);
-        const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.044) * nuits;
+        const tarifMoyen = totalAdultes > 0 ? (taxeSejourCalculee / (totalAdultes * nuits * 0.044)) : 25;
 
         const detailsLignes = devisFinal.chambres.map(chId => {
           const details = chDetails[chId] || { adultes: 0, enfants: 0 };
@@ -1955,6 +1956,7 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
     let totalAdultes = 0;
     let totalMineurs = 0;
     let totalPrixBase = 0;
+    let taxeSejourCalculee = 0;
     
     const chambresDetails = devis.chambresDetails || {};
     devis.chambres.forEach(chId => {
@@ -1968,11 +1970,11 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
       totalAdultes += nbAdultes;
       totalMineurs += nbMineurs;
       totalPrixBase += occupantsCount * tarifPers * nuits;
+      taxeSejourCalculee += nbAdultes * tarifPers * nuits * 0.044;
     });
 
     const totalPersonnes = totalAdultes + totalMineurs;
-    const tarifMoyen = totalPrixBase / ((totalPersonnes || 1) * nuits);
-    const taxeSejourCalculee = totalAdultes * (tarifMoyen * 0.044) * nuits;
+    const tarifMoyen = totalAdultes > 0 ? (taxeSejourCalculee / (totalAdultes * nuits * 0.044)) : 25;
 
     const detailsLignes = devis.chambres.map(chId => {
       const details = chambresDetails[chId] || { adultes: 0, enfants: 0 };
