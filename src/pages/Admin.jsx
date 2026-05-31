@@ -913,15 +913,27 @@ const Admin = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
+                      <th onClick={() => handleSort('client')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Client {sortConfig.key === 'client' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
                       <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Dates {sortConfig.key === 'dateDebut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest min-w-[120px]">Tarif</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest w-24">Validé par</th>
+                      <th onClick={() => handleSort('prestations')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Prestations {sortConfig.key === 'prestations' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th onClick={() => handleSort('restauration')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Restauration {sortConfig.key === 'restauration' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th onClick={() => handleSort('tarif')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest min-w-[120px] cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Tarif {sortConfig.key === 'tarif' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th onClick={() => handleSort('statut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Statut {sortConfig.key === 'statut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th onClick={() => handleSort('validePar')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest w-24 cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Validé par {sortConfig.key === 'validePar' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
                       <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Date de création {sortConfig.key === 'createdAt' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
@@ -946,6 +958,61 @@ const Admin = () => {
                         const dateA = new Date(a.dateDebut);
                         const dateB = new Date(b.dateDebut);
                         return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+                      }
+                      if (sortConfig.key === 'client') {
+                        const valA = a.client?.nom || '';
+                        const valB = b.client?.nom || '';
+                        return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                      }
+                      if (sortConfig.key === 'prestations') {
+                        const getPrestationsStr = (res) => {
+                          const ch = (res.chambres || []).map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ');
+                          let s = '';
+                          if (res.salles) {
+                            if (res.salles.salle15) s += ' Salle 15 pl.';
+                            if (res.salles.salle12) s += ' Salle 12 pl.';
+                          }
+                          return `${ch} ${s}`;
+                        };
+                        const valA = getPrestationsStr(a);
+                        const valB = getPrestationsStr(b);
+                        return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                      }
+                      if (sortConfig.key === 'restauration') {
+                        const getRestaurationScore = (res) => {
+                          let total = 0;
+                          if (res.repas) {
+                            Object.values(res.repas).forEach(r => {
+                              if (r.PETIT_DEJ) total += (parseInt(r.PETIT_DEJ.ADULTE) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_12) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_5) || 0);
+                              if (r.DEJEUNER) total += (parseInt(r.DEJEUNER.ADULTE) || 0) + (parseInt(r.DEJEUNER.ENFANT_MOINS_12) || 0) + (parseInt(r.DEJEUNER.ENFANT_MOINS_5) || 0);
+                              if (r.DINER) total += (parseInt(r.DINER.ADULTE) || 0) + (parseInt(r.DINER.ENFANT_MOINS_12) || 0) + (parseInt(r.DINER.ENFANT_MOINS_5) || 0);
+                            });
+                          }
+                          if (total === 0 && res.repasGlobal) {
+                            if (res.repasGlobal.PETIT_DEJ) total += 1;
+                            if (res.repasGlobal.DEJEUNER) total += 10;
+                            if (res.repasGlobal.DINER) total += 100;
+                          }
+                          return total;
+                        };
+                        const valA = getRestaurationScore(a);
+                        const valB = getRestaurationScore(b);
+                        return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+                      }
+                      if (sortConfig.key === 'tarif') {
+                        const valA = a.prixTotal || 0;
+                        const valB = b.prixTotal || 0;
+                        return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+                      }
+                      if (sortConfig.key === 'statut') {
+                        const valA = a.statut || '';
+                        const valB = b.statut || '';
+                        return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                      }
+                      if (sortConfig.key === 'validePar') {
+                        const valA = formatAdminName(a.validePar);
+                        const valB = formatAdminName(b.validePar);
+                        return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
                       }
                       return 0;
                     }).map((res) => (
