@@ -1755,6 +1755,17 @@ const Admin = () => {
         
         const resultatNet = totalRecettes - totalDepenses;
 
+        const taxesMensuelles = rList447.reduce((acc, item) => {
+            const date = new Date(item.date);
+            const monthYear = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+            if (!acc[monthYear]) acc[monthYear] = 0;
+            acc[monthYear] += item.montant;
+            return acc;
+        }, {});
+        // Sort by date (descending)
+        const taxesMensuellesArray = Object.entries(taxesMensuelles).map(([label, total]) => ({ label, total }));
+
+
         const openModal = (code, title, total, items) => {
             setFinanceModalData({ code, title, total, items: items.sort((a,b) => new Date(b.date) - new Date(a.date)) });
             setShowFinanceModal(true);
@@ -1815,6 +1826,25 @@ const Admin = () => {
                             <PCGRow code="7062" title="Restauration (Repas facturés)" total={r7062} items={rList7062} type="recette" />
                             <PCGRow code="7063" title="Location de Salles" total={r7063} items={rList7063} type="recette" />
                             <PCGRow code="447" title="Taxe de séjour collectée" total={r447} items={rList447} type="recette" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* TAXE DE SEJOUR MENSUELLE */}
+                <div className="bg-amber-50 rounded-2xl shadow-xl border border-amber-100 overflow-hidden mt-8">
+                    <div className="p-6 border-b border-amber-200 flex justify-between items-center bg-amber-100/50">
+                        <h3 className="font-black text-amber-900 uppercase tracking-widest flex items-center gap-2">
+                            <span className="text-2xl">🏛️</span> Taxe de Séjour Mensuelle (À reverser)
+                        </h3>
+                    </div>
+                    <div className="p-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {taxesMensuellesArray.length > 0 ? taxesMensuellesArray.map((t, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-4 border border-amber-200 rounded-xl bg-white shadow-sm">
+                            <span className="text-xs font-bold text-amber-900 capitalize">{t.label}</span>
+                            <span className="text-base font-black text-amber-600">{t.total.toFixed(2)} €</span>
+                            </div>
+                        )) : <p className="text-sm text-amber-700 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
                         </div>
                     </div>
                 </div>
