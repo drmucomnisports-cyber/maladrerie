@@ -131,6 +131,11 @@ const Admin = () => {
   const [manualPaymentRes, setManualPaymentRes] = useState(null);
   const [manualPaymentForm, setManualPaymentForm] = useState({ montant: '', mode: 'ESPECES', typePaiement: 'ACOMPTE' });
 
+  // Modifications clients
+  const [showModificationModal, setShowModificationModal] = useState(false);
+  const [selectedProposedModification, setSelectedProposedModification] = useState(null);
+  const [isValidatingProposed, setIsValidatingProposed] = useState(false);
+
   useEffect(() => {
     if (token) {
       fetchReservations();
@@ -733,7 +738,9 @@ const Admin = () => {
   const handleAction = async (action, id) => {
     // Action 'accept' or 'reject' triggers the backend email logic
     try {
-      const res = await fetch(`${API_URL}/api/reservations/${id}/${action}`);
+      const res = await fetch(`${API_URL}/api/reservations/${id}/${action}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         alert(action === 'accept' ? 'Réservation acceptée et e-mail envoyé.' : 'Réservation refusée et e-mail envoyé.');
         fetchReservations();
@@ -742,6 +749,53 @@ const Admin = () => {
       }
     } catch (err) {
       alert('Erreur réseau');
+    }
+  };
+
+  const handleAcceptModification = async (id) => {
+    setIsValidatingProposed(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${id}/accept-modification`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showFeedback("Modification acceptée avec succès.");
+        setShowModificationModal(false);
+        setSelectedProposedModification(null);
+        fetchReservations();
+        fetchFinances();
+      } else {
+        const data = await res.json();
+        showFeedback(data.error || "Erreur lors de la validation.", "error");
+      }
+    } catch (err) {
+      showFeedback("Erreur réseau.", "error");
+    } finally {
+      setIsValidatingProposed(false);
+    }
+  };
+
+  const handleRejectModification = async (id) => {
+    setIsValidatingProposed(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${id}/reject-modification`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showFeedback("Modification rejetée.");
+        setShowModificationModal(false);
+        setSelectedProposedModification(null);
+        fetchReservations();
+      } else {
+        const data = await res.json();
+        showFeedback(data.error || "Erreur lors du rejet.", "error");
+      }
+    } catch (err) {
+      showFeedback("Erreur réseau.", "error");
+    } finally {
+      setIsValidatingProposed(false);
     }
   };
 
@@ -1005,6 +1059,19 @@ const Admin = () => {
                       </td>
                       <td className="p-4">
                         <div className="space-y-2">
+                          {res.modificationProposed && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedProposedModification(res);
+                                setShowModificationModal(true);
+                              }}
+                              className="w-full text-center bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black uppercase tracking-wider px-2 py-1.5 rounded-lg hover:bg-purple-100 transition-all flex items-center justify-center gap-1.5 animate-pulse"
+                            >
+                              <AlertTriangle size={12} className="text-purple-600 shrink-0" />
+                              Modif. demandée
+                            </button>
+                          )}
                           <select
                             value={res.statut}
                             onChange={(e) => updateStatut(res.id, e.target.value)}
@@ -1287,7 +1354,7 @@ const Admin = () => {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-1.5">
-                            {res.statut === 'DEVIS_EN_ATTENTE' && (
+                            {(res.statut === 'DEVIS_EN_ATTENTE' || res.statut === 'DEVIS_EXPIRE') && (
                               <>
                                 <button
                                   onClick={() => {
@@ -2264,8 +2331,8 @@ const Admin = () => {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-y-auto max-h-[90vh] border border-slate-100">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <div>
-                <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">{editingReservation.statut === 'DEVIS_EN_ATTENTE' ? 'Modifier le devis' : 'Modifier la réservation'}</h2>
-                <p className="text-xs text-slate-500 mt-1">{editingReservation.statut === 'DEVIS_EN_ATTENTE' ? 'Modification du devis' : 'Modification de la réservation'} #{editingReservation.id}</p>
+                <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">{editingReservation.statut?.includes('DEVIS') ? 'Modifier le devis' : 'Modifier la réservation'}</h2>
+                <p className="text-xs text-slate-500 mt-1">{editingReservation.statut?.includes('DEVIS') ? 'Modification du devis' : 'Modification de la réservation'} #{editingReservation.id}</p>
               </div>
               <button onClick={() => setEditingReservation(null)} className="text-slate-400 hover:text-slate-600 font-bold text-2xl px-2">&times;</button>
             </div>
@@ -2273,7 +2340,7 @@ const Admin = () => {
               <ReservationForm
                 events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres }))}
                 isAdmin={true}
-                isDevis={editingReservation.statut === 'DEVIS_EN_ATTENTE'}
+                isDevis={editingReservation.statut?.includes('DEVIS')}
                 existingReservation={editingReservation}
                 onCreated={() => { setEditingReservation(null); fetchReservations(); }}
               />
@@ -2468,6 +2535,208 @@ const Admin = () => {
           </div>
         </div>
       )}
+
+      {/* Modale de validation de modification client */}
+      {showModificationModal && selectedProposedModification && (() => {
+        const current = selectedProposedModification;
+        const proposed = selectedProposedModification.modificationProposed;
+        
+        // Helper to format values
+        const formatOptionsList = (opt) => {
+          if (!opt) return "Aucun";
+          const list = [];
+          if (opt.litsFaits) list.push("Lits faits");
+          if (opt.lingeFourni) list.push("Linge de toilette");
+          if (opt.menage) list.push("Ménage");
+          return list.join(', ') || "Aucun";
+        };
+
+        const formatSallesList = (sl) => {
+          if (!sl) return "Aucune";
+          const list = [];
+          if (sl.salle15) list.push("Salle 15 pers.");
+          if (sl.salle12) list.push("Salle 12 pers.");
+          return list.join(', ') || "Aucune";
+        };
+
+        const formatMealsCount = (mealsObj) => {
+          if (!mealsObj) return "Aucun";
+          let petitDej = 0, dej = 0, diner = 0;
+          Object.values(mealsObj).forEach(day => {
+            if (day.PETIT_DEJ) petitDej += (day.PETIT_DEJ.ADULTE || 0) + (day.PETIT_DEJ.ENFANT_MOINS_12 || 0) + (day.PETIT_DEJ.ENFANT_MOINS_5 || 0);
+            if (day.DEJEUNER) dej += (day.DEJEUNER.ADULTE || 0) + (day.DEJEUNER.ENFANT_MOINS_12 || 0) + (day.DEJEUNER.ENFANT_MOINS_5 || 0);
+            if (day.DINER) diner += (day.DINER.ADULTE || 0) + (day.DINER.ENFANT_MOINS_12 || 0) + (day.DINER.ENFANT_MOINS_5 || 0);
+          });
+          const parts = [];
+          if (petitDej) parts.push(`${petitDej} P-Dej`);
+          if (dej) parts.push(`${dej} Dej`);
+          if (diner) parts.push(`${diner} Din`);
+          return parts.join(', ') || "Aucun";
+        };
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+              <div className="bg-purple-700 p-6 text-white shrink-0">
+                <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-amber-300" />
+                  Validation de la modification proposée par le client
+                </h3>
+                <p className="text-sm opacity-90">Réservation #{current.id} - Client : {current.client?.nom || 'Inconnu'}</p>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                <table className="w-full text-left border-collapse border border-slate-200 rounded-xl overflow-hidden">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 font-black text-xs uppercase tracking-wider border-b border-slate-200">
+                      <th className="p-3 border border-slate-200">Élément</th>
+                      <th className="p-3 border border-slate-200 bg-red-50/30 text-red-800">Version Actuelle</th>
+                      <th className="p-3 border border-slate-200 bg-green-50/30 text-green-800">Version Proposée</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs font-semibold text-slate-700">
+                    <tr className="border-b border-slate-200">
+                      <td className="p-3 font-bold border border-slate-200">Dates</td>
+                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                        Du {new Date(current.dateDebut).toLocaleDateString('fr-FR')} <br/>
+                        au {new Date(current.dateFin).toLocaleDateString('fr-FR')}
+                      </td>
+                      <td className={`p-3 border border-slate-200 ${
+                        current.dateDebut !== proposed.dateDebut || current.dateFin !== proposed.dateFin ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      }`}>
+                        Du {new Date(proposed.dateDebut).toLocaleDateString('fr-FR')} <br/>
+                        au {new Date(proposed.dateFin).toLocaleDateString('fr-FR')}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="p-3 font-bold border border-slate-200">Chambres</td>
+                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                        {current.chambres.join(', ')}
+                      </td>
+                      <td className={`p-3 border border-slate-200 ${
+                        JSON.stringify(current.chambres.sort()) !== JSON.stringify(proposed.chambres.sort()) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      }`}>
+                        {proposed.chambres.join(', ')}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="p-3 font-bold border border-slate-200">Options</td>
+                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                        {formatOptionsList(current.options)}
+                      </td>
+                      <td className={`p-3 border border-slate-200 ${
+                        JSON.stringify(current.options) !== JSON.stringify(proposed.options) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      }`}>
+                        {formatOptionsList(proposed.options)}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="p-3 font-bold border border-slate-200">Salles</td>
+                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                        {formatSallesList(current.salles)}
+                      </td>
+                      <td className={`p-3 border border-slate-200 ${
+                        JSON.stringify(current.salles) !== JSON.stringify(proposed.salles) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      }`}>
+                        {formatSallesList(proposed.salles)}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="p-3 font-bold border border-slate-200">Repas</td>
+                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                        {formatMealsCount(current.repas)}
+                      </td>
+                      <td className={`p-3 border border-slate-200 ${
+                        JSON.stringify(current.repas) !== JSON.stringify(proposed.repas) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      }`}>
+                        {formatMealsCount(proposed.repas)}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="p-3 font-bold border border-slate-200">Voyageurs</td>
+                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                        {current.occupants?.length || 0} occupant(s)
+                      </td>
+                      <td className={`p-3 border border-slate-200 ${
+                        (current.occupants?.length || 0) !== proposed.occupants?.length ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      }`}>
+                        {proposed.occupants?.length || 0} occupant(s)
+                      </td>
+                    </tr>
+                    <tr className="bg-slate-50 font-black">
+                      <td className="p-3 border border-slate-200">Prix total</td>
+                      <td className="p-3 border border-slate-200 bg-red-50/10 text-red-800">
+                        {current.prixTotal?.toFixed(2)} €
+                      </td>
+                      <td className="p-3 border border-slate-200 bg-green-50 text-green-900">
+                        {proposed.recalculatedPrice?.toFixed(2)} € 
+                        {proposed.priceDifference !== 0 && (
+                          <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full ${proposed.priceDifference > 0 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
+                            {proposed.priceDifference > 0 ? `+${proposed.priceDifference.toFixed(2)} €` : `${proposed.priceDifference.toFixed(2)} €`}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Occupants detailed lists comparison */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/30">
+                    <h4 className="font-black text-xs text-slate-500 uppercase tracking-wider mb-2">Occupants Actuels ({current.occupants?.length || 0})</h4>
+                    <ul className="text-xs space-y-1.5 list-disc pl-4 font-semibold text-slate-700">
+                      {(current.occupants || []).map((o, idx) => (
+                        <li key={idx}>
+                          {o.nom} {o.prenom} ({o.estAdulte ? 'Adulte' : `${o.age} ans`}) - {o.nationalite || 'Française'}
+                        </li>
+                      ))}
+                      {(current.occupants || []).length === 0 && <li className="text-slate-400 italic">Aucun occupant renseigné</li>}
+                    </ul>
+                  </div>
+                  <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/30">
+                    <h4 className="font-black text-xs text-slate-500 uppercase tracking-wider mb-2">Occupants Proposés ({proposed.occupants?.length || 0})</h4>
+                    <ul className="text-xs space-y-1.5 list-disc pl-4 font-semibold text-slate-700">
+                      {(proposed.occupants || []).map((o, idx) => (
+                        <li key={idx}>
+                          {o.nom} {o.prenom} ({o.estAdulte ? 'Adulte' : `${o.age} ans`}) - {o.nationalite || 'Française'}
+                        </li>
+                      ))}
+                      {(proposed.occupants || []).length === 0 && <li className="text-slate-400 italic">Aucun occupant renseigné</li>}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-6 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+                <button
+                  onClick={() => {
+                    setShowModificationModal(false);
+                    setSelectedProposedModification(null);
+                  }}
+                  disabled={isValidatingProposed}
+                  className="px-6 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-all text-xs"
+                >
+                  Fermer
+                </button>
+                <button
+                  onClick={() => handleRejectModification(current.id)}
+                  disabled={isValidatingProposed}
+                  className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-wider rounded-xl transition-all text-xs shadow-md"
+                >
+                  Refuser la modification
+                </button>
+                <button
+                  onClick={() => handleAcceptModification(current.id)}
+                  disabled={isValidatingProposed}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-wider rounded-xl transition-all text-xs shadow-md"
+                >
+                  Valider la modification
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {activeTab === 'profil' && (
         <div className="max-w-xl mx-auto">

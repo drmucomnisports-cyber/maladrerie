@@ -12,6 +12,7 @@ import CGV from './pages/CGV';
 import DevisValidate from './pages/DevisValidate';
 import PaymentSuccess from './pages/PaymentSuccess';
 import OccupantsCollect from './pages/OccupantsCollect';
+import ReservationModify from './pages/ReservationModify';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Route path="/devis/validate" element={<DevisValidate />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/reservation/occupants" element={<OccupantsCollect />} />
+        <Route path="/reservation/modify" element={<ReservationModify />} />
       </Routes>
     </Router>
   );

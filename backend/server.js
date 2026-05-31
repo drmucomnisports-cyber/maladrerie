@@ -624,6 +624,23 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
 
     // 1. Email pour le Client
     if (reservation.client?.email && reservation.client?.email !== 'N/A') {
+      let tokenModification = reservation.tokenModification;
+      if (!tokenModification) {
+        tokenModification = require('crypto').randomBytes(32).toString('hex');
+        try {
+          await prisma.reservation.update({
+            where: { id: reservation.id },
+            data: { tokenModification }
+          });
+        } catch (dbErr) {
+          console.error("Erreur lors de la génération de tokenModification:", dbErr);
+        }
+      }
+
+      const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
+      const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+      const modificationLinkHTML = getModificationLinkHTML(tokenModification);
+
       await sendMail({
         to: reservation.client.email,
         subject: `Confirmation de paiement - ${typeLabel} - Gîte de la Maladrerie`,
@@ -666,7 +683,11 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
                         </div>
                       ` : ''}
 
-                      <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                      ${modificationLinkHTML}
+
+                      <p style="margin-top: 30px;">À très bientôt !</p>
+                      
+                      ${adminSignatureHTML}
                     </td>
                   </tr>
                   <tr>
@@ -901,6 +922,54 @@ function calculerRevenuRepasServeur(repas) {
   };
 }
 
+// --- HELPER : Obtenir les coordonnées de l'admin validateur ---
+async function getValidatingAdminDetails(validePar) {
+  let admin = null;
+  if (validePar && validePar.includes('@')) {
+    try {
+      admin = await prisma.adminAccount.findUnique({
+        where: { email: validePar }
+      });
+    } catch (err) {
+      console.error("Erreur getValidatingAdminDetails:", err);
+    }
+  }
+  const isGeneric = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
+  return {
+    nom: isGeneric ? 'David Roujet' : admin.nom,
+    email: admin ? admin.email : 'david.roujet@mucomnisports.fr',
+    telephone: admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81'
+  };
+}
+
+// --- HELPER : Générer la signature admin pour les e-mails ---
+async function getAdminSignatureHTML(validePar) {
+  const details = await getValidatingAdminDetails(validePar);
+  return `
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eeeeee; font-size: 14px; color: #555555; font-family: sans-serif;">
+      <p style="margin: 0 0 5px 0; color: #666666; font-size: 12px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">Votre conseiller pour ce séjour :</p>
+      <p style="margin: 0 0 3px 0; font-weight: bold; color: #004B93; font-size: 16px;">${details.nom}</p>
+      <p style="margin: 0 0 3px 0;">✉ Email : <a href="mailto:${details.email}" style="color: #004B93; text-decoration: none;">${details.email}</a></p>
+      <p style="margin: 0;">📞 Tél : <a href="tel:${details.telephone.replace(/\s+/g, '')}" style="color: #004B93; text-decoration: none;">${details.telephone}</a></p>
+    </div>
+  `;
+}
+
+// --- HELPER : Générer le bloc de lien de modification de réservation ---
+function getModificationLinkHTML(tokenModification) {
+  if (!tokenModification) return '';
+  const modificationLink = `${FRONTEND_URL}/reservation/modify?token=${tokenModification}`;
+  return `
+    <div style="background-color: #f1f5f9; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-top: 25px; font-family: sans-serif;">
+      <p style="margin: 0; font-size: 13px; color: #475569; line-height: 1.5;">
+        <strong>Modifier votre séjour :</strong> Vous pouvez à tout moment revoir et modifier les détails de votre réservation (dates, chambres, repas, options, occupants) en utilisant le lien sécurisé ci-dessous. Toute modification soumise sera validée par votre conseiller.
+      </p>
+      <p style="margin: 12px 0 0 0; text-align: center;">
+        <a href="${modificationLink}" style="background-color: #004B93; color: white; padding: 8px 18px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block;">Modifier ma réservation</a>
+      </p>
+    </div>
+  `;
+}
 
 // --- HELPER : Générer la section Options, Repas et Salles pour les e-mails ---
 function generateOptionsHTML(options, repas, salles) {
@@ -1292,6 +1361,21 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
       stripeSessionId = session.id;
     }
 
+    let adminEmail = req.query.adminEmail || existingReservation.validePar || 'david.roujet@mucomnisports.fr';
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded && decoded.email) {
+          adminEmail = decoded.email;
+        }
+      } catch (jwtErr) {
+        console.error("JWT decoding error in accept route:", jwtErr);
+      }
+    }
+
+    const tokenModification = existingReservation.tokenModification || require('crypto').randomBytes(32).toString('hex');
+
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(id) },
       data: { 
@@ -1300,7 +1384,8 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
         montantSolde: isLastMinuteStay ? montantTotal : montantSolde,
         stripeAcompteId: isLastMinuteStay ? null : stripeSessionId,
         stripeSoldeId: isLastMinuteStay ? stripeSessionId : null,
-        validePar: req.user?.email || 'Admin'
+        validePar: adminEmail,
+        tokenModification: tokenModification
       },
       include: { client: true }
     });
@@ -1308,7 +1393,11 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     const dDebutAccept = new Date(reservation.dateDebut);
     const dFinAccept = new Date(reservation.dateFin);
     const nbNuitsAccept = Math.round((dFinAccept - dDebutAccept) / (1000 * 60 * 60 * 24));
-     await sendMail({
+    
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const modificationLinkHTML = getModificationLinkHTML(tokenModification);
+
+    await sendMail({
       to: reservation.client.email,
       subject: "Confirmation de votre réservation et Paiement - Gîte de La Maladrerie",
       html: `
@@ -1377,7 +1466,11 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
                       </div>
                     ` : '<p>Votre réservation est confirmée. Le règlement se fera selon les modalités convenues.</p>'}
                     
-                    <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                    ${modificationLinkHTML}
+                    
+                    <p style="margin-top: 30px;">À très bientôt !</p>
+                    
+                    ${adminSignatureHTML}
                   </td>
                 </tr>
                 <tr>
@@ -1876,14 +1969,17 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
       include: { client: true }
     });
 
-    if (!devisExistant || devisExistant.statut !== 'DEVIS_EN_ATTENTE') {
-      return res.status(400).json({ error: "Devis introuvable ou déjà validé/expiré." });
+    if (!devisExistant || (devisExistant.statut !== 'DEVIS_EN_ATTENTE' && devisExistant.statut !== 'DEVIS_EXPIRE')) {
+      return res.status(400).json({ error: "Devis introuvable ou déjà validé." });
     }
 
     await prisma.client.update({
       where: { id: devisExistant.clientId },
       data: { nom, email, telephone, adressePostale }
     });
+    
+    const expiration = new Date();
+    expiration.setHours(expiration.getHours() + 48);
     
     const devisUpdate = await prisma.reservation.update({
       where: { id: parseInt(id) },
@@ -1895,7 +1991,9 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
         options: options || {},
         salles: salles || {},
         repas: repas || {},
-        prixTotal: prixTotal || 0
+        prixTotal: prixTotal || 0,
+        statut: 'DEVIS_EN_ATTENTE',
+        expireLe: expiration
       },
       include: { client: true }
     });
@@ -2713,10 +2811,24 @@ app.post('/api/reservations/:id/acompte', checkAuth, async (req, res) => {
     
     const session = await stripe.checkout.sessions.create(params);
 
+    let tokenModification = reservation.tokenModification;
+    if (!tokenModification) {
+      tokenModification = require('crypto').randomBytes(32).toString('hex');
+    }
+
+    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+
     await prisma.reservation.update({
       where: { id: parseInt(id) },
-      data: { stripeSessionId: session.id }
+      data: { 
+        stripeSessionId: session.id,
+        tokenModification: tokenModification,
+        validePar: adminEmail
+      }
     });
+
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
     await sendMail({
       to: reservation.client.email,
@@ -2731,7 +2843,12 @@ app.post('/api/reservations/:id/acompte', checkAuth, async (req, res) => {
               <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
                 <tr><td><a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer l'acompte de ${montantAcompteCalcule.toFixed(2)} €</a></td></tr>
               </table>
-              <p>À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie</strong></p>
+              
+              ${modificationLinkHTML}
+
+              <p>À très bientôt !</p>
+              
+              ${adminSignatureHTML}
             </td></tr>
           </table></td></tr>
         </table>
@@ -2784,10 +2901,24 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
     
     const session = await stripe.checkout.sessions.create(params);
 
+    let tokenModification = reservation.tokenModification;
+    if (!tokenModification) {
+      tokenModification = require('crypto').randomBytes(32).toString('hex');
+    }
+
+    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+
     await prisma.reservation.update({
       where: { id: parseInt(id) },
-      data: { stripeSoldeId: session.id }
+      data: { 
+        stripeSoldeId: session.id,
+        tokenModification: tokenModification,
+        validePar: adminEmail
+      }
     });
+
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
     await sendMail({
       to: reservation.client.email,
@@ -2802,7 +2933,12 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
               <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
                 <tr><td><a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer la totalité de ${montantTotal.toFixed(2)} €</a></td></tr>
               </table>
-              <p>À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie</strong></p>
+              
+              ${modificationLinkHTML}
+
+              <p>À très bientôt !</p>
+              
+              ${adminSignatureHTML}
             </td></tr>
           </table></td></tr>
         </table>
@@ -2864,10 +3000,24 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
     }
     const session = await stripe.checkout.sessions.create(soldeParams);
 
+    let tokenModification = reservation.tokenModification;
+    if (!tokenModification) {
+      tokenModification = require('crypto').randomBytes(32).toString('hex');
+    }
+
+    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+
     await prisma.reservation.update({
       where: { id: parseInt(id) },
-      data: { stripeSoldeId: session.id }
+      data: { 
+        stripeSoldeId: session.id,
+        tokenModification: tokenModification,
+        validePar: adminEmail
+      }
     });
+
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
     await sendMail({
       to: reservation.client.email,
@@ -2897,7 +3047,12 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
                     </table>
                     
                     <p>Nous restons à  votre disposition pour toute question.</p>
-                    <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                    
+                    ${modificationLinkHTML}
+
+                    <p>À très bientôt !</p>
+                    
+                    ${adminSignatureHTML}
                   </td>
                 </tr>
                 <tr>
@@ -2963,10 +3118,24 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
     }
     const session = await stripe.checkout.sessions.create(cautionParams);
 
+    let tokenModification = reservation.tokenModification;
+    if (!tokenModification) {
+      tokenModification = require('crypto').randomBytes(32).toString('hex');
+    }
+
+    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+
     await prisma.reservation.update({
       where: { id: parseInt(id) },
-      data: { stripeCautionId: session.id }
+      data: { 
+        stripeCautionId: session.id,
+        tokenModification: tokenModification,
+        validePar: adminEmail
+      }
     });
+
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
     await sendMail({
       to: reservation.client.email,
@@ -3006,7 +3175,12 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
                     </table>
                     
                     <p style="margin-top: 30px;">Si vous avez la moindre question, n'hésitez pas à  nous contacter.</p>
-                    <p>Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+
+                    ${modificationLinkHTML}
+
+                    <p>Cordialement,</p>
+                    
+                    ${adminSignatureHTML}
                   </td>
                 </tr>
                 <tr>
@@ -3251,47 +3425,43 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
                             </table>
                           </td>
                         </tr>
-                      </table>
-
-                      <p style="font-size: 13px; color: #999999; margin-top: 30px;">En cas de question, n'hésitez pas à  nous contacter directement.</p>
-                      <p>Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="background-color: #FDB913; height: 5px;"></td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        `
-      });
+        if (nuits > 0) {
+            let nbAdultes = 0;
+            let nbOccupants = 0;
+            if (res.occupants && res.occupants.length > 0) {
+                nbAdultes = res.occupants.filter(o => o.estAdulte).length;
+                nbOccupants = res.occupants.length;
+            } else if (res.chambresDetails && Object.keys(res.chambresDetails).length > 0) {
+                Object.values(res.chambresDetails).forEach(room => {
+                    nbAdultes += parseInt(room.adultes || 0);
+                    nbOccupants += parseInt(room.adultes || 0) + parseInt(room.enfants || 0);
+                });
+            }
+            if (nbAdultes > 0 && res.chambres && res.chambres.length > 0) {
+                const tarifPers = (nbOccupants >= res.chambres.length * 4) ? 22 : 25;
+                taxeSejour = nbAdultes * tarifPers * nuits * 0.044;
+            }
+            
+            if (res.salles) {
+                let nuitsSalles = nuits;
+                if (res.salles.dateDebut && res.salles.dateFin) {
+                    const startS = new Date(res.salles.dateDebut);
+                    const endS = new Date(res.salles.dateFin);
+                    nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+                }
+                const prixSalle = (res.chambres && res.chambres.length > 0) ? 100 : 150;
+                if (res.salles.salle15) totalSalles += prixSalle * nuitsSalles;
+                if (res.salles.salle12) totalSalles += prixSalle * nuitsSalles;
+            }
+        }
     }
+    
+    return {
+        taxeSejour: Math.round(taxeSejour * 100) / 100,
+        totalSalles: Math.round(totalSalles * 100) / 100
+    };
+}
 
-    res.json({ missions: createdMissions, notified: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur lors de la création des missions' });
-  }
-});
-
-// Supprimer une mission
-app.delete('/api/admin/missions/:id', checkAuth, async (req, res) => {
-  const { id } = req.params;
-  try {
-    await prisma.mission.delete({
-      where: { id: parseInt(id) }
-    });
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur lors de la suppression de la mission' });
-  }
-});
-
-// ===== FINANCES =====
-
-// Obtenir les données financières pour le dashboard
 app.get('/api/admin/finances', checkAuth, async (req, res) => {
   try {
     // 1. Chiffre d'affaires encaissé
@@ -3299,7 +3469,7 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
       where: {
         statutPaiement: { in: ['ACOMPTE_PAYE', 'PAYE'] }
       },
-      include: { client: true }
+      include: { client: true, occupants: true }
     });
     
     let caEnquaisse = 0;
@@ -3344,7 +3514,7 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
 
     // 3. Rémunération des intervenants (toutes les missions)
     const missions = await prisma.mission.findMany({
-      include: { intervenant: true }
+      include: { intervenant: true, reservation: { include: { client: true } } }
     });
     
     const remunerationTotale = missions.reduce((sum, m) => sum + m.montant, 0);
@@ -3356,6 +3526,17 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
       if (!remunerationParIntervenant[nom]) remunerationParIntervenant[nom] = 0;
       remunerationParIntervenant[nom] += m.montant;
     });
+
+    const missionsDetails = missions.map(m => ({
+        id: m.id,
+        date: m.date || (m.reservation ? m.reservation.dateDebut : new Date()),
+        intervenant: `${m.intervenant.prenom} ${m.intervenant.nom}`,
+        typeMission: m.typeMission,
+        montant: m.montant,
+        clientNom: m.reservation?.client?.nom || 'Inconnu',
+        reservationId: m.reservationId,
+        statut: m.statut
+    })).sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // 4. Prochains paiements attendus
     const prochainsPaiements = reservationsEnAttente.map(r => ({
@@ -3398,19 +3579,48 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
       }
     });
 
-    // 7. Consolidation des Recettes détaillées
+    // 7. Consolidation des Recettes détaillées avec ventilation Salles / Taxe de Séjour / Hébergement
     const recettesDetaillees = reservationsPayees.map(r => {
       const { total: totalRepas } = calculerRevenuRepasServeur(r.repas);
+      const { taxeSejour, totalSalles } = calculerDetailsFinanciersReservation(r);
       const montantPaye = r.statutPaiement === 'PAYE' ? (r.prixTotal || 0) : (r.montantAcompte || 0);
-      return {
+      
+      let partRestaurationEncaissee = 0;
+      let partSallesEncaissee = 0;
+      let partTaxeEncaissee = 0;
+      let partHebergementEncaissee = 0;
+
+      const totalTheoriqueApresRepas = Math.max(0, (r.prixTotal || 0) - totalRepas);
+      const hebergementTheorique = Math.max(0, totalTheoriqueApresRepas - totalSalles - taxeSejour);
+
+      if (r.statutPaiement === 'PAYE') {
+        partRestaurationEncaissee = totalRepas;
+        partSallesEncaissee = totalSalles;
+        partTaxeEncaissee = taxeSejour;
+        partHebergementEncaissee = hebergementTheorique;
+      } else { // ACOMPTE_PAYE
+        partRestaurationEncaissee = Math.min(montantPaye, totalRepas);
+        const resteAcompte = Math.max(0, montantPaye - partRestaurationEncaissee);
+        if (totalTheoriqueApresRepas > 0) {
+            const ratio = resteAcompte / totalTheoriqueApresRepas;
+            partSallesEncaissee = Math.round(totalSalles * ratio * 100) / 100;
+            partTaxeEncaissee = Math.round(taxeSejour * ratio * 100) / 100;
+            partHebergementEncaissee = Math.max(0, resteAcompte - partSallesEncaissee - partTaxeEncaissee);
+        }
+      }
+
+        return {
         id: r.id,
-        date: r.createdAt,
+        date: r.dateDebut,
+        createdAt: r.createdAt,
         clientNom: r.client?.nom || 'Inconnu',
         typePaiement: r.statutPaiement,
         montantTotal: r.prixTotal,
         montantPaye,
-        partRestauration: totalRepas,
-        partHebergement: Math.max(0, (r.prixTotal || 0) - totalRepas)
+        partRestauration: partRestaurationEncaissee,
+        partSalles: partSallesEncaissee,
+        partTaxeSejour: partTaxeEncaissee,
+        partHebergement: partHebergementEncaissee
       };
     });
 
@@ -3685,6 +3895,320 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
   }
 });
 
+// --- CLIENT MODIFICATION ROUTES ---
+
+app.get('/api/reservation/modify/info/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token },
+      include: { client: true, occupants: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable ou lien expiré." });
+    }
+    res.json(reservation);
+  } catch (error) {
+    console.error("Erreur modify info:", error);
+    res.status(500).json({ error: "Erreur lors de la récupération de la réservation." });
+  }
+});
+
+app.post('/api/reservation/modify/recalculate/:token', async (req, res) => {
+  const { token } = req.params;
+  const { dateDebut, dateFin, chambres, chambresDetails, options, repas, salles } = req.body;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+    const newPrice = await recalculerPrix(
+      dateDebut,
+      dateFin,
+      chambres,
+      chambresDetails,
+      options,
+      reservation.codePromo,
+      repas,
+      salles
+    );
+    res.json({
+      originalPrice: reservation.prixTotal,
+      newPrice: newPrice,
+      difference: Math.round((newPrice - reservation.prixTotal) * 100) / 100
+    });
+  } catch (error) {
+    console.error("Erreur recalcul:", error);
+    res.status(500).json({ error: "Erreur lors du calcul du prix." });
+  }
+});
+
+app.post('/api/reservation/modify/:token', async (req, res) => {
+  const { token } = req.params;
+  const { dateDebut, dateFin, chambres, chambresDetails, options, repas, salles, occupants } = req.body;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+    const proposedPrice = await recalculerPrix(
+      dateDebut,
+      dateFin,
+      chambres,
+      chambresDetails,
+      options,
+      reservation.codePromo,
+      repas,
+      salles
+    );
+
+    const modificationProposed = {
+      dateDebut,
+      dateFin,
+      chambres,
+      chambresDetails,
+      options,
+      repas,
+      salles,
+      occupants,
+      prixTotal: proposedPrice
+    };
+
+    const updated = await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: {
+        modificationProposed: modificationProposed
+      }
+    });
+
+    const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
+    const dDebutOld = new Date(reservation.dateDebut).toLocaleDateString('fr-FR');
+    const dFinOld = new Date(reservation.dateFin).toLocaleDateString('fr-FR');
+    const dDebutNew = new Date(dateDebut).toLocaleDateString('fr-FR');
+    const dFinNew = new Date(dateFin).toLocaleDateString('fr-FR');
+
+    await sendMail({
+      to: adminEmail,
+      subject: `⚡ Demande de modification de réservation - ${reservation.client.nom}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #004B93; margin-top: 0;">Demande de modification reçue</h2>
+          <p>Le client <strong>${reservation.client.nom}</strong> a soumis une demande de modification pour sa réservation <strong>#${reservation.id}</strong>.</p>
+          
+          <table width="100%" cellpadding="10" cellspacing="0" style="border-collapse: collapse; margin: 20px 0;">
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <th align="left">Détail</th>
+              <th align="left">Actuel</th>
+              <th align="left" style="color: #004B93;">Proposé</th>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td><strong>Dates</strong></td>
+              <td>Du ${dDebutOld} au ${dFinOld}</td>
+              <td style="color: #004B93; font-weight: bold;">Du ${dDebutNew} au ${dFinNew}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td><strong>Chambres</strong></td>
+              <td>${reservation.chambres.join(', ')}</td>
+              <td style="color: #004B93; font-weight: bold;">${chambres.join(', ')}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td><strong>Prix</strong></td>
+              <td>${(reservation.prixTotal || 0).toFixed(2)} €</td>
+              <td style="color: #004B93; font-weight: bold;">${proposedPrice.toFixed(2)} €</td>
+            </tr>
+          </table>
+          
+          <p style="margin-top: 25px;">
+            Veuillez vous connecter à l'espace administrateur pour valider ou refuser cette modification.
+          </p>
+          <p style="text-align: center; margin-top: 25px;">
+            <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder au Tableau de Bord Admin</a>
+          </p>
+        </div>
+      `
+    });
+
+    res.json({ success: true, message: "Demande de modification soumise à l'administrateur." });
+  } catch (error) {
+    console.error("Erreur soumission modify:", error);
+    res.status(500).json({ error: "Erreur lors de la soumission de la modification." });
+  }
+});
+
+// --- ADMIN MODIFICATION MANAGEMENT ROUTES ---
+
+app.post('/api/admin/reservations/:id/accept-modification', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+    if (!reservation.modificationProposed) {
+      return res.status(400).json({ error: "Aucune modification proposée pour cette réservation." });
+    }
+
+    const proposed = reservation.modificationProposed;
+    const newTotal = proposed.prixTotal;
+    const repasTotal = calculerTotalRepasServeur(proposed.repas);
+    const montantHebergement = Math.max(0, newTotal - repasTotal);
+    const proposedAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+    const proposedSolde = Math.round((newTotal - proposedAcompte) * 100) / 100;
+
+    const updatedReservation = await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: {
+        dateDebut: new Date(proposed.dateDebut),
+        dateFin: new Date(proposed.dateFin),
+        chambres: proposed.chambres,
+        chambresDetails: proposed.chambresDetails,
+        options: proposed.options,
+        repas: proposed.repas,
+        salles: proposed.salles,
+        prixTotal: newTotal,
+        montantAcompte: reservation.statutPaiement === 'PAYE' ? 0 : proposedAcompte,
+        montantSolde: reservation.statutPaiement === 'PAYE' ? newTotal : proposedSolde,
+        modificationProposed: null
+      },
+      include: { client: true }
+    });
+
+    await prisma.occupant.deleteMany({
+      where: { reservationId: reservation.id }
+    });
+
+    if (proposed.occupants && proposed.occupants.length > 0) {
+      await prisma.occupant.createMany({
+        data: proposed.occupants.map(occ => {
+          const estAdulte = occ.estAdulte === true || occ.estAdulte === 'true';
+          let occNom = occ.nom;
+          let occPrenom = occ.prenom;
+          if (!estAdulte && (!occNom?.trim() && !occPrenom?.trim())) {
+            occNom = "Mineur";
+            occPrenom = "";
+          }
+          const age = (occ.age !== undefined && occ.age !== null && occ.age !== '') ? parseInt(occ.age) : null;
+          let nationalite = occ.nationalite || 'Française';
+          return {
+            reservationId: reservation.id,
+            nom: occNom || '',
+            prenom: occPrenom || '',
+            estAdulte,
+            age,
+            nationalite
+          };
+        })
+      });
+    }
+
+    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const modificationLinkHTML = getModificationLinkHTML(reservation.tokenModification);
+
+    await sendMail({
+      to: reservation.client.email,
+      subject: "Confirmation de modification de votre séjour - Gîte de La Maladrerie",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #004B93; margin-top: 0;">Séjour mis à jour avec succès</h2>
+          <p>Bonjour ${reservation.client.nom},</p>
+          <p>Nous vous confirmons que votre demande de modification pour votre séjour au <strong>Gîte de La Maladrerie</strong> a été acceptée et enregistrée par votre conseiller.</p>
+          
+          <table width="100%" cellpadding="10" cellspacing="0" style="background-color: #f8fafc; border-radius: 8px; margin: 20px 0;">
+            <tr>
+              <td><strong>Période :</strong></td>
+              <td>Du ${new Date(proposed.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(proposed.dateFin).toLocaleDateString('fr-FR')}</td>
+            </tr>
+            <tr>
+              <td><strong>Chambres :</strong></td>
+              <td>${proposed.chambres.join(', ')}</td>
+            </tr>
+            <tr>
+              <td><strong>Nouveau montant total :</strong></td>
+              <td style="font-weight: bold; color: #004B93;">${newTotal.toFixed(2)} €</td>
+            </tr>
+          </table>
+
+          <p>Vos documents et échéances de paiement ont été mis à jour en conséquence. Si un ajustement de paiement est nécessaire, notre équipe prendra contact avec vous ou vous recevrez un lien dédié.</p>
+          
+          ${modificationLinkHTML}
+          
+          <p style="margin-top: 25px;">Nous restons à votre entière disposition.</p>
+          
+          ${adminSignatureHTML}
+        </div>
+      `
+    });
+
+    res.json({ success: true, reservation: updatedReservation });
+  } catch (error) {
+    console.error("Erreur accept modification:", error);
+    res.status(500).json({ error: "Erreur lors de la validation de la modification." });
+  }
+});
+
+app.post('/api/admin/reservations/:id/reject-modification', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+    if (!reservation.modificationProposed) {
+      return res.status(400).json({ error: "Aucune modification proposée pour cette réservation." });
+    }
+
+    const proposed = reservation.modificationProposed;
+
+    const updatedReservation = await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: {
+        modificationProposed: null
+      }
+    });
+
+    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const modificationLinkHTML = getModificationLinkHTML(reservation.tokenModification);
+
+    await sendMail({
+      to: reservation.client.email,
+      subject: "Information concernant votre demande de modification - Gîte de La Maladrerie",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #dc2626; margin-top: 0;">Demande de modification non validée</h2>
+          <p>Bonjour ${reservation.client.nom},</p>
+          <p>Nous avons bien reçu votre demande de modification de séjour du <strong>${new Date(proposed.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(proposed.dateFin).toLocaleDateString('fr-FR')}</strong>.</p>
+          <p>Malheureusement, après étude de votre dossier par votre conseiller, cette modification n'a pas pu être validée (pour des raisons de disponibilité ou de contraintes logistiques).</p>
+          <p>Votre réservation initiale reste <strong>active et inchangée</strong> aux conditions initialement prévues.</p>
+          
+          ${modificationLinkHTML}
+          
+          <p style="margin-top: 25px;">N'hésitez pas à contacter votre conseiller pour échanger sur vos besoins.</p>
+          
+          ${adminSignatureHTML}
+        </div>
+      `
+    });
+
+    res.json({ success: true, reservation: updatedReservation });
+  } catch (error) {
+    console.error("Erreur reject modification:", error);
+    res.status(500).json({ error: "Erreur lors du rejet de la modification." });
+  }
+});
+
 // ==== PORTAIL INTERVENANT ====
 
 // Connexion Intervenant (vérification email)
@@ -3905,6 +4429,7 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
         structure: structure || null,
         validePar: req.user.email,
         tokenDevis: token,
+        tokenModification: require('crypto').randomBytes(32).toString('hex'),
         client: {
           create: { nom, email: email || 'N/A', telephone: telephone || 'N/A', adressePostale: adressePostale || null }
         },
@@ -4038,6 +4563,10 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
           </div>
         ` : '';
 
+        const adminEmail = req.user.email;
+        const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+        const modificationLinkHTML = getModificationLinkHTML(updatedReservation.tokenModification);
+
         await sendMail({
           to: email,
           subject: "Confirmation d'enregistrement de votre réservation - Gîte de La Maladrerie",
@@ -4059,7 +4588,11 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
                         ${paymentSectionHtml}
                         ${occupantsSectionHtml}
                         
-                        <p style="margin-top: 30px;">À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
+                        ${modificationLinkHTML}
+                        
+                        <p style="margin-top: 30px;">À très bientôt !</p>
+                        
+                        ${adminSignatureHTML}
                       </td>
                     </tr>
                     <tr><td style="background-color: #FDB913; height: 5px;"></td></tr>

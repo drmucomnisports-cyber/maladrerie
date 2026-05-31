@@ -41,6 +41,8 @@ model Reservation {
   statut          String       @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE, RESERVE, DEVIS_EN_ATTENTE, DEVIS_EXPIRE
   validePar       String?      // Nom de l'admin ayant validé
   tokenDevis      String?      @unique
+  tokenModification String?    @unique
+  modificationProposed Json?
   expireLe        DateTime?    // Pour les devis (48h)
   numeroDevis     String?      @unique
   isGroupe        Boolean      @default(false)
