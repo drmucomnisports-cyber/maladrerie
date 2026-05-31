@@ -117,8 +117,47 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
     const paymentType = session.metadata?.paymentType?.toLowerCase(); // 'acompte', 'solde', 'caution'
     
     if(reservationId) {
-               if (paymentType === 'acompte') {
-          let balancePaymentLink = '';
+      // Calcul des frais Stripe
+      let stripeFee = 0;
+      if (session.payment_intent) {
+        try {
+          const pi = await stripe.paymentIntents.retrieve(session.payment_intent, {
+            expand: ['latest_charge.balance_transaction']
+          });
+          const charge = pi.latest_charge;
+          if (charge && charge.balance_transaction) {
+            stripeFee = charge.balance_transaction.fee / 100;
+          }
+        } catch (stripeErr) {
+          console.error("Erreur récupération frais réels Stripe via API:", stripeErr);
+        }
+      }
+      if (stripeFee === 0 && session.amount_total) {
+        // Fallback standard : 1.4% + 0.25€
+        stripeFee = Math.round(((session.amount_total / 100) * 0.014 + 0.25) * 100) / 100;
+      }
+
+      // Enregistrer automatiquement les frais Stripe en dépense
+      if (stripeFee > 0 && (paymentType === 'acompte' || paymentType === 'solde' || paymentType === 'totalite')) {
+        try {
+          await prisma.expense.create({
+            data: {
+              date: new Date(),
+              label: `Frais Stripe - Réservation #${reservationId} (${paymentType.toUpperCase()})`,
+              montant: stripeFee,
+              categorie: 'Frais bancaires & Commissions Stripe',
+              comptePcg: '627',
+              description: `Automatique: Frais Stripe pour la session ${session.id}`
+            }
+          });
+          console.log(`Frais Stripe de ${stripeFee} € enregistrés en dépense pour la résa ${reservationId}`);
+        } catch (expErr) {
+          console.error("Erreur création dépense commission Stripe:", expErr);
+        }
+      }
+
+      if (paymentType === 'acompte') {
+        let balancePaymentLink = '';
           let stripeSoldeId = null;
           
           try {
@@ -811,6 +850,57 @@ function calculerTotalRepasServeur(repas) {
   });
   return total;
 }
+
+// --- HELPER : Calculer le coût de revient des déjeuners et dîners (7.11€ / 6.23€) ---
+function calculerCoutRepasServeur(repas) {
+  if (!repas) return 0;
+  let totalCout = 0;
+  Object.values(repas).forEach(day => {
+    if (day.DEJEUNER) {
+      totalCout += (parseInt(day.DEJEUNER.ADULTE || 0) * 7.11);
+      totalCout += (parseInt(day.DEJEUNER.ENFANT_MOINS_12 || 0) * 6.23);
+      totalCout += (parseInt(day.DEJEUNER.ENFANT_MOINS_5 || 0) * 6.23);
+    }
+    if (day.DINER) {
+      totalCout += (parseInt(day.DINER.ADULTE || 0) * 7.11);
+      totalCout += (parseInt(day.DINER.ENFANT_MOINS_12 || 0) * 6.23);
+      totalCout += (parseInt(day.DINER.ENFANT_MOINS_5 || 0) * 6.23);
+    }
+  });
+  return Math.round(totalCout * 100) / 100;
+}
+
+// --- HELPER : Calculer le détail des revenus par type de repas ---
+function calculerRevenuRepasServeur(repas) {
+  if (!repas) return { total: 0, petitDej: 0, dejeuner: 0, diner: 0 };
+  let petitDej = 0;
+  let dejeuner = 0;
+  let diner = 0;
+  Object.values(repas).forEach(day => {
+    if (day.PETIT_DEJ) {
+      petitDej += (parseInt(day.PETIT_DEJ.ADULTE || 0) * 6);
+      petitDej += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_12 || 0) * 5);
+      petitDej += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_5 || 0) * 4);
+    }
+    if (day.DEJEUNER) {
+      dejeuner += (parseInt(day.DEJEUNER.ADULTE || 0) * 11.5);
+      dejeuner += (parseInt(day.DEJEUNER.ENFANT_MOINS_12 || 0) * 9.5);
+      dejeuner += (parseInt(day.DEJEUNER.ENFANT_MOINS_5 || 0) * 8);
+    }
+    if (day.DINER) {
+      diner += (parseInt(day.DINER.ADULTE || 0) * 14);
+      diner += (parseInt(day.DINER.ENFANT_MOINS_12 || 0) * 12);
+      diner += (parseInt(day.DINER.ENFANT_MOINS_5 || 0) * 10);
+    }
+  });
+  return {
+    total: Math.round((petitDej + dejeuner + diner) * 100) / 100,
+    petitDej: Math.round(petitDej * 100) / 100,
+    dejeuner: Math.round(dejeuner * 100) / 100,
+    diner: Math.round(diner * 100) / 100
+  };
+}
+
 
 // --- HELPER : Générer la section Options, Repas et Salles pour les e-mails ---
 function generateOptionsHTML(options, repas, salles) {
@@ -3208,24 +3298,39 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     const reservationsPayees = await prisma.reservation.findMany({
       where: {
         statutPaiement: { in: ['ACOMPTE_PAYE', 'PAYE'] }
-      }
+      },
+      include: { client: true }
     });
     
     let caEnquaisse = 0;
+    let caHebergementEncaisse = 0;
+    let caRestaurationEncaisse = 0;
+
     reservationsPayees.forEach(r => {
+      const { total: totalRepas } = calculerRevenuRepasServeur(r.repas);
       if (r.statutPaiement === 'PAYE') {
         caEnquaisse += (r.prixTotal || 0);
+        caRestaurationEncaisse += totalRepas;
+        caHebergementEncaisse += Math.max(0, (r.prixTotal || 0) - totalRepas);
       } else if (r.statutPaiement === 'ACOMPTE_PAYE') {
         caEnquaisse += (r.montantAcompte || 0);
+        // L'acompte inclut 100% des repas s'il y en a + 30% hébergement.
+        if (totalRepas >= (r.montantAcompte || 0)) {
+          caRestaurationEncaisse += (r.montantAcompte || 0);
+        } else {
+          caRestaurationEncaisse += totalRepas;
+          caHebergementEncaisse += ((r.montantAcompte || 0) - totalRepas);
+        }
       }
     });
 
-    // 2. Reste à  encaisser (Acompte en attente ou Solde en attente)
+    // 2. Reste à encaisser (Acompte en attente ou Solde en attente)
     const reservationsEnAttente = await prisma.reservation.findMany({
       where: {
         statut: 'RESERVE',
         statutPaiement: { not: 'PAYE' }
-      }
+      },
+      include: { client: true }
     });
 
     let resteAEncaisser = 0;
@@ -3255,21 +3360,76 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     // 4. Prochains paiements attendus
     const prochainsPaiements = reservationsEnAttente.map(r => ({
       reservationId: r.id,
+      clientNom: r.client?.nom || 'Inconnu',
       dateDebut: r.dateDebut,
       typeAttendu: r.statutPaiement === 'EN_ATTENTE' ? (calculerTotalRepasServeur(r.repas) > 0 ? 'Acompte (30% Hébergement + 100% Repas)' : 'Acompte (30%)') : 'SOLDE (70%)',
       montant: r.statutPaiement === 'EN_ATTENTE' ? r.montantAcompte : r.montantSolde
     })).sort((a, b) => new Date(a.dateDebut) - new Date(b.dateDebut));
 
+    // 5. Récupération des dépenses manuelles et commissions Stripe automatiques
+    const expenses = await prisma.expense.findMany({
+      orderBy: { date: 'desc' }
+    });
+
+    // 6. Calcul automatique du coût des repas (Déjeuners & Dîners) pour les réservations confirmées/terminées
+    const reservationsMangeants = await prisma.reservation.findMany({
+      where: {
+        statut: { in: ['RESERVE', 'TERMINE'] }
+      },
+      include: { client: true }
+    });
+
+    let totalCoutRepasCalcules = 0;
+    const repasCoutsDetailles = [];
+
+    reservationsMangeants.forEach(r => {
+      const cost = calculerCoutRepasServeur(r.repas);
+      if (cost > 0) {
+        totalCoutRepasCalcules += cost;
+        repasCoutsDetailles.push({
+          id: `repas-res-${r.id}`,
+          date: r.dateDebut,
+          label: `Coût repas (Déj/Dîn) - Réservation #${r.id} (${r.client?.nom || 'Client'})`,
+          montant: cost,
+          categorie: "Coût d'achat des repas (Restauration)",
+          comptePcg: "601",
+          description: `Calcul automatique: Déjeuners/Dîners pour la résa #${r.id}`
+        });
+      }
+    });
+
+    // 7. Consolidation des Recettes détaillées
+    const recettesDetaillees = reservationsPayees.map(r => {
+      const { total: totalRepas } = calculerRevenuRepasServeur(r.repas);
+      const montantPaye = r.statutPaiement === 'PAYE' ? (r.prixTotal || 0) : (r.montantAcompte || 0);
+      return {
+        id: r.id,
+        date: r.createdAt,
+        clientNom: r.client?.nom || 'Inconnu',
+        typePaiement: r.statutPaiement,
+        montantTotal: r.prixTotal,
+        montantPaye,
+        partRestauration: totalRepas,
+        partHebergement: Math.max(0, (r.prixTotal || 0) - totalRepas)
+      };
+    });
+
     res.json({
       caEnquaisse,
+      caHebergementEncaisse,
+      caRestaurationEncaisse,
       resteAEncaisser,
       remunerationTotale,
       remunerationParIntervenant,
-      prochainsPaiements
+      prochainsPaiements,
+      expenses,
+      repasCoutsDetailles,
+      totalCoutRepasCalcules,
+      recettesDetaillees
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Erreur calcul finances:", error);
     res.status(500).json({ error: 'Erreur lors du calcul des données financières' });
   }
 });
@@ -4382,6 +4542,78 @@ app.put('/api/admin/promo-codes/:id', checkAuth, async (req, res) => {
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la mise à  jour du code promo' });
+  }
+});
+
+// ===== EXPENSES (DEPENSES) =====
+
+// Obtenir toutes les dépenses manuelles
+app.get('/api/admin/expenses', checkAuth, async (req, res) => {
+  try {
+    const expenses = await prisma.expense.findMany({ orderBy: { date: 'desc' } });
+    res.json(expenses);
+  } catch (error) {
+    console.error("Erreur récupération dépenses:", error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des dépenses' });
+  }
+});
+
+// Créer une dépense
+app.post('/api/admin/expenses', checkAuth, async (req, res) => {
+  const { label, montant, categorie, comptePcg, description, date } = req.body;
+  if (!label || montant === undefined || !categorie || !comptePcg) {
+    return res.status(400).json({ error: 'Libellé, montant, catégorie et compte PCG sont requis' });
+  }
+  try {
+    const expense = await prisma.expense.create({
+      data: {
+        label,
+        montant: parseFloat(montant),
+        categorie,
+        comptePcg,
+        description: description || null,
+        date: date ? new Date(date) : new Date()
+      }
+    });
+    res.status(201).json(expense);
+  } catch (error) {
+    console.error("Erreur création dépense:", error);
+    res.status(500).json({ error: 'Erreur lors de la création de la dépense' });
+  }
+});
+
+// Modifier une dépense
+app.put('/api/admin/expenses/:id', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const { label, montant, categorie, comptePcg, description, date } = req.body;
+  try {
+    const updated = await prisma.expense.update({
+      where: { id: parseInt(id) },
+      data: {
+        label,
+        montant: montant !== undefined ? parseFloat(montant) : undefined,
+        categorie,
+        comptePcg,
+        description,
+        date: date ? new Date(date) : undefined
+      }
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error("Erreur modification dépense:", error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour de la dépense' });
+  }
+});
+
+// Supprimer une dépense
+app.delete('/api/admin/expenses/:id', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.expense.delete({ where: { id: parseInt(id) } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Erreur suppression dépense:", error);
+    res.status(500).json({ error: 'Erreur lors de la suppression de la dépense' });
   }
 });
 

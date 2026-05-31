@@ -31,6 +31,19 @@ const formatAdminName = (validePar) => {
   return validePar.charAt(0).toUpperCase() + validePar.slice(1);
 };
 
+const PCG_CATEGORIES = [
+  { code: '6063', name: 'Produits d\'entretien & petit équipement' },
+  { code: '6068', name: 'Achats alimentaires & consommables' },
+  { code: '613', name: 'Loyer & locations' },
+  { code: '6061', name: 'Fluides (Électricité, Eau, Gaz)' },
+  { code: '615', name: 'Entretien & réparations du gîte' },
+  { code: '616', name: 'Primes d\'assurances' },
+  { code: '623', name: 'Publicité & Communication' },
+  { code: '627', name: 'Frais bancaires & Commissions Stripe' },
+  { code: '626', name: 'Télécoms (Internet, Abonnements)' },
+  { code: '658', name: 'Charges diverses de gestion courante' }
+];
+
 const Admin = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -52,6 +65,17 @@ const Admin = () => {
   // Finances & Missions
   const [finances, setFinances] = useState(null);
   const [showMissionModal, setShowMissionModal] = useState(false);
+  const [financeSubTab, setFinanceSubTab] = useState('recettes'); // 'recettes' or 'depenses'
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [expenseForm, setExpenseForm] = useState({
+    label: '',
+    montant: '',
+    categorie: 'Produits d\'entretien & petit équipement',
+    comptePcg: '6063',
+    description: '',
+    date: new Date().toISOString().substring(0, 10)
+  });
   const [editingReservation, setEditingReservation] = useState(null);
   const [currentReservationForMission, setCurrentReservationForMission] = useState(null);
   const [missionChecks, setMissionChecks] = useState({
@@ -466,6 +490,69 @@ const Admin = () => {
       }
     } catch (err) {
       console.error("Erreur finances:", err);
+    }
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!window.confirm('Voulez-vous vraiment supprimer cette dépense ?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/expenses/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showFeedback('Dépense supprimée avec succès');
+        fetchFinances();
+      } else {
+        const data = await res.json();
+        showFeedback(data.error || 'Erreur lors de la suppression', 'error');
+      }
+    } catch (err) {
+      showFeedback('Erreur réseau', 'error');
+    }
+  };
+
+  const handleSaveExpense = async (e) => {
+    e.preventDefault();
+    if (!expenseForm.label || !expenseForm.montant || !expenseForm.categorie || !expenseForm.comptePcg) {
+      showFeedback('Veuillez remplir tous les champs obligatoires', 'error');
+      return;
+    }
+
+    const method = editingExpense ? 'PUT' : 'POST';
+    const url = editingExpense 
+      ? `${API_URL}/api/admin/expenses/${editingExpense.id}`
+      : `${API_URL}/api/admin/expenses`;
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(expenseForm)
+      });
+
+      if (res.ok) {
+        showFeedback(editingExpense ? 'Dépense modifiée avec succès' : 'Dépense ajoutée avec succès');
+        setShowExpenseModal(false);
+        setEditingExpense(null);
+        setExpenseForm({
+          label: '',
+          montant: '',
+          categorie: 'Produits d\'entretien & petit équipement',
+          comptePcg: '6063',
+          description: '',
+          date: new Date().toISOString().substring(0, 10)
+        });
+        fetchFinances();
+      } else {
+        const data = await res.json();
+        showFeedback(data.error || 'Erreur lors de l\'enregistrement', 'error');
+      }
+    } catch (err) {
+      showFeedback('Erreur réseau', 'error');
     }
   };
 
@@ -1518,70 +1605,286 @@ const Admin = () => {
 
       {activeTab === 'finances' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
-              <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs mb-2">Chiffre d'Affaires Encaissé</h3>
-              <p className="text-4xl font-black text-green-500">{finances?.caEnquaisse ? finances.caEnquaisse.toFixed(2) : '0.00'} €</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
-              <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs mb-2">Reste à Encaisser</h3>
-              <p className="text-4xl font-black text-amber-500">{finances?.resteAEncaisser ? finances.resteAEncaisser.toFixed(2) : '0.00'} €</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
-              <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs mb-2">Rémunération Totale (Missions)</h3>
-              <p className="text-4xl font-black text-muc-blue">{finances?.remunerationTotale ? finances.remunerationTotale.toFixed(2) : '0.00'} €</p>
-            </div>
+          {/* Sous-navigation interne Finances */}
+          <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex gap-4">
+            <button
+              onClick={() => setFinanceSubTab('recettes')}
+              className={`px-4 py-2 font-black uppercase tracking-widest text-xs rounded-xl transition-all ${
+                financeSubTab === 'recettes'
+                  ? 'bg-muc-blue text-white shadow-md'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              📈 Recettes (Revenues)
+            </button>
+            <button
+              onClick={() => setFinanceSubTab('depenses')}
+              className={`px-4 py-2 font-black uppercase tracking-widest text-xs rounded-xl transition-all ${
+                financeSubTab === 'depenses'
+                  ? 'bg-muc-blue text-white shadow-md'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              📉 Dépenses (Expenses)
+            </button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden mt-6 mb-6">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-black text-slate-800 uppercase tracking-widest">Taxe de Séjour à reverser</h3>
-              <div className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold">Basé sur le mois d'arrivée</div>
-            </div>
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {taxesSejourArray.length > 0 ? taxesSejourArray.map((t, idx) => (
-                <div key={idx} className="flex justify-between items-center p-4 border border-amber-100 rounded-xl bg-amber-50">
-                  <span className="text-sm font-bold text-amber-900 capitalize">{t.label}</span>
-                  <span className="text-lg font-black text-amber-600">{t.total.toFixed(2)} €</span>
+          {financeSubTab === 'recettes' ? (
+            <div className="space-y-6">
+              {/* Recettes KPIs */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                  <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">CA Global Encaissé</h3>
+                  <p className="text-3xl font-black text-green-500">{finances?.caEnquaisse ? finances.caEnquaisse.toFixed(2) : '0.00'} €</p>
                 </div>
-              )) : <p className="text-sm text-slate-500 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-              <div className="p-6 border-b border-slate-100">
-                <h3 className="font-black text-slate-800 uppercase tracking-widest">Prochains Paiements Attendus</h3>
+                <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                  <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">Part Hébergement</h3>
+                  <p className="text-3xl font-black text-muc-blue">{finances?.caHebergementEncaisse ? finances.caHebergementEncaisse.toFixed(2) : '0.00'} €</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                  <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">Part Restauration</h3>
+                  <p className="text-3xl font-black text-orange-500">{finances?.caRestaurationEncaisse ? finances.caRestaurationEncaisse.toFixed(2) : '0.00'} €</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                  <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">Reste à Encaisser</h3>
+                  <p className="text-3xl font-black text-amber-500">{finances?.resteAEncaisser ? finances.resteAEncaisser.toFixed(2) : '0.00'} €</p>
+                </div>
               </div>
-              <div className="p-4 overflow-y-auto max-h-80 space-y-3">
-                {finances?.prochainsPaiements?.length > 0 ? finances.prochainsPaiements.map((p, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-3 border border-slate-100 rounded-lg bg-slate-50">
-                    <div>
-                      <span className="text-xs font-bold text-slate-500 uppercase">{p.typeAttendu}</span>
-                      <p className="text-sm font-bold text-slate-800">Résa #{p.reservationId} (Du {new Date(p.dateDebut).toLocaleDateString('fr-FR')})</p>
+
+              {/* Taxe de séjour */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">Taxe de Séjour à reverser</h3>
+                  <div className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold">Basé sur le mois d'arrivée</div>
+                </div>
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {taxesSejourArray.length > 0 ? taxesSejourArray.map((t, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-4 border border-amber-100 rounded-xl bg-amber-50">
+                      <span className="text-xs font-bold text-amber-900 capitalize">{t.label}</span>
+                      <span className="text-base font-black text-amber-600">{t.total.toFixed(2)} €</span>
                     </div>
-                    <span className="text-lg font-black text-muc-blue">{p.montant ? p.montant.toFixed(2) : '0.00'} €</span>
+                  )) : <p className="text-sm text-slate-500 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
+                </div>
+              </div>
+
+              {/* Prochains paiements & Historique */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Prochains paiements */}
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden lg:col-span-1">
+                  <div className="p-6 border-b border-slate-100">
+                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">Prochains Paiements Attendus</h3>
                   </div>
-                )) : <p className="text-sm text-slate-500 italic p-4 text-center">Aucun paiement en attente.</p>}
-              </div>
-            </div>
+                  <div className="p-4 overflow-y-auto max-h-96 space-y-3">
+                    {finances?.prochainsPaiements?.length > 0 ? finances.prochainsPaiements.map((p, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-3 border border-slate-100 rounded-lg bg-slate-50">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase block truncate">{p.typeAttendu}</span>
+                          <p className="text-xs font-bold text-slate-800 truncate">Client: {p.clientNom}</p>
+                          <p className="text-[10px] text-slate-400">Résa #{p.reservationId} (Du {new Date(p.dateDebut).toLocaleDateString('fr-FR')})</p>
+                        </div>
+                        <span className="text-sm font-black text-muc-blue shrink-0">{p.montant ? p.montant.toFixed(2) : '0.00'} €</span>
+                      </div>
+                    )) : <p className="text-sm text-slate-500 italic p-4 text-center">Aucun paiement en attente.</p>}
+                  </div>
+                </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-              <div className="p-6 border-b border-slate-100">
-                <h3 className="font-black text-slate-800 uppercase tracking-widest">Rémunération par Intervenant</h3>
-              </div>
-              <div className="p-4 overflow-y-auto max-h-80 space-y-3">
-                {finances?.remunerationParIntervenant && Object.keys(finances.remunerationParIntervenant).length > 0 ? (
-                  Object.entries(finances.remunerationParIntervenant).map(([nom, montant], idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 border border-slate-100 rounded-lg bg-slate-50">
-                      <span className="text-sm font-bold text-slate-800">{nom}</span>
-                      <span className="text-lg font-black text-muc-blue">{montant.toFixed(2)} €</span>
-                    </div>
-                  ))
-                ) : <p className="text-sm text-slate-500 italic p-4 text-center">Aucune rémunération calculée.</p>}
+                {/* Historique des Recettes */}
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden lg:col-span-2">
+                  <div className="p-6 border-b border-slate-100">
+                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">Historique des Encaissements</h3>
+                  </div>
+                  <div className="p-4 overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                          <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Client</th>
+                          <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Hébergement</th>
+                          <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Restauration</th>
+                          <th className="p-3 font-bold text-slate-500 uppercase tracking-wider text-right">Total Encaissé</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {finances?.recettesDetaillees?.length > 0 ? (
+                          finances.recettesDetaillees.map((r, idx) => (
+                            <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                              <td className="p-3 font-medium text-slate-500">{new Date(r.date).toLocaleDateString('fr-FR')}</td>
+                              <td className="p-3 font-bold text-slate-800">Résa #{r.id} ({r.clientNom})</td>
+                              <td className="p-3 font-bold text-muc-blue">{r.partHebergement.toFixed(2)} €</td>
+                              <td className="p-3 font-bold text-orange-500">{r.partRestauration.toFixed(2)} €</td>
+                              <td className="p-3 font-black text-green-600 text-right">{r.montantPaye.toFixed(2)} €</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="5" className="p-8 text-center text-slate-400 italic">Aucune recette enregistrée</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Dépenses KPIs */}
+              {(() => {
+                const totalManuellesEtStripe = finances?.expenses?.reduce((sum, e) => sum + e.montant, 0) || 0;
+                const totalMissions = finances?.remunerationTotale || 0;
+                const totalRepas = finances?.totalCoutRepasCalcules || 0;
+                const grandTotalDepenses = totalManuellesEtStripe + totalMissions + totalRepas;
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">Total des Dépenses</h3>
+                      <p className="text-3xl font-black text-red-500">{grandTotalDepenses.toFixed(2)} €</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">Dépenses Courantes (Saisies/Stripe)</h3>
+                      <p className="text-3xl font-black text-slate-800">{totalManuellesEtStripe.toFixed(2)} €</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">Rémunérations Intervenants</h3>
+                      <p className="text-3xl font-black text-muc-blue">{totalMissions.toFixed(2)} €</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">Coût de revient Repas</h3>
+                      <p className="text-3xl font-black text-orange-500">{totalRepas.toFixed(2)} €</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Dépenses Courantes & Bouton d'ajout */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">Registre des Dépenses</h3>
+                  <button
+                    onClick={() => {
+                      setEditingExpense(null);
+                      setExpenseForm({
+                        label: '',
+                        montant: '',
+                        categorie: 'Produits d\'entretien & petit équipement',
+                        comptePcg: '6063',
+                        description: '',
+                        date: new Date().toISOString().substring(0, 10)
+                      });
+                      setShowExpenseModal(true);
+                    }}
+                    className="w-full sm:w-auto bg-muc-blue text-white px-4 py-2.5 rounded-xl font-bold hover:bg-blue-800 hover:scale-105 transition-all shadow-md text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                  >
+                    <PlusCircle size={16} />
+                    Saisir une dépense
+                  </button>
+                </div>
+                <div className="p-4 overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Compte PCG</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Catégorie</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase tracking-wider">Libellé / Description</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase tracking-wider text-right">Montant</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase tracking-wider text-center">Type</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const manualExpenses = finances?.expenses || [];
+                        const mealsExpenses = finances?.repasCoutsDetailles || [];
+                        const combinedExpenses = [...manualExpenses, ...mealsExpenses].sort(
+                          (a, b) => new Date(b.date) - new Date(a.date)
+                        );
+
+                        if (combinedExpenses.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="7" className="p-8 text-center text-slate-400 italic">Aucune dépense enregistrée</td>
+                            </tr>
+                          );
+                        }
+
+                        return combinedExpenses.map((exp, idx) => {
+                          const isAuto = (typeof exp.id === 'string' && exp.id.startsWith('repas-res-')) || exp.description?.startsWith('Automatique:');
+                          return (
+                            <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                              <td className="p-3 font-medium text-slate-500">{new Date(exp.date).toLocaleDateString('fr-FR')}</td>
+                              <td className="p-3 font-bold"><span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-mono">{exp.comptePcg}</span></td>
+                              <td className="p-3 text-slate-600 font-bold">{exp.categorie}</td>
+                              <td className="p-3">
+                                <p className="font-bold text-slate-800">{exp.label}</p>
+                                {exp.description && <p className="text-[10px] text-slate-400 mt-0.5">{exp.description}</p>}
+                              </td>
+                              <td className="p-3 font-black text-red-600 text-right">{exp.montant.toFixed(2)} €</td>
+                              <td className="p-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isAuto ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                                  {isAuto ? 'Auto' : 'Saisie'}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right">
+                                {!isAuto ? (
+                                  <div className="flex justify-end gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        setEditingExpense(exp);
+                                        setExpenseForm({
+                                          label: exp.label,
+                                          montant: exp.montant.toString(),
+                                          categorie: exp.categorie,
+                                          comptePcg: exp.comptePcg,
+                                          description: exp.description || '',
+                                          date: new Date(exp.date).toISOString().substring(0, 10)
+                                        });
+                                        setShowExpenseModal(true);
+                                      }}
+                                      className="p-1 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
+                                      title="Modifier"
+                                    >
+                                      <Edit3 size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteExpense(exp.id)}
+                                      className="p-1 text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
+                                      title="Supprimer"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 italic text-[10px]">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Rémunérations Intervenants (Missions) */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-100">
+                  <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">Rémunération par Intervenant (Compte 611 / 621)</h3>
+                </div>
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {finances?.remunerationParIntervenant && Object.keys(finances.remunerationParIntervenant).length > 0 ? (
+                    Object.entries(finances.remunerationParIntervenant).map(([nom, montant], idx) => (
+                      <div key={idx} className="flex justify-between items-center p-4 border border-slate-100 rounded-xl bg-slate-50">
+                        <span className="text-xs font-bold text-slate-800">{nom}</span>
+                        <span className="text-base font-black text-muc-blue">{montant.toFixed(2)} €</span>
+                      </div>
+                    ))
+                  ) : <p className="text-sm text-slate-500 italic p-4 col-span-full text-center">Aucune rémunération calculée.</p>}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2192,6 +2495,101 @@ const Admin = () => {
               <button type="submit" disabled={isSavingProfile} className={`w-full py-4 bg-muc-blue text-white font-black uppercase tracking-widest rounded-xl hover:bg-muc-blue/90 shadow-lg transition-all ${isSavingProfile ? 'opacity-70 cursor-not-allowed' : ''}`}>
                 {isSavingProfile ? 'Enregistrement...' : 'Enregistrer les modifications'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showExpenseModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-100 p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-black text-muc-blue uppercase tracking-tight mb-4">
+              {editingExpense ? 'Modifier la dépense' : 'Saisir une dépense'}
+            </h3>
+            <form onSubmit={handleSaveExpense} className="space-y-4">
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={expenseForm.date}
+                  onChange={e => setExpenseForm({ ...expenseForm, date: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-muc-blue font-medium"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Libellé *</label>
+                <input
+                  type="text"
+                  value={expenseForm.label}
+                  onChange={e => setExpenseForm({ ...expenseForm, label: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-muc-blue font-medium"
+                  placeholder="ex: Achats produits d'entretien"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Montant TTC (€) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={expenseForm.montant}
+                    onChange={e => setExpenseForm({ ...expenseForm, montant: e.target.value })}
+                    className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-muc-blue font-bold"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Code PCG & Catégorie *</label>
+                  <select
+                    value={expenseForm.comptePcg}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      const cat = PCG_CATEGORIES.find(c => c.code === code);
+                      if (cat) {
+                        setExpenseForm({ ...expenseForm, comptePcg: code, categorie: cat.name });
+                      }
+                    }}
+                    className="w-full p-3 border border-slate-200 rounded-xl bg-white outline-none focus:border-muc-blue font-bold text-xs"
+                    required
+                  >
+                    {PCG_CATEGORIES.map(cat => (
+                      <option key={cat.code} value={cat.code}>
+                        {cat.code} - {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Description / Notes</label>
+                <textarea
+                  value={expenseForm.description || ''}
+                  onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-muc-blue font-medium h-20 resize-none"
+                  placeholder="Description détaillée de la dépense..."
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExpenseModal(false);
+                    setEditingExpense(null);
+                  }}
+                  className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 text-sm font-bold text-white bg-muc-blue hover:bg-blue-800 rounded-xl transition-all shadow-md"
+                >
+                  Enregistrer
+                </button>
+              </div>
             </form>
           </div>
         </div>
