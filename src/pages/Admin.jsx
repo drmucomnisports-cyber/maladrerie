@@ -16,6 +16,7 @@ const CHAMBRES_NAMES = {
 
 const formatAdminName = (validePar) => {
   if (!validePar) return '-';
+  if (validePar.toLowerCase() === 'admin') return 'David R.';
   if (validePar.startsWith('Système')) return 'Système';
   if (validePar.includes('@')) {
     const localPart = validePar.split('@')[0];
