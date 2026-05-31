@@ -14,6 +14,23 @@ const CHAMBRES_NAMES = {
   6: "Chambre 6"
 };
 
+const formatAdminName = (validePar) => {
+  if (!validePar) return '-';
+  if (validePar.startsWith('Système')) return 'Système';
+  if (validePar.includes('@')) {
+    const localPart = validePar.split('@')[0];
+    const parts = localPart.split(/[._-]/);
+    if (parts.length >= 2) {
+      const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+      const lastNameLetter = parts[parts.length - 1].charAt(0).toUpperCase();
+      return `${firstName} ${lastNameLetter}.`;
+    } else if (parts.length === 1) {
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+    }
+  }
+  return validePar.charAt(0).toUpperCase() + validePar.slice(1);
+};
+
 const Admin = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -863,26 +880,36 @@ const Admin = () => {
                           {res.taxeSejour > 0 && <div className="text-[10px] text-slate-500 font-normal italic mt-0.5">dont {res.taxeSejour.toFixed(2)} € de taxe de séjour</div>}
                         </div>
                         <div className="flex flex-col gap-1 mt-2">
-                          <div className="flex items-center justify-between text-[10px]">
+                          <div className="flex items-center justify-between text-[10px] gap-2">
                             <span className="text-slate-500 font-bold uppercase">Acompte (30%)</span>
                             {res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
                               <span className="text-green-600 font-bold">✓ Payé</span>
+                            ) : res.stripeAcompteId ? (
+                              <span className="text-blue-600 font-bold">Lien envoyé</span>
                             ) : (
                               <span className="text-amber-600 font-bold">En attente</span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between text-[10px]">
+                          <div className="flex items-center justify-between text-[10px] gap-2">
                             <span className="text-slate-500 font-bold uppercase">Solde (70%)</span>
                             {res.statutPaiement === 'PAYE' ? (
                               <span className="text-green-600 font-bold">✓ Payé</span>
+                            ) : res.stripeSoldeId ? (
+                              <span className="text-blue-600 font-bold">Lien envoyé</span>
                             ) : (
                               <span className="text-amber-600 font-bold">En attente</span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
+                          <div className="flex items-center justify-between text-[10px] gap-2 pt-1 border-t border-slate-100">
                             <span className="text-slate-500 font-bold uppercase">Caution</span>
                             {res.statutCaution === 'DEPOSEE' ? (
                               <span className="text-green-600 font-bold">✓ Déposée</span>
+                            ) : res.statutCaution === 'RESTITUEE' ? (
+                              <span className="text-slate-500 font-bold">✓ Restituée</span>
+                            ) : res.statutCaution === 'UTILISEE' ? (
+                              <span className="text-red-600 font-bold">⚠️ Retenue</span>
+                            ) : res.stripeCautionId ? (
+                              <span className="text-blue-600 font-bold">Lien envoyé</span>
                             ) : (
                               <span className="text-amber-600 font-bold">En attente</span>
                             )}
@@ -936,7 +963,7 @@ const Admin = () => {
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs font-bold text-slate-600">{res.validePar || '-'}</div>
+                        <div className="text-xs font-bold text-slate-600">{formatAdminName(res.validePar)}</div>
                       </td>
                       <td className="p-4 text-right">
                         <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')} à {new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
