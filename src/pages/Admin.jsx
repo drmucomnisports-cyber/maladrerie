@@ -99,6 +99,15 @@ const Admin = () => {
   const [intervenants, setIntervenants] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
   const [reservationSearch, setReservationSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
+
+  const handleSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
   const [intervenantSearch, setIntervenantSearch] = useState('');
 
   const [selectedClient, setSelectedClient] = useState(null);
@@ -905,13 +914,17 @@ const Admin = () => {
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Client</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Dates</th>
+                      <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Dates {sortConfig.key === 'dateDebut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Prestations</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Restauration</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tarif</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest min-w-[120px]">Tarif</th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Statut</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest">Validé par</th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Date de création</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest w-24">Validé par</th>
+                      <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                        Date de création {sortConfig.key === 'createdAt' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
                       <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                   </thead>
@@ -923,6 +936,18 @@ const Admin = () => {
                         res.client?.nom?.toLowerCase().includes(search) ||
                         res.client?.email?.toLowerCase().includes(search)
                       );
+                    }).sort((a, b) => {
+                      if (sortConfig.key === 'createdAt') {
+                        const dateA = new Date(a.createdAt);
+                        const dateB = new Date(b.createdAt);
+                        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+                      }
+                      if (sortConfig.key === 'dateDebut') {
+                        const dateA = new Date(a.dateDebut);
+                        const dateB = new Date(b.dateDebut);
+                        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+                      }
+                      return 0;
                     }).map((res) => (
                       <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <td className="p-4">
@@ -1123,7 +1148,13 @@ const Admin = () => {
                         <div className="text-xs font-bold text-slate-600">{formatAdminName(res.validePar)}</div>
                       </td>
                       <td className="p-4 text-right">
-                        <div className="text-xs font-bold text-slate-600">{new Date(res.createdAt).toLocaleDateString('fr-FR')} à {new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="text-xs font-bold text-slate-600">
+                          {new Date(res.createdAt).toLocaleDateString('fr-FR')}
+                          <br />
+                          <span className="font-normal text-slate-400">
+                            {new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-1.5">
@@ -1831,6 +1862,14 @@ const Admin = () => {
                     </div>
                 </div>
 
+                {/* RÉSULTAT */}
+                <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 flex flex-col items-center justify-center text-center transform transition-all hover:scale-[1.01]">
+                    <h3 className="text-slate-400 font-black uppercase tracking-widest text-sm mb-2">Résultat Net (Recettes - Dépenses)</h3>
+                    <p className={`text-6xl font-black ${resultatNet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {resultatNet >= 0 ? '+' : ''}{resultatNet.toFixed(2)} €
+                    </p>
+                </div>
+
                 {/* TAXE DE SEJOUR MENSUELLE */}
                 <div className="bg-amber-50 rounded-2xl shadow-xl border border-amber-100 overflow-hidden mt-8">
                     <div className="p-6 border-b border-amber-200 flex justify-between items-center bg-amber-100/50">
@@ -1848,14 +1887,6 @@ const Admin = () => {
                         )) : <p className="text-sm text-amber-700 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
                         </div>
                     </div>
-                </div>
-
-                {/* RÉSULTAT */}
-                <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 flex flex-col items-center justify-center text-center transform transition-all hover:scale-[1.01]">
-                    <h3 className="text-slate-400 font-black uppercase tracking-widest text-sm mb-2">Résultat Net (Recettes - Dépenses)</h3>
-                    <p className={`text-6xl font-black ${resultatNet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {resultatNet >= 0 ? '+' : ''}{resultatNet.toFixed(2)} €
-                    </p>
                 </div>
             </div>
         );
