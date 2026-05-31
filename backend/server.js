@@ -3425,6 +3425,36 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
                             </table>
                           </td>
                         </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background-color: #FDB913; height: 5px;"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        `
+      });
+
+      res.json(createdMissions);
+    } else {
+      res.json(createdMissions);
+    }
+  } catch (error) {
+    console.error("Erreur assignation missions:", error);
+    res.status(500).json({ error: "Erreur lors de la création des missions" });
+  }
+});
+
+function calculerDetailsFinanciersReservation(res) {
+    let taxeSejour = 0;
+    let totalSalles = 0;
+    if (res.dateDebut && res.dateFin) {
+        const start = new Date(res.dateDebut);
+        const end = new Date(res.dateFin);
+        const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
         if (nuits > 0) {
             let nbAdultes = 0;
             let nbOccupants = 0;
