@@ -238,7 +238,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
 
         const newDetails = { ...prev.chambresDetails };
         prev.chambres.forEach(ch => {
-          if (unavailable.has(ch)) {
+          if (unavailableMap[ch]) {
             delete newDetails[ch];
           }
         });
