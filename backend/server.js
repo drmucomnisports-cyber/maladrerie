@@ -459,6 +459,10 @@ const sendMail = async (options) => {
         email: "dr.mucomnisports@gmail.com" 
       },
       to: toEmails,
+      headers: {
+        'X-Mailin-Track-Click': '0',
+        'X-Mailin-Track': '0'
+      },
       attachment: options.attachments ? options.attachments.map(att => ({
         content: att.content,
         name: att.name
