@@ -158,13 +158,20 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
 
       if (paymentType === 'acompte') {
         let balancePaymentLink = '';
-          let stripeSoldeId = null;
-          
+        let stripeSoldeId = null;
+        
+        const reservationDb = await prisma.reservation.findUnique({
+          where: { id: parseInt(reservationId) },
+          include: { client: true }
+        });
+
+        let targetStatus = 'ACOMPTE_PAYE';
+        if (reservationDb && reservationDb.statutPaiement === 'SOLDE_PAYE') {
+          targetStatus = 'PAYE';
+        }
+
+        if (targetStatus === 'ACOMPTE_PAYE') {
           try {
-            const reservationDb = await prisma.reservation.findUnique({
-              where: { id: parseInt(reservationId) },
-              include: { client: true }
-            });
             if (reservationDb) {
               const soldeSession = await createStripeSessionForReservation(reservationDb, 'solde');
               stripeSoldeId = soldeSession.id;
@@ -173,71 +180,60 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
           } catch (err) {
             console.error("Erreur génération automatique du lien de solde lors du paiement de l'acompte:", err);
           }
+        }
 
-          const reservation = await prisma.reservation.update({
-            where: { id: parseInt(reservationId) },
-            data: { 
-              statutPaiement: 'ACOMPTE_PAYE',
-              statut: 'RESERVE',
-              stripeSoldeId: stripeSoldeId || undefined
-            },
-            include: { client: true, intervenant: true }
-          });
-          console.log(`Acompte payé pour la réservation ${reservationId}`);
-          await sendCuisineEmailIfNeeded(reservationId);
-          await sendPaymentConfirmationEmails(reservation, 'acompte', session.amount_total / 100, balancePaymentLink);
-          
-          // Incrémenter l'usage du code promo si présent
-          if (reservation.codePromo) {
-            try {
-              await prisma.promoCode.update({
-                where: { code: reservation.codePromo.toUpperCase() },
-                data: { usageActuel: { increment: 1 } }
-              });
-              console.log(`Usage incrémenté pour le code promo: ${reservation.codePromo}`);
-            } catch (promoErr) {
-              console.error("Erreur incrémentation code promo:", promoErr.message);
-            }
+        const reservation = await prisma.reservation.update({
+          where: { id: parseInt(reservationId) },
+          data: { 
+            statutPaiement: targetStatus,
+            statut: 'RESERVE',
+            stripeSoldeId: stripeSoldeId || undefined
+          },
+          include: { client: true, intervenant: true }
+        });
+        console.log(`Acompte payé (statut final: ${targetStatus}) pour la réservation ${reservationId}`);
+        await sendCuisineEmailIfNeeded(reservationId);
+        await sendPaymentConfirmationEmails(reservation, 'acompte', session.amount_total / 100, balancePaymentLink);
+        
+        if (reservation.codePromo) {
+          try {
+            await prisma.promoCode.update({
+              where: { code: reservation.codePromo.toUpperCase() },
+              data: { usageActuel: { increment: 1 } }
+            });
+            console.log(`Usage incrémenté pour le code promo: ${reservation.codePromo}`);
+          } catch (promoErr) {
+            console.error("Erreur incrémentation code promo:", promoErr.message);
           }
-        } else if (paymentType === 'solde' || paymentType === 'totalite') {
-          const reservation = await prisma.reservation.update({
-            where: { id: parseInt(reservationId) },
-            data: { statutPaiement: 'PAYE' },
-            include: { client: true, intervenant: true }
-          });
-          console.log(`Solde/Totalité payé pour la réservation ${reservationId}`);
-          await sendCuisineEmailIfNeeded(reservationId);
-          await sendPaymentConfirmationEmails(reservation, paymentType, session.amount_total / 100);
-        } else if (paymentType === 'caution') {
-          const reservation = await prisma.reservation.update({
-            where: { id: parseInt(reservationId) },
-            data: { 
-              statutCaution: 'DEPOSEE',
-              stripeCautionId: session.payment_intent // Stocke l'ID du PaymentIntent pour une capture ultérieure si besoin
-            },
-            include: { client: true, intervenant: true }
-          });
-          console.log(`Caution déposée (PaymentIntent autorisé) pour la réservation ${reservationId}`);
-          await sendPaymentConfirmationEmails(reservation, 'caution', session.amount_total / 100);
-        } else if (paymentType === 'solde') {
-         const reservation = await prisma.reservation.update({
-           where: { id: parseInt(reservationId) },
-           data: { statutPaiement: 'PAYE' },
-           include: { client: true, intervenant: true }
-         });
-         console.log(`Solde payé pour la réservation ${reservationId}`);
-         await sendCuisineEmailIfNeeded(reservationId);
-       } else if (paymentType === 'caution') {
-         const reservation = await prisma.reservation.update({
-           where: { id: parseInt(reservationId) },
-           data: { 
-             statutCaution: 'DEPOSEE',
-             stripeCautionId: session.payment_intent // Stocke l'ID du PaymentIntent pour une capture ultérieure si besoin
-           },
-           include: { client: true, intervenant: true }
-         });
-         console.log(`Caution déposée (PaymentIntent autorisé) pour la réservation ${reservationId}`);
-       }
+        }
+      } else if (paymentType === 'solde' || paymentType === 'totalite') {
+        const resDb = await prisma.reservation.findUnique({
+          where: { id: parseInt(reservationId) }
+        });
+        let targetStatus = 'PAYE';
+        if (paymentType === 'solde' && resDb && resDb.montantAcompte > 0 && resDb.statutPaiement !== 'ACOMPTE_PAYE') {
+          targetStatus = 'SOLDE_PAYE';
+        }
+        const reservation = await prisma.reservation.update({
+          where: { id: parseInt(reservationId) },
+          data: { statutPaiement: targetStatus },
+          include: { client: true, intervenant: true }
+        });
+        console.log(`Solde/Totalité payé (statut final: ${targetStatus}) pour la réservation ${reservationId}`);
+        await sendCuisineEmailIfNeeded(reservationId);
+        await sendPaymentConfirmationEmails(reservation, paymentType, session.amount_total / 100);
+      } else if (paymentType === 'caution') {
+        const reservation = await prisma.reservation.update({
+          where: { id: parseInt(reservationId) },
+          data: { 
+            statutCaution: 'DEPOSEE',
+            stripeCautionId: session.payment_intent
+          },
+          include: { client: true, intervenant: true }
+        });
+        console.log(`Caution déposée (PaymentIntent autorisé) pour la réservation ${reservationId}`);
+        await sendPaymentConfirmationEmails(reservation, 'caution', session.amount_total / 100);
+      }
     }
   }
   response.send();
@@ -600,6 +596,9 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
     let cgvReference = '';
     const soldeRestant = (reservation.prixTotal || 0) - amount;
 
+    const isSoldeComplet = isSolde && (reservation.statutPaiement === 'PAYE');
+    const isSoldePartiel = isSolde && (reservation.statutPaiement === 'SOLDE_PAYE');
+
     if (isCaution) {
       typeLabel = 'Dépôt de garantie (Caution)';
       descriptionText = `Une empreinte bancaire temporaire de <strong>${amount.toFixed(2)} €</strong> a été enregistrée à titre de caution. Aucun montant n'a été débité de votre compte.`;
@@ -613,10 +612,14 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
       } else {
         cgvReference += ` Vous recevrez un lien de paiement automatique par e-mail à cette date.`;
       }
-    } else if (isSolde) {
+    } else if (isSoldeComplet) {
       typeLabel = "Solde du séjour";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Votre réservation est désormais entièrement payée !`;
       cgvReference = `Avant votre entrée dans les lieux, il vous sera demandé d'effectuer l'empreinte bancaire pour le dépôt de garantie (caution de 500 €). Si ce n'est pas déjà fait, vous recevrez un lien de paiement dédié quelques jours avant votre arrivée.`;
+    } else if (isSoldePartiel) {
+      typeLabel = "Solde du séjour (Règlement partiel)";
+      descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Attention : l'acompte de <strong>${(reservation.montantAcompte || 0).toFixed(2)} €</strong> reste à régler.`;
+      cgvReference = `Pour confirmer définitivement votre réservation, merci de procéder également au règlement de l'acompte de <strong>${(reservation.montantAcompte || 0).toFixed(2)} €</strong>.`;
     }
 
     const dDebut = new Date(reservation.dateDebut).toLocaleDateString('fr-FR');
@@ -3500,7 +3503,7 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     // 1. Chiffre d'affaires encaissé
     const reservationsPayees = await prisma.reservation.findMany({
       where: {
-        statutPaiement: { in: ['ACOMPTE_PAYE', 'PAYE'] }
+        statutPaiement: { in: ['ACOMPTE_PAYE', 'PAYE', 'SOLDE_PAYE'] }
       },
       include: { client: true, occupants: true }
     });
@@ -3515,6 +3518,9 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         caEnquaisse += (r.prixTotal || 0);
         caRestaurationEncaisse += totalRepas;
         caHebergementEncaisse += Math.max(0, (r.prixTotal || 0) - totalRepas);
+      } else if (r.statutPaiement === 'SOLDE_PAYE') {
+        caEnquaisse += (r.montantSolde || 0);
+        caHebergementEncaisse += (r.montantSolde || 0);
       } else if (r.statutPaiement === 'ACOMPTE_PAYE') {
         caEnquaisse += (r.montantAcompte || 0);
         // L'acompte inclut 100% des repas s'il y en a + 30% hébergement.
@@ -3542,6 +3548,8 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         resteAEncaisser += (r.prixTotal || 0);
       } else if (r.statutPaiement === 'ACOMPTE_PAYE') {
         resteAEncaisser += (r.montantSolde || 0);
+      } else if (r.statutPaiement === 'SOLDE_PAYE') {
+        resteAEncaisser += (r.montantAcompte || 0);
       }
     });
 
@@ -3616,7 +3624,14 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     const recettesDetaillees = reservationsPayees.map(r => {
       const { total: totalRepas } = calculerRevenuRepasServeur(r.repas);
       const { taxeSejour, totalSalles } = calculerDetailsFinanciersReservation(r);
-      const montantPaye = r.statutPaiement === 'PAYE' ? (r.prixTotal || 0) : (r.montantAcompte || 0);
+      let montantPaye = 0;
+      if (r.statutPaiement === 'PAYE') {
+        montantPaye = r.prixTotal || 0;
+      } else if (r.statutPaiement === 'SOLDE_PAYE') {
+        montantPaye = r.montantSolde || 0;
+      } else {
+        montantPaye = r.montantAcompte || 0;
+      }
       
       let partRestaurationEncaissee = 0;
       let partSallesEncaissee = 0;
@@ -3631,6 +3646,14 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         partSallesEncaissee = totalSalles;
         partTaxeEncaissee = taxeSejour;
         partHebergementEncaissee = hebergementTheorique;
+      } else if (r.statutPaiement === 'SOLDE_PAYE') {
+        if (r.prixTotal > 0) {
+          const ratio = (r.montantSolde || 0) / r.prixTotal;
+          partRestaurationEncaissee = Math.round(totalRepas * ratio * 100) / 100;
+          partSallesEncaissee = Math.round(totalSalles * ratio * 100) / 100;
+          partTaxeEncaissee = Math.round(taxeSejour * ratio * 100) / 100;
+          partHebergementEncaissee = Math.round(hebergementTheorique * ratio * 100) / 100;
+        }
       } else { // ACOMPTE_PAYE
         partRestaurationEncaissee = Math.min(montantPaye, totalRepas);
         const resteAcompte = Math.max(0, montantPaye - partRestaurationEncaissee);
@@ -3899,22 +3922,42 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
       return res.status(404).json({ error: "Réservation introuvable." });
     }
 
+    let targetStatus = existing.statutPaiement;
     const data = {
-      modePaiement: mode,
-      statutPaiement: typePaiement === 'ACOMPTE' ? 'ACOMPTE_PAYE' : 'PAYE'
+      modePaiement: mode
     };
 
     if (typePaiement === 'ACOMPTE') {
       data.montantAcompte = parsedMontant;
+      if (existing.statutPaiement === 'SOLDE_PAYE') {
+        targetStatus = 'PAYE';
+      } else {
+        targetStatus = 'ACOMPTE_PAYE';
+      }
       if (!existing.montantSolde && existing.prixTotal) {
         data.montantSolde = Math.round((existing.prixTotal - parsedMontant) * 100) / 100;
       }
-    } else {
+    } else if (typePaiement === 'SOLDE') {
       data.montantSolde = parsedMontant;
+      if (existing.statutPaiement === 'ACOMPTE_PAYE') {
+        targetStatus = 'PAYE';
+      } else {
+        targetStatus = 'SOLDE_PAYE';
+      }
       if (!existing.montantAcompte && existing.prixTotal) {
         data.montantAcompte = Math.round((existing.prixTotal - parsedMontant) * 100) / 100;
       }
+    } else {
+      // TOTAL / TOTALITE
+      targetStatus = 'PAYE';
+      if (existing.prixTotal) {
+        const acomptePart = existing.montantAcompte || Math.round(existing.prixTotal * 0.3 * 100) / 100;
+        data.montantAcompte = acomptePart;
+        data.montantSolde = Math.round((existing.prixTotal - acomptePart) * 100) / 100;
+      }
     }
+
+    data.statutPaiement = targetStatus;
     
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(id) },
@@ -4673,6 +4716,13 @@ app.put('/api/admin/reservations/:id/full', checkAuth, async (req, res) => {
         newSolde = Math.round(newPrixTotal * 0.7 * 100) / 100;
       } else if (oldRes.statutPaiement === 'ACOMPTE_PAYE') {
         newSolde = Math.max(0, newPrixTotal - (oldRes.montantAcompte || 0));
+      } else if (oldRes.statutPaiement === 'SOLDE_PAYE') {
+        if (newPrixTotal > (oldRes.montantSolde || 0)) {
+          newAcompte = Math.round((newPrixTotal - (oldRes.montantSolde || 0)) * 100) / 100;
+        } else {
+          newAcompte = 0;
+          newStatutPaiement = 'PAYE';
+        }
       } else if (oldRes.statutPaiement === 'PAYE') {
         if (newPrixTotal > oldRes.prixTotal) {
           newStatutPaiement = 'ACOMPTE_PAYE';
@@ -5346,12 +5396,12 @@ cron.schedule('0 9 * * *', async () => {
     });
 
     for (const reser of toWarn) {
-      const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : 'totalite';
+      const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : (reser.statutPaiement === 'SOLDE_PAYE' ? 'acompte' : 'totalite');
       const session = await createStripeSessionForReservation(reser, paymentType);
       
       const montant = paymentType === 'solde' 
         ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
-        : (reser.prixTotal || 0);
+        : (paymentType === 'acompte' ? (reser.montantAcompte || 0) : (reser.prixTotal || 0));
 
       await sendMail({
         to: reser.client.email,
@@ -5414,12 +5464,12 @@ cron.schedule('0 9 * * *', async () => {
     });
 
     for (const reser of toRemind) {
-      const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : 'totalite';
+      const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : (reser.statutPaiement === 'SOLDE_PAYE' ? 'acompte' : 'totalite');
       const session = await createStripeSessionForReservation(reser, paymentType);
       
       const montant = paymentType === 'solde' 
         ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
-        : (reser.prixTotal || 0);
+        : (paymentType === 'acompte' ? (reser.montantAcompte || 0) : (reser.prixTotal || 0));
 
       await sendMail({
         to: reser.client.email,

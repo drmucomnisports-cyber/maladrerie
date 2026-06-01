@@ -1132,7 +1132,7 @@ const Admin = () => {
                             <span className="text-slate-500 font-bold uppercase">
                               {res.montantAcompte === 0 ? "Totalité (100%)" : "Solde (70%)"}
                             </span>
-                            {res.statutPaiement === 'PAYE' ? (
+                            {res.statutPaiement === 'SOLDE_PAYE' || res.statutPaiement === 'PAYE' ? (
                               <span className="text-green-600 font-bold">✓ Payé</span>
                             ) : res.stripeSoldeId ? (
                               <span className="text-blue-600 font-bold">Lien envoyé</span>
@@ -1263,7 +1263,26 @@ const Admin = () => {
                               )}
                             </>
                           )}
-                          <button onClick={() => { setManualPaymentRes(res); setShowManualPaymentModal(true); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors" title="Enregistrer un paiement manuel">
+                          <button
+                            onClick={() => {
+                              setManualPaymentRes(res);
+                              const isAcomptePaid = res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE';
+                              const defaultType = isAcomptePaid ? 'SOLDE' : 'ACOMPTE';
+                              const defaultAmt = isAcomptePaid
+                                ? (res.montantSolde || Math.round((res.prixTotal || 0) * 0.7 * 100) / 100)
+                                : (res.montantAcompte === 0 ? (res.prixTotal || 0) : (res.montantAcompte || Math.round((res.prixTotal || 0) * 0.3 * 100) / 100));
+                              const defaultTypeFormatted = res.montantAcompte === 0 && !isAcomptePaid ? 'TOTAL' : defaultType;
+                              
+                              setManualPaymentForm({
+                                montant: defaultAmt.toString(),
+                                mode: 'ESPECES',
+                                typePaiement: defaultTypeFormatted
+                              });
+                              setShowManualPaymentModal(true);
+                            }}
+                            className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors"
+                            title="Enregistrer un paiement manuel"
+                          >
                             <Banknote size={18} />
                           </button>
                           <button onClick={() => setEditingReservation(res)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-500 hover:text-white transition-colors" title="Modifier la réservation">
@@ -2486,18 +2505,39 @@ const Admin = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Type de règlement</label>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
-                      onClick={() => setManualPaymentForm({ ...manualPaymentForm, typePaiement: 'ACOMPTE' })}
-                      className={`py-3 rounded-xl font-bold border-2 transition-all ${manualPaymentForm.typePaiement === 'ACOMPTE' ? 'bg-muc-blue text-white border-muc-blue' : 'bg-white text-slate-600 border-slate-100 hover:border-muc-blue/30'}`}
+                      type="button"
+                      onClick={() => {
+                        const amt = manualPaymentRes.montantAcompte || Math.round((manualPaymentRes.prixTotal || 0) * 0.3 * 100) / 100;
+                        setManualPaymentForm({ ...manualPaymentForm, typePaiement: 'ACOMPTE', montant: amt.toString() });
+                      }}
+                      className={`py-3 px-1 rounded-xl font-bold border-2 transition-all text-center leading-none ${manualPaymentForm.typePaiement === 'ACOMPTE' ? 'bg-muc-blue text-white border-muc-blue' : 'bg-white text-slate-600 border-slate-100 hover:border-muc-blue/30'}`}
+                      style={{ fontSize: '10px' }}
                     >
                       Acompte (30%)
                     </button>
                     <button
-                      onClick={() => setManualPaymentForm({ ...manualPaymentForm, typePaiement: 'TOTAL' })}
-                      className={`py-3 rounded-xl font-bold border-2 transition-all ${manualPaymentForm.typePaiement === 'TOTAL' ? 'bg-muc-blue text-white border-muc-blue' : 'bg-white text-slate-600 border-slate-100 hover:border-muc-blue/30'}`}
+                      type="button"
+                      onClick={() => {
+                        const amt = manualPaymentRes.montantSolde || Math.round((manualPaymentRes.prixTotal || 0) * 0.7 * 100) / 100;
+                        setManualPaymentForm({ ...manualPaymentForm, typePaiement: 'SOLDE', montant: amt.toString() });
+                      }}
+                      className={`py-3 px-1 rounded-xl font-bold border-2 transition-all text-center leading-none ${manualPaymentForm.typePaiement === 'SOLDE' ? 'bg-muc-blue text-white border-muc-blue' : 'bg-white text-slate-600 border-slate-100 hover:border-muc-blue/30'}`}
+                      style={{ fontSize: '10px' }}
                     >
-                      Solde Total
+                      Solde (70%)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const amt = manualPaymentRes.prixTotal || 0;
+                        setManualPaymentForm({ ...manualPaymentForm, typePaiement: 'TOTAL', montant: amt.toString() });
+                      }}
+                      className={`py-3 px-1 rounded-xl font-bold border-2 transition-all text-center leading-none ${manualPaymentForm.typePaiement === 'TOTAL' ? 'bg-muc-blue text-white border-muc-blue' : 'bg-white text-slate-600 border-slate-100 hover:border-muc-blue/30'}`}
+                      style={{ fontSize: '10px' }}
+                    >
+                      Totalité (100%)
                     </button>
                   </div>
                 </div>
