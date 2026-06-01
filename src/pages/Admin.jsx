@@ -1118,7 +1118,9 @@ const Admin = () => {
                         <div className="flex flex-col gap-1 mt-2">
                           <div className="flex items-center justify-between text-[10px] gap-2">
                             <span className="text-slate-500 font-bold uppercase">Acompte (30%)</span>
-                            {res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
+                            {res.montantAcompte === 0 ? (
+                              <span className="text-slate-400 font-bold">N/A</span>
+                            ) : res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
                               <span className="text-green-600 font-bold">✓ Payé</span>
                             ) : res.stripeAcompteId ? (
                               <span className="text-blue-600 font-bold">Lien envoyé</span>
@@ -1127,7 +1129,9 @@ const Admin = () => {
                             )}
                           </div>
                           <div className="flex items-center justify-between text-[10px] gap-2">
-                            <span className="text-slate-500 font-bold uppercase">Solde (70%)</span>
+                            <span className="text-slate-500 font-bold uppercase">
+                              {res.montantAcompte === 0 ? "Totalité (100%)" : "Solde (70%)"}
+                            </span>
                             {res.statutPaiement === 'PAYE' ? (
                               <span className="text-green-600 font-bold">✓ Payé</span>
                             ) : res.stripeSoldeId ? (
