@@ -910,34 +910,34 @@ const Admin = () => {
             
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse table-fixed" style={{ minWidth: '1312px' }}>
+                <table className="text-left border-collapse table-fixed" style={{ width: '1390px', minWidth: '1390px' }}>
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th onClick={() => handleSort('client')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-48 min-w-[192px]">
+                      <th onClick={() => handleSort('client')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[220px]">
                         Client {sortConfig.key === 'client' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-36 min-w-[144px]">
+                      <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[150px]">
                         Dates {sortConfig.key === 'dateDebut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('prestations')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-56 min-w-[224px] max-w-[224px]">
+                      <th onClick={() => handleSort('prestations')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[230px]">
                         Prestations {sortConfig.key === 'prestations' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('restauration')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-28 min-w-[112px]">
+                      <th onClick={() => handleSort('restauration')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[110px]">
                         Restauration {sortConfig.key === 'restauration' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('tarif')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-48 min-w-[192px] max-w-[192px]">
+                      <th onClick={() => handleSort('tarif')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[200px]">
                         Tarif {sortConfig.key === 'tarif' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('statut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-32 min-w-[128px]">
+                      <th onClick={() => handleSort('statut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[120px]">
                         Statut {sortConfig.key === 'statut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('validePar')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-24 min-w-[96px]">
+                      <th onClick={() => handleSort('validePar')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[90px]">
                         Validé par {sortConfig.key === 'validePar' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors select-none w-28 min-w-[112px] max-w-[112px]">
+                      <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors select-none w-[110px]">
                         Date de création {sortConfig.key === 'createdAt' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right w-28 min-w-[112px]">Actions</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right w-[160px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1017,16 +1017,16 @@ const Admin = () => {
                       return 0;
                     }).map((res) => (
                       <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 w-48 min-w-[192px]">
+                      <td className="p-4">
                         <div className="font-bold text-slate-800 truncate" title={res.client?.nom || 'Client inconnu'}>{res.client?.nom || 'Client inconnu'}</div>
                         <div className="text-xs text-slate-500 truncate" title={res.client?.email || '-'}>{res.client?.email || '-'}</div>
                         <div className="text-xs text-slate-500 truncate">{res.client?.telephone || '-'}</div>
                       </td>
-                      <td className="p-4 w-36 min-w-[144px]">
+                      <td className="p-4">
                         <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
                         <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
                       </td>
-                      <td className="p-4 w-56 min-w-[224px] max-w-[224px]">
+                      <td className="p-4">
                         <div className="text-sm font-bold text-muc-blue leading-tight">
                           {(res.chambres || []).map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
                         </div>
@@ -1063,7 +1063,7 @@ const Admin = () => {
                           {res.options?.menage && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧹 Ménage</span>}
                         </div>
                       </td>
-                      <td className="p-4 w-28 min-w-[112px]">
+                      <td className="p-4">
                         <div className="flex flex-col gap-1 text-[11px] uppercase tracking-wider font-bold">
                           {(() => {
                             let totalPtitDej = 0;
@@ -1111,7 +1111,7 @@ const Admin = () => {
                           })()}
                         </div>
                       </td>
-                      <td className="p-4 w-48 min-w-[192px] max-w-[192px]">
+                      <td className="p-4">
                         <div className="text-sm font-black text-slate-800">
                           {res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}
                           {res.taxeSejour > 0 && <div className="text-[10px] text-slate-500 font-normal italic mt-0.5">dont {res.taxeSejour.toFixed(2)} € de taxe de séjour</div>}
@@ -1157,7 +1157,7 @@ const Admin = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 w-32 min-w-[128px]">
+                      <td className="p-4">
                         <div className="space-y-2">
                           {res.modificationProposed && (
                             <button
@@ -1216,10 +1216,10 @@ const Admin = () => {
                           </button>
                         </div>
                       </td>
-                      <td className="p-4 w-24 min-w-[96px]">
+                      <td className="p-4">
                         <div className="text-xs font-bold text-slate-600">{formatAdminName(res.validePar)}</div>
                       </td>
-                      <td className="p-4 text-right w-28 min-w-[112px] max-w-[112px]">
+                      <td className="p-4 text-right">
                         <div className="text-xs font-bold text-slate-600">
                           {new Date(res.createdAt).toLocaleDateString('fr-FR')}
                           <br />
@@ -1228,7 +1228,7 @@ const Admin = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="p-4 text-right w-28 min-w-[112px]">
+                      <td className="p-4 text-right">
                         <div className="flex justify-end gap-1.5">
                           {res.statut === 'EN_ATTENTE' && (
                             <>
