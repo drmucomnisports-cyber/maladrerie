@@ -2501,7 +2501,7 @@ app.post('/api/admin/devis/:id/prolong', checkAuth, async (req, res) => {
   }
 });
 
-app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) =>>,StartLine:2196,TargetContent:
+app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const devis = await prisma.reservation.findUnique({
