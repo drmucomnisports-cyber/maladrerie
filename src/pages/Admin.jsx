@@ -910,16 +910,16 @@ const Admin = () => {
             
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
               <div className="overflow-x-auto">
-                <table className="text-left border-collapse table-fixed" style={{ width: '1310px', minWidth: '1310px' }}>
+                <table className="text-left border-collapse table-fixed" style={{ width: '1400px', minWidth: '1400px' }}>
                   <colgroup>
-                    <col style={{ width: '200px' }} />
+                    <col style={{ width: '195px' }} />
                     <col style={{ width: '140px' }} />
-                    <col style={{ width: '180px' }} />
-                    <col style={{ width: '110px' }} />
-                    <col style={{ width: '220px' }} />
+                    <col style={{ width: '170px' }} />
+                    <col style={{ width: '115px' }} />
+                    <col style={{ width: '225px' }} />
                     <col style={{ width: '120px' }} />
-                    <col style={{ width: '90px' }} />
-                    <col style={{ width: '120px' }} />
+                    <col style={{ width: '85px' }} />
+                    <col style={{ width: '155px' }} />
                     <col style={{ width: '130px' }} />
                   </colgroup>
                   <thead>
