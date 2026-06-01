@@ -910,17 +910,17 @@ const Admin = () => {
             
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
               <div className="overflow-x-auto">
-                <table className="text-left border-collapse table-fixed" style={{ width: '1410px', minWidth: '1410px' }}>
+                <table className="text-left border-collapse table-fixed" style={{ width: '1310px', minWidth: '1310px' }}>
                   <colgroup>
-                    <col style={{ width: '220px' }} />
-                    <col style={{ width: '150px' }} />
-                    <col style={{ width: '230px' }} />
-                    <col style={{ width: '110px' }} />
                     <col style={{ width: '200px' }} />
+                    <col style={{ width: '140px' }} />
+                    <col style={{ width: '180px' }} />
+                    <col style={{ width: '110px' }} />
+                    <col style={{ width: '220px' }} />
                     <col style={{ width: '120px' }} />
                     <col style={{ width: '90px' }} />
                     <col style={{ width: '120px' }} />
-                    <col style={{ width: '170px' }} />
+                    <col style={{ width: '130px' }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
@@ -1122,48 +1122,48 @@ const Admin = () => {
                           })()}
                         </div>
                       </td>
-                      <td className="p-4">
-                        <div className="text-sm font-black text-slate-800">
+                      <td className="p-3">
+                        <div className="text-sm font-black text-slate-800 leading-tight">
                           {res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}
-                          {res.taxeSejour > 0 && <div className="text-[10px] text-slate-500 font-normal italic mt-0.5">dont {res.taxeSejour.toFixed(2)} € de taxe de séjour</div>}
+                          {res.taxeSejour > 0 && <span className="text-[9px] text-slate-400 font-normal italic ml-1">(taxe {res.taxeSejour.toFixed(2)}€)</span>}
                         </div>
-                        <div className="flex flex-col gap-1 mt-2">
-                          <div className="flex items-center justify-between text-[10px] gap-2">
-                            <span className="text-slate-500 font-bold uppercase whitespace-nowrap">Acompte (30%)</span>
+                        <div className="flex flex-col gap-0.5 mt-1.5">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-500 font-bold uppercase">Ac. 30%</span>
                             {res.montantAcompte === 0 ? (
-                              <span className="text-slate-400 font-bold whitespace-nowrap">N/A</span>
+                              <span className="text-slate-400 font-bold">—</span>
                             ) : res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold whitespace-nowrap">✓ Payé</span>
+                              <span className="text-green-600 font-bold">✓ Payé</span>
                             ) : res.stripeAcompteId ? (
-                              <span className="text-blue-600 font-bold whitespace-nowrap">Lien envoyé</span>
+                              <span className="text-blue-600 font-bold">Lien</span>
                             ) : (
-                              <span className="text-amber-600 font-bold whitespace-nowrap">En attente</span>
+                              <span className="text-amber-600 font-bold">Attente</span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between text-[10px] gap-2">
-                            <span className="text-slate-500 font-bold uppercase whitespace-nowrap font-bold uppercase">
-                              {res.montantAcompte === 0 ? "Totalité (100%)" : "Solde (70%)"}
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-500 font-bold uppercase">
+                              {res.montantAcompte === 0 ? "Total 100%" : "Solde 70%"}
                             </span>
                             {res.statutPaiement === 'SOLDE_PAYE' || res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold whitespace-nowrap">✓ Payé</span>
+                              <span className="text-green-600 font-bold">✓ Payé</span>
                             ) : res.stripeSoldeId ? (
-                              <span className="text-blue-600 font-bold whitespace-nowrap">Lien envoyé</span>
+                              <span className="text-blue-600 font-bold">Lien</span>
                             ) : (
-                              <span className="text-amber-600 font-bold whitespace-nowrap">En attente</span>
+                              <span className="text-amber-600 font-bold">Attente</span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between text-[10px] gap-2 pt-1 border-t border-slate-100">
-                            <span className="text-slate-500 font-bold uppercase whitespace-nowrap">Caution</span>
+                          <div className="flex items-center justify-between text-[10px] pt-0.5 border-t border-slate-100">
+                            <span className="text-slate-500 font-bold uppercase">Caution</span>
                             {res.statutCaution === 'DEPOSEE' ? (
-                              <span className="text-green-600 font-bold whitespace-nowrap">✓ Déposée</span>
+                              <span className="text-green-600 font-bold">✓ Dép.</span>
                             ) : res.statutCaution === 'RESTITUEE' ? (
-                              <span className="text-slate-500 font-bold whitespace-nowrap">✓ Restituée</span>
+                              <span className="text-slate-500 font-bold">✓ Rest.</span>
                             ) : res.statutCaution === 'UTILISEE' ? (
-                              <span className="text-red-600 font-bold whitespace-nowrap">⚠️ Retenue</span>
+                              <span className="text-red-600 font-bold">⚠ Ret.</span>
                             ) : res.stripeCautionId ? (
-                              <span className="text-blue-600 font-bold whitespace-nowrap">Lien envoyé</span>
+                              <span className="text-blue-600 font-bold">Lien</span>
                             ) : (
-                              <span className="text-amber-600 font-bold whitespace-nowrap">En attente</span>
+                              <span className="text-amber-600 font-bold">Attente</span>
                             )}
                           </div>
                         </div>
