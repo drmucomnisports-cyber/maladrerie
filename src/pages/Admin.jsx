@@ -811,6 +811,38 @@ const Admin = () => {
     }
   };
 
+  const handleProlongDevis = async (devis) => {
+    const defaultHours = 48;
+    const val = window.prompt("De combien d'heures souhaitez-vous prolonger ce devis ? (Entrez par exemple 48 pour 2 jours, 168 pour une semaine)", defaultHours);
+    if (val === null) return; // Annulé
+
+    const hours = parseInt(val);
+    if (isNaN(hours) || hours <= 0) {
+      alert("Veuillez entrer un nombre d'heures valide supérieur à 0.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/devis/${devis.id}/prolong`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ hours })
+      });
+      if (res.ok) {
+        showFeedback(`Devis prolongé de ${hours} heures avec succès ! E-mail de mise à jour envoyé.`);
+        fetchReservations();
+      } else {
+        const data = await res.json();
+        showFeedback(data.error || "Erreur lors de la prolongation.", "error");
+      }
+    } catch (err) {
+      showFeedback("Erreur réseau.", "error");
+    }
+  };
+
   useEffect(() => {
     console.log('Admin Component Mounted. Token:', token ? 'Present' : 'Missing');
     if (!token) {
@@ -1505,6 +1537,13 @@ const Admin = () => {
                                   title="Modifier le devis"
                                 >
                                   <Edit3 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleProlongDevis(res)}
+                                  className="p-1.5 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded transition-colors"
+                                  title="Prolonger la validité"
+                                >
+                                  <Clock size={14} />
                                 </button>
                                 <button
                                   onClick={() => window.open(`${API_URL}/api/admin/devis/${res.id}/pdf?token=${token}`, '_blank')}
@@ -2371,10 +2410,30 @@ const Admin = () => {
       {editingReservation && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-y-auto max-h-[90vh] border border-slate-100">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-start sticky top-0 bg-white z-10">
               <div>
                 <h2 className="text-xl font-black text-muc-blue tracking-tight uppercase">{editingReservation.statut?.includes('DEVIS') ? 'Modifier le devis' : 'Modifier la réservation'}</h2>
                 <p className="text-xs text-slate-500 mt-1">{editingReservation.statut?.includes('DEVIS') ? 'Modification du devis' : 'Modification de la réservation'} #{editingReservation.id}</p>
+                {editingReservation.statut?.includes('DEVIS') && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1">
+                      <Clock size={12} className="text-amber-600" />
+                      Expire le : {editingReservation.expireLe ? new Date(editingReservation.expireLe).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Non défini'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleProlongDevis(editingReservation);
+                        setEditingReservation(null);
+                      }}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md hover:scale-[1.02]"
+                      title="Prolonger la validité sans modifier le contenu"
+                    >
+                      <Clock size={10} />
+                      Prolonger le devis
+                    </button>
+                  </div>
+                )}
               </div>
               <button onClick={() => setEditingReservation(null)} className="text-slate-400 hover:text-slate-600 font-bold text-2xl px-2">&times;</button>
             </div>
