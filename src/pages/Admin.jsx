@@ -913,14 +913,14 @@ const Admin = () => {
                 <table className="text-left border-collapse table-fixed w-full" style={{ minWidth: '1100px' }}>
                   <colgroup>
                     <col style={{ width: '13%' }} />
-                    <col style={{ width: '9%' }} />
-                    <col style={{ width: '16%' }} />
                     <col style={{ width: '7%' }} />
-                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '15%' }} />
                     <col style={{ width: '9%' }} />
                     <col style={{ width: '6%' }} />
-                    <col style={{ width: '11%' }} />
-                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '14%' }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
@@ -1033,9 +1033,9 @@ const Admin = () => {
                         <div className="text-xs text-slate-500 truncate" title={res.client?.email || '-'}>{res.client?.email || '-'}</div>
                         <div className="text-xs text-slate-500 truncate">{res.client?.telephone || '-'}</div>
                       </td>
-                      <td className="p-4">
-                        <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
-                        <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
+                      <td className="px-2 py-3">
+                        <div className="text-xs font-bold text-slate-700">{new Date(res.dateDebut).toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
+                        <div className="text-xs font-medium text-slate-500">{new Date(res.dateFin).toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
                       </td>
                       <td className="p-4">
                         <div className="text-sm font-bold text-muc-blue leading-tight">
@@ -1230,9 +1230,9 @@ const Admin = () => {
                       <td className="p-4">
                         <div className="text-xs font-bold text-slate-600">{formatAdminName(res.validePar)}</div>
                       </td>
-                      <td className="p-4">
-                        <div className="text-xs font-bold text-slate-600">
-                          {new Date(res.createdAt).toLocaleDateString('fr-FR')}
+                      <td className="px-2 py-3">
+                        <div className="text-[11px] font-bold text-slate-600 leading-tight">
+                          {new Date(res.createdAt).toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'2-digit'})}
                           <br />
                           <span className="font-normal text-slate-400">
                             {new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
