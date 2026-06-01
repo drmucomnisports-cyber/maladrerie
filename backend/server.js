@@ -2912,6 +2912,9 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
       where: { id: parseInt(id) },
       data: { 
         stripeSoldeId: session.id,
+        montantAcompte: 0,
+        montantSolde: montantTotal,
+        stripeAcompteId: null, // Clear any previous deposit session since they are paying in full
         tokenModification: tokenModification,
         validePar: adminEmail
       }
