@@ -1134,6 +1134,8 @@ const Admin = () => {
                               <span className="text-slate-400 font-bold">—</span>
                             ) : res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
                               <span className="text-green-600 font-bold">✓ Payé</span>
+                            ) : res.modePaiement === 'VIREMENT' ? (
+                              <span className="text-cyan-600 font-bold" title="Virement attendu">🏦 Vir. Att.</span>
                             ) : res.stripeAcompteId ? (
                               <span className="text-blue-600 font-bold">Lien</span>
                             ) : (
@@ -1146,6 +1148,8 @@ const Admin = () => {
                             </span>
                             {res.statutPaiement === 'SOLDE_PAYE' || res.statutPaiement === 'PAYE' ? (
                               <span className="text-green-600 font-bold">✓ Payé</span>
+                            ) : res.modePaiement === 'VIREMENT' ? (
+                              <span className="text-cyan-600 font-bold" title="Virement attendu">🏦 Vir. Att.</span>
                             ) : res.stripeSoldeId ? (
                               <span className="text-blue-600 font-bold">Lien</span>
                             ) : (
@@ -2404,7 +2408,7 @@ const Admin = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100 p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-black text-slate-800">Lien de Paiement Stripe</h3>
+              <h3 className="text-lg font-black text-slate-800">Lien de Paiement</h3>
               <button onClick={() => setPaymentLinkData(null)} className="text-slate-400 hover:text-slate-600">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2413,7 +2417,7 @@ const Admin = () => {
             </div>
 
             <p className="text-sm text-slate-500 mb-4">
-              Le lien de paiement a été généré avec succès. Vous pouvez le copier et l'envoyer au client.
+              Le lien de paiement intermédiaire a été généré avec succès. Vous pouvez le copier et l'envoyer au client.
             </p>
 
             <div className="flex items-center gap-2 mb-6">

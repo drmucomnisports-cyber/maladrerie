@@ -1361,12 +1361,8 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     const montantSolde = Math.round((montantTotal - montantAcompte) * 100) / 100;
 
     const paymentType = isLastMinuteStay ? 'totalite' : 'acompte';
-
-    if (montantTotal > 0 && process.env.STRIPE_SECRET_KEY) {
-      const session = await createStripeSessionForReservation(existingReservation, paymentType);
-      paymentLink = session.url;
-      stripeSessionId = session.id;
-    }
+    const tokenModification = existingReservation.tokenModification || require('crypto').randomBytes(32).toString('hex');
+    paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${paymentType}`;
 
     let adminEmail = req.query.adminEmail || existingReservation.validePar || 'david.roujet@mucomnisports.fr';
     if (req.headers.authorization) {
@@ -1381,16 +1377,12 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
       }
     }
 
-    const tokenModification = existingReservation.tokenModification || require('crypto').randomBytes(32).toString('hex');
-
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(id) },
       data: { 
         statut: 'RESERVE',
         montantAcompte: isLastMinuteStay ? 0 : montantAcompte,
         montantSolde: isLastMinuteStay ? montantTotal : montantSolde,
-        stripeAcompteId: isLastMinuteStay ? null : stripeSessionId,
-        stripeSoldeId: isLastMinuteStay ? stripeSessionId : null,
         validePar: adminEmail,
         tokenModification: tokenModification
       },
@@ -2461,7 +2453,7 @@ app.get('/api/devis/info/:token', async (req, res) => {
 // Valider un devis avec saisie des occupants (Client - POST)
 app.post('/api/devis/validate/:token', async (req, res) => {
   const { token } = req.params;
-  const { occupants } = req.body;
+  const { occupants, paymentMethod } = req.body;
 
   try {
     const devis = await prisma.reservation.findUnique({
@@ -2522,42 +2514,130 @@ app.post('/api/devis/validate/:token', async (req, res) => {
     const montantAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
     const montantSolde = Math.round((devis.prixTotal - montantAcompte) * 100) / 100;
 
-    const stripeCustomerPL = await getOrCreateStripeCustomer(devis.client.email, devis.client.nom);
-    const plParams = {
-      payment_method_types: ['card'],
-      allow_promotion_codes: true,
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: { 
-            name: repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
-            description: getStripeDescription(devis)
-          },
-          unit_amount: Math.round(montantAcompte * 100),
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-        billing_address_collection: 'required',
-      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/payment-cancel`,
-      metadata: { reservationId: devis.id.toString(), paymentType: 'ACOMPTE' }
-    };
-    if (stripeCustomerPL) plParams.customer = stripeCustomerPL;
-    else if (devis.client.email && devis.client.email !== 'N/A') plParams.customer_email = devis.client.email;
-    
-    const session = await stripe.checkout.sessions.create(plParams);
+    let sessionUrl = null;
+    let bankDetails = null;
+    let reference = null;
 
-    await prisma.reservation.update({
-      where: { id: devis.id },
-      data: { 
-        statut: 'RESERVE', 
-        tokenDevis: null,
-        montantAcompte: montantAcompte,
-        montantSolde: montantSolde,
-        stripeSessionId: session.id
-      }
-    });
+    if (paymentMethod === 'virement') {
+      const uniqueRef = `MUC-${devis.id}-ACOMPTE`;
+      reference = uniqueRef;
+      bankDetails = {
+        iban: process.env.BANK_IBAN || 'FR76 1027 8089 6300 0201 6890 992',
+        bic: process.env.BANK_BIC || 'CMCIFR2A',
+        holder: process.env.BANK_HOLDER || 'MUC Omnisport',
+        bankName: process.env.BANK_NAME || 'Crédit Mutuel - CCM Montpellier Opera'
+      };
+
+      await prisma.reservation.update({
+        where: { id: devis.id },
+        data: { 
+          statut: 'RESERVE', 
+          tokenDevis: null,
+          montantAcompte: montantAcompte,
+          montantSolde: montantSolde,
+          modePaiement: 'VIREMENT'
+        }
+      });
+
+      // Envoyer l'email d'intention de virement au client
+      const adminEmailForSignature = devis.validePar || 'dr.mucomnisports@gmail.com';
+      const adminSignatureHTML = await getAdminSignatureHTML(adminEmailForSignature);
+      await sendMail({
+        to: devis.client.email,
+        subject: `Confirmation de réservation et RIB - Gîte de La Maladrerie (Réf: ${uniqueRef})`,
+        html: `
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: sans-serif;">
+              <tr><td style="background-color: #004B93; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0;">Gîte de La Maladrerie</h1></td></tr>
+              <tr><td style="padding: 40px; color: #333333; line-height: 1.6;">
+                <h2 style="color: #004B93; margin-top: 0;">Bonjour ${devis.client.nom},</h2>
+                <p>Nous vous confirmons que votre devis <strong>${devis.numeroDevis}</strong> a été validé et que votre séjour est bien enregistré.</p>
+                <p>Afin de confirmer définitivement vos dates de séjour, veuillez procéder au règlement de l'acompte par virement bancaire.</p>
+                
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin-top: 0; font-weight: bold; color: #004B93;">Détails de l'acompte :</p>
+                  <table width="100%" style="font-size: 14px;">
+                    <tr><td style="padding: 5px 0;"><strong>Montant de l'acompte :</strong></td><td style="font-weight: bold; font-size: 16px; color: #004B93;">${montantAcompte.toFixed(2)} €</td></tr>
+                    <tr><td style="padding: 5px 0;"><strong>Libellé/Référence obligatoire :</strong></td><td style="font-weight: bold; color: #d97706; background-color: #fef3c7; padding: 2px 6px; border-radius: 4px;">${uniqueRef}</td></tr>
+                    <tr><td colspan="2" style="padding: 10px 0 5px 0; border-top: 1px dashed #e2e8f0;"><strong>Coordonnées bancaires :</strong></td></tr>
+                    <tr><td style="padding: 3px 0;">Titulaire du compte :</td><td><strong>${bankDetails.holder}</strong></td></tr>
+                    <tr><td style="padding: 3px 0;">IBAN :</td><td><strong style="font-family: monospace; font-size: 13px;">${bankDetails.iban}</strong></td></tr>
+                    <tr><td style="padding: 3px 0;">BIC :</td><td><strong style="font-family: monospace; font-size: 13px;">${bankDetails.bic}</strong></td></tr>
+                    <tr><td style="padding: 3px 0;">Banque :</td><td>${bankDetails.bankName}</td></tr>
+                  </table>
+                </div>
+
+                <p style="font-size: 13px; color: #666; font-style: italic;">
+                  ⚠️ <strong>Important :</strong> Veuillez indiquer exactement la référence <strong>${uniqueRef}</strong> dans le motif ou libellé de votre virement afin que nous puissions valider votre réservation.
+                </p>
+
+                <p>Dès réception des fonds, vous recevrez un e-mail de confirmation finale.</p>
+                
+                ${adminSignatureHTML}
+              </td></tr>
+            </table></td></tr>
+          </table>
+        `
+      });
+
+      // Envoyer un mail de notification à l'admin pour le virement
+      const targetAdminEmail = process.env.ADMIN_EMAIL || 'david.roujet@mucomnisports.fr';
+      await sendMail({
+        to: targetAdminEmail,
+        subject: `🏦 [VIREMENT DEVIS] Devis ${devis.numeroDevis} validé par virement - ${montantAcompte.toFixed(2)} €`,
+        html: `
+          <div style="font-family: sans-serif;">
+            <h2>Devis validé par virement bancaire</h2>
+            <p>Le devis <strong>${devis.numeroDevis}</strong> du client <strong>${devis.client.nom}</strong> a été validé.</p>
+            <p>Le client a choisi de payer l'acompte par virement bancaire.</p>
+            <ul>
+              <li><strong>Montant de l'acompte attendu :</strong> ${montantAcompte.toFixed(2)} €</li>
+              <li><strong>Référence obligatoire :</strong> <code>${uniqueRef}</code></li>
+            </ul>
+            <p>Veuillez surveiller votre compte bancaire pour valider le séjour manuellement une fois les fonds reçus.</p>
+          </div>
+        `
+      });
+
+    } else {
+      const stripeCustomerPL = await getOrCreateStripeCustomer(devis.client.email, devis.client.nom);
+      const plParams = {
+        payment_method_types: ['card'],
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: 'eur',
+            product_data: { 
+              name: repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie',
+              description: getStripeDescription(devis)
+            },
+            unit_amount: Math.round(montantAcompte * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        billing_address_collection: 'required',
+        success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${FRONTEND_URL}/payment-cancel`,
+        metadata: { reservationId: devis.id.toString(), paymentType: 'ACOMPTE' }
+      };
+      if (stripeCustomerPL) plParams.customer = stripeCustomerPL;
+      else if (devis.client.email && devis.client.email !== 'N/A') plParams.customer_email = devis.client.email;
+      
+      const session = await stripe.checkout.sessions.create(plParams);
+      sessionUrl = session.url;
+
+      await prisma.reservation.update({
+        where: { id: devis.id },
+        data: { 
+          statut: 'RESERVE', 
+          tokenDevis: null,
+          montantAcompte: montantAcompte,
+          montantSolde: montantSolde,
+          stripeSessionId: session.id
+        }
+      });
+    }
 
     // Envoyer un e-mail à  l'admin créateur du devis pour l'alerter
     if (devis.validePar && devis.validePar !== 'Admin' && devis.validePar.includes('@')) {
@@ -2606,7 +2686,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       }
     }
 
-    res.json({ success: true, url: session.url });
+    res.json({ success: true, url: sessionUrl, method: paymentMethod, bankDetails, reference, amount: montantAcompte });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erreur lors de la validation du devis." });
@@ -2793,31 +2873,6 @@ app.post('/api/reservations/:id/acompte', checkAuth, async (req, res) => {
 
     if (montantAcompteCalcule <= 0) return res.status(400).json({ error: 'L\'acompte est de 0€' });
 
-    const stripeCustomer = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
-    const params = {
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: 'Acompte du séjour - Gîte de La Maladrerie',
-            description: getStripeDescription(reservation),
-          },
-          unit_amount: Math.round(montantAcompteCalcule * 100),
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      billing_address_collection: 'required',
-      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/payment-cancel`,
-      metadata: { reservationId: reservation.id.toString(), paymentType: 'acompte' }
-    };
-    if (stripeCustomer) params.customer = stripeCustomer;
-    else if (reservation.client.email && reservation.client.email !== 'N/A') params.customer_email = reservation.client.email;
-    
-    const session = await stripe.checkout.sessions.create(params);
-
     let tokenModification = reservation.tokenModification;
     if (!tokenModification) {
       tokenModification = require('crypto').randomBytes(32).toString('hex');
@@ -2828,12 +2883,12 @@ app.post('/api/reservations/:id/acompte', checkAuth, async (req, res) => {
     await prisma.reservation.update({
       where: { id: parseInt(id) },
       data: { 
-        stripeSessionId: session.id,
         tokenModification: tokenModification,
         validePar: adminEmail
       }
     });
 
+    const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=acompte`;
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
@@ -2848,11 +2903,11 @@ app.post('/api/reservations/:id/acompte', checkAuth, async (req, res) => {
               <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
               <p>Afin de confirmer votre réservation pour le séjour du <strong>${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</strong>, veuillez procéder au règlement de l'acompte.</p>
               <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
-                <tr><td><a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer l'acompte de ${montantAcompteCalcule.toFixed(2)} €</a></td></tr>
+                <tr><td><a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Procéder au règlement de ${montantAcompteCalcule.toFixed(2)} €</a></td></tr>
               </table>
               
               ${modificationLinkHTML}
-
+ 
               <p>À très bientôt !</p>
               
               ${adminSignatureHTML}
@@ -2862,7 +2917,7 @@ app.post('/api/reservations/:id/acompte', checkAuth, async (req, res) => {
       `
     });
 
-    res.json({ message: 'Lien d\'acompte envoyé', url: session.url });
+    res.json({ message: 'Lien d\'acompte envoyé', url: paymentLink });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Erreur lors de la génération de l\'acompte' });
@@ -2883,31 +2938,6 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
     const montantTotal = reservation.prixTotal || 0;
     if (montantTotal <= 0) return res.status(400).json({ error: 'Le montant total est de 0€' });
 
-    const stripeCustomer = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
-    const params = {
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: 'Paiement total du séjour - Gîte de La Maladrerie',
-            description: getStripeDescription(reservation),
-          },
-          unit_amount: Math.round(montantTotal * 100),
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      billing_address_collection: 'required',
-      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/payment-cancel`,
-      metadata: { reservationId: reservation.id.toString(), paymentType: 'totalite' }
-    };
-    if (stripeCustomer) params.customer = stripeCustomer;
-    else if (reservation.client.email && reservation.client.email !== 'N/A') params.customer_email = reservation.client.email;
-    
-    const session = await stripe.checkout.sessions.create(params);
-
     let tokenModification = reservation.tokenModification;
     if (!tokenModification) {
       tokenModification = require('crypto').randomBytes(32).toString('hex');
@@ -2918,15 +2948,14 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
     await prisma.reservation.update({
       where: { id: parseInt(id) },
       data: { 
-        stripeSoldeId: session.id,
         montantAcompte: 0,
         montantSolde: montantTotal,
-        stripeAcompteId: null, // Clear any previous deposit session since they are paying in full
         tokenModification: tokenModification,
         validePar: adminEmail
       }
     });
 
+    const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=totalite`;
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
@@ -2941,7 +2970,7 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
               <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
               <p>Afin de confirmer et régler l'intégralité de votre séjour du <strong>${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</strong>, veuillez procéder au règlement total.</p>
               <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
-                <tr><td><a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer la totalité de ${montantTotal.toFixed(2)} €</a></td></tr>
+                <tr><td><a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Procéder au règlement de ${montantTotal.toFixed(2)} €</a></td></tr>
               </table>
               
               ${modificationLinkHTML}
@@ -2955,7 +2984,7 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
       `
     });
 
-    res.json({ message: 'Lien de paiement total envoyé', url: session.url });
+    res.json({ message: 'Lien de totalité envoyé', url: paymentLink });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Erreur lors de la génération du paiement total' });
@@ -2980,36 +3009,6 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
       return res.status(400).json({ error: "Le solde est de 0€ (déjà  réglé ou prix total non défini)" });
     }
 
-    const stripeCustomerSolde = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
-    const soldeParams = {
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: 'Solde du séjour - Gîte de La Maladrerie',
-            description: getStripeDescription(reservation),
-          },
-          unit_amount: Math.round(montantSoldeCalcule * 100),
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-        billing_address_collection: 'required',
-      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/payment-cancel`,
-      metadata: {
-        reservationId: reservation.id.toString(),
-        paymentType: 'solde'
-      }
-    };
-    if (stripeCustomerSolde) {
-      soldeParams.customer = stripeCustomerSolde;
-    } else if (reservation.client.email && reservation.client.email !== 'N/A') {
-      soldeParams.customer_email = reservation.client.email;
-    }
-    const session = await stripe.checkout.sessions.create(soldeParams);
-
     let tokenModification = reservation.tokenModification;
     if (!tokenModification) {
       tokenModification = require('crypto').randomBytes(32).toString('hex');
@@ -3020,12 +3019,12 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
     await prisma.reservation.update({
       where: { id: parseInt(id) },
       data: { 
-        stripeSoldeId: session.id,
         tokenModification: tokenModification,
         validePar: adminEmail
       }
     });
 
+    const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=solde`;
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
@@ -3051,7 +3050,7 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
                     <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
                       <tr>
                         <td>
-                          <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer le solde de ${montantSoldeCalcule.toFixed(2)} €</a>
+                          <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer le solde de ${montantSoldeCalcule.toFixed(2)} €</a>
                         </td>
                       </tr>
                     </table>
@@ -3975,6 +3974,227 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
   }
 });
 
+// --- CLIENT PAYMENT ROUTES ---
+
+app.get('/api/payment/info/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token },
+      include: { client: true, occupants: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable ou lien expiré." });
+    }
+    res.json({
+      id: reservation.id,
+      clientNom: reservation.client.nom,
+      clientEmail: reservation.client.email,
+      dateDebut: reservation.dateDebut,
+      dateFin: reservation.dateFin,
+      chambres: reservation.chambres,
+      prixTotal: reservation.prixTotal,
+      montantAcompte: reservation.montantAcompte,
+      montantSolde: reservation.montantSolde,
+      statutPaiement: reservation.statutPaiement,
+      modePaiement: reservation.modePaiement,
+      structure: reservation.structure,
+      repas: reservation.repas
+    });
+  } catch (error) {
+    console.error("Erreur payment info:", error);
+    res.status(500).json({ error: "Erreur lors de la récupération de la réservation." });
+  }
+});
+
+app.post('/api/payment/stripe/:token', async (req, res) => {
+  const { token } = req.params;
+  const { type } = req.body; // 'acompte', 'solde', 'totalite'
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable ou lien expiré." });
+    }
+    if (!reservation.prixTotal) {
+      return res.status(400).json({ error: "Le prix total de la réservation n'est pas défini." });
+    }
+
+    let amount = 0;
+    let productName = '';
+    
+    if (type === 'acompte') {
+      const repasTotal = calculerTotalRepasServeur(reservation.repas);
+      const montantHebergement = Math.max(0, reservation.prixTotal - repasTotal);
+      amount = reservation.montantAcompte ? reservation.montantAcompte : Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+      productName = repasTotal > 0 ? 'Acompte (30% Hébergement + 100% Repas) - Séjour Gîte de La Maladrerie' : 'Acompte (30% Hébergement) - Séjour Gîte de La Maladrerie';
+    } else if (type === 'solde') {
+      amount = reservation.montantSolde ? reservation.montantSolde : (reservation.prixTotal - (reservation.montantAcompte || 0));
+      productName = 'Solde du séjour - Gîte de La Maladrerie';
+    } else {
+      amount = reservation.prixTotal;
+      productName = 'Paiement total du séjour - Gîte de La Maladrerie';
+    }
+
+    const stripeCustomer = await getOrCreateStripeCustomer(reservation.client.email, reservation.client.nom);
+    const plParams = {
+      payment_method_types: ['card'],
+      allow_promotion_codes: true,
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: { 
+            name: productName,
+            description: getStripeDescription(reservation)
+          },
+          unit_amount: Math.round(amount * 100),
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      billing_address_collection: 'required',
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
+      metadata: { reservationId: reservation.id.toString(), paymentType: type.toUpperCase() }
+    };
+    if (stripeCustomer) {
+      plParams.customer = stripeCustomer;
+    } else if (reservation.client.email && reservation.client.email !== 'N/A') {
+      plParams.customer_email = reservation.client.email;
+    }
+    const session = await stripe.checkout.sessions.create(plParams);
+
+    // Save session ID based on type
+    const dataUpdate = {};
+    if (type === 'acompte') dataUpdate.stripeAcompteId = session.id;
+    else if (type === 'solde') dataUpdate.stripeSoldeId = session.id;
+    else dataUpdate.stripeSessionId = session.id;
+
+    await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: dataUpdate
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error("Erreur Stripe payment session creation:", error);
+    res.status(500).json({ error: "Erreur lors de la génération de la session Stripe." });
+  }
+});
+
+app.post('/api/payment/virement/:token', async (req, res) => {
+  const { token } = req.params;
+  const { type } = req.body; // 'acompte', 'solde', 'totalite'
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable ou lien expiré." });
+    }
+    if (!reservation.prixTotal) {
+      return res.status(400).json({ error: "Le prix total de la réservation n'est pas défini." });
+    }
+
+    let amount = 0;
+    let label = '';
+    if (type === 'acompte') {
+      const repasTotal = calculerTotalRepasServeur(reservation.repas);
+      const montantHebergement = Math.max(0, reservation.prixTotal - repasTotal);
+      amount = reservation.montantAcompte ? reservation.montantAcompte : Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+      label = "Acompte (30% Hébergement" + (repasTotal > 0 ? " + 100% Repas)" : ")");
+    } else if (type === 'solde') {
+      amount = reservation.montantSolde ? reservation.montantSolde : (reservation.prixTotal - (reservation.montantAcompte || 0));
+      label = "Solde (70%)";
+    } else {
+      amount = reservation.prixTotal;
+      label = "Totalité (100%)";
+    }
+
+    // Update reservation payment mode
+    await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: { modePaiement: 'VIREMENT' }
+    });
+
+    const reference = `MUC-${reservation.id}-${type.toUpperCase()}`;
+    const bankDetails = {
+      iban: process.env.BANK_IBAN || 'FR76 1027 8089 6300 0201 6890 992',
+      bic: process.env.BANK_BIC || 'CMCIFR2A',
+      holder: process.env.BANK_HOLDER || 'MUC Omnisport',
+      bankName: process.env.BANK_NAME || 'Crédit Mutuel - CCM Montpellier Opera'
+    };
+
+    // Send email to client
+    const adminEmail = reservation.validePar || 'dr.mucomnisports@gmail.com';
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
+    const dateStr = new Date(reservation.dateDebut).toLocaleDateString('fr-FR') + " au " + new Date(reservation.dateFin).toLocaleDateString('fr-FR');
+
+    await sendMail({
+      to: reservation.client.email,
+      subject: `Instructions de virement - Séjour Gîte de La Maladrerie (Réf: ${reference})`,
+      html: `
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: sans-serif;">
+            <tr><td style="background-color: #004B93; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0;">Gîte de La Maladrerie</h1></td></tr>
+            <tr><td style="padding: 40px; color: #333333; line-height: 1.6;">
+              <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+              <p>Vous avez choisi de régler le paiement de votre séjour par virement bancaire.</p>
+              
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin-top: 0; font-weight: bold; color: #004B93;">Détails du paiement (${label}) :</p>
+                <table width="100%" style="font-size: 14px;">
+                  <tr><td style="padding: 5px 0;"><strong>Montant :</strong></td><td style="font-weight: bold; font-size: 16px; color: #004B93;">${amount.toFixed(2)} €</td></tr>
+                  <tr><td style="padding: 5px 0;"><strong>Libellé/Référence obligatoire :</strong></td><td style="font-weight: bold; color: #d97706; background-color: #fef3c7; padding: 2px 6px; border-radius: 4px;">${reference}</td></tr>
+                  <tr><td colspan="2" style="padding: 10px 0 5px 0; border-top: 1px dashed #e2e8f0;"><strong>Coordonnées bancaires :</strong></td></tr>
+                  <tr><td style="padding: 3px 0;">Titulaire du compte :</td><td><strong>${bankDetails.holder}</strong></td></tr>
+                  <tr><td style="padding: 3px 0;">IBAN :</td><td><strong style="font-family: monospace; font-size: 13px;">${bankDetails.iban}</strong></td></tr>
+                  <tr><td style="padding: 3px 0;">BIC :</td><td><strong style="font-family: monospace; font-size: 13px;">${bankDetails.bic}</strong></td></tr>
+                  <tr><td style="padding: 3px 0;">Banque :</td><td>${bankDetails.bankName}</td></tr>
+                </table>
+              </div>
+
+              <p style="font-size: 13px; color: #666; font-style: italic;">
+                ⚠️ <strong>Important :</strong> Veuillez indiquer exactement la référence <strong>${reference}</strong> dans le motif ou libellé de votre virement afin que nous puissions identifier et valider votre paiement rapidement.
+              </p>
+
+              <p>Dès réception des fonds sur notre compte, votre paiement sera validé et vous recevrez un e-mail de confirmation.</p>
+              
+              ${adminSignatureHTML}
+            </td></tr>
+          </table></td></tr>
+        </table>
+      `
+    });
+
+    // Send email to admin
+    await sendMail({
+      to: 'dr.mucomnisports@gmail.com',
+      subject: `🏦 [VIREMENT INTENTION] Client: ${reservation.client.nom} - ${amount.toFixed(2)} €`,
+      html: `
+        <div style="font-family: sans-serif;">
+          <h2>Intention de virement bancaire enregistrée</h2>
+          <p>Le client <strong>${reservation.client.nom}</strong> (${reservation.client.email}) a indiqué son intention de payer par virement pour la réservation <strong>#${reservation.id}</strong> (séjour du ${dateStr}).</p>
+          <ul>
+            <li><strong>Type de paiement :</strong> ${label}</li>
+            <li><strong>Montant attendu :</strong> ${amount.toFixed(2)} €</li>
+            <li><strong>Référence de virement :</strong> <code>${reference}</code></li>
+          </ul>
+          <p>Vous retrouverez cette réservation marquée comme "Virement attendu" sur votre espace d'administration. Une fois le virement reçu sur votre compte bancaire, veuillez enregistrer le paiement manuellement sur la réservation correspondante.</p>
+        </div>
+      `
+    });
+
+    res.json({ success: true, reference, bankDetails, amount });
+  } catch (error) {
+    console.error("Erreur virement intent:", error);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement de l'intention de virement." });
+  }
+});
+
 // --- CLIENT MODIFICATION ROUTES ---
 
 app.get('/api/reservation/modify/info/:token', async (req, res) => {
@@ -4809,6 +5029,7 @@ app.put('/api/admin/reservations/:id/full', checkAuth, async (req, res) => {
 // Envoyer le lien de paiement par e-mail
 app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req, res) => {
   const { id } = req.params;
+  const { type } = req.body; // optional type: 'acompte', 'solde', 'totalite'
   try {
     const reservation = await prisma.reservation.findUnique({
       where: { id: parseInt(id) },
@@ -4816,14 +5037,18 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
     });
 
     if (!reservation) return res.status(404).json({ error: 'Réservation non trouvée' });
-    if (!reservation.stripeSessionId) return res.status(400).json({ error: 'Lien de paiement non généré. Veuillez d\'abord générer le lien.' });
 
-    // Retrieve session to get the URL if we didn't save it
-    const session = await stripe.checkout.sessions.retrieve(reservation.stripeSessionId);
-
-    if (!session || !session.url) {
-      return res.status(400).json({ error: 'URL de session Stripe introuvable.' });
+    let tokenModification = reservation.tokenModification;
+    if (!tokenModification) {
+      tokenModification = require('crypto').randomBytes(32).toString('hex');
+      await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { tokenModification }
+      });
     }
+
+    const typePaiement = type || (reservation.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : 'totalite');
+    const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${typePaiement}`;
 
     const nbPersonnes = reservation.occupants ? reservation.occupants.length : 0;
     const nbNuits = Math.round((new Date(reservation.dateFin) - new Date(reservation.dateDebut)) / (1000 * 60 * 60 * 24));
@@ -4839,6 +5064,11 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
         </div>
       `;
     }
+
+    let typeLabel = "votre acompte / solde";
+    if (typePaiement === 'acompte') typeLabel = "l'acompte (30%)";
+    else if (typePaiement === 'solde') typeLabel = "le solde (70%)";
+    else if (typePaiement === 'totalite') typeLabel = "la totalité (100%)";
 
     await sendMail({
       to: reservation.client.email,
@@ -4856,7 +5086,7 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
                 <tr>
                   <td style="padding: 40px; color: #333333; line-height: 1.6;">
                     <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
-                    <p>Voici le lien pour finaliser le règlement de votre réservation.</p>
+                    <p>Voici le lien pour finaliser le règlement de ${typeLabel} de votre réservation.</p>
                     
                     <table width="100%" cellpadding="10" cellspacing="0" border="0" style="background-color: #f9f9f9; border-radius: 8px; margin: 25px 0;">
                       <tr>
@@ -4872,17 +5102,17 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
                         <td style="border-bottom: 1px solid #eeeeee;">${reservation.chambres.join(', ')}</td>
                       </tr>
                       <tr>
-                        <td style="font-weight: bold;">Montant</td>
+                        <td style="font-weight: bold;">Montant total</td>
                         <td style="font-size: 18px; font-weight: bold; color: #004B93;">${reservation.prixTotal ? reservation.prixTotal.toFixed(2) + ' €' : 'Non défini'}</td>
                       </tr>
                     </table>
                     
                     ${occupantsHTML}
-
+ 
                     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
                       <tr>
                         <td align="center">
-                          <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Payer en ligne</a>
+                          <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Procéder au règlement</a>
                         </td>
                       </tr>
                     </table>
@@ -4898,12 +5128,12 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
         </table>
       `
     });
-
+ 
     await prisma.reservation.update({
-      where: { id: parseInt(id) },
+      where: { id: reservation.id },
       data: { lienPaiementEnvoye: true }
     });
-
+ 
     res.json({ success: true, message: 'E-mail envoyé avec succès.' });
   } catch (error) {
     console.error("Erreur envoi lien:", error);
@@ -5401,7 +5631,17 @@ cron.schedule('0 9 * * *', async () => {
 
     for (const reser of toWarn) {
       const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : (reser.statutPaiement === 'SOLDE_PAYE' ? 'acompte' : 'totalite');
-      const session = await createStripeSessionForReservation(reser, paymentType);
+      
+      let tokenModification = reser.tokenModification;
+      if (!tokenModification) {
+        tokenModification = require('crypto').randomBytes(32).toString('hex');
+        await prisma.reservation.update({
+          where: { id: reser.id },
+          data: { tokenModification }
+        });
+      }
+
+      const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${paymentType}`;
       
       const montant = paymentType === 'solde' 
         ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
@@ -5434,7 +5674,7 @@ cron.schedule('0 9 * * *', async () => {
                       <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
                         <tr>
                           <td>
-                            <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le paiement de ${montant.toFixed(2)} €</a>
+                            <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le paiement de ${montant.toFixed(2)} €</a>
                           </td>
                         </tr>
                       </table>
@@ -5469,7 +5709,17 @@ cron.schedule('0 9 * * *', async () => {
 
     for (const reser of toRemind) {
       const paymentType = reser.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : (reser.statutPaiement === 'SOLDE_PAYE' ? 'acompte' : 'totalite');
-      const session = await createStripeSessionForReservation(reser, paymentType);
+      
+      let tokenModification = reser.tokenModification;
+      if (!tokenModification) {
+        tokenModification = require('crypto').randomBytes(32).toString('hex');
+        await prisma.reservation.update({
+          where: { id: reser.id },
+          data: { tokenModification }
+        });
+      }
+
+      const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${paymentType}`;
       
       const montant = paymentType === 'solde' 
         ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
@@ -5498,7 +5748,7 @@ cron.schedule('0 9 * * *', async () => {
                       <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
                         <tr>
                           <td>
-                            <a href="${session.url}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le solde de ${montant.toFixed(2)} €</a>
+                            <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le solde de ${montant.toFixed(2)} €</a>
                           </td>
                         </tr>
                       </table>

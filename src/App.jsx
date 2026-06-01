@@ -13,6 +13,7 @@ import DevisValidate from './pages/DevisValidate';
 import PaymentSuccess from './pages/PaymentSuccess';
 import OccupantsCollect from './pages/OccupantsCollect';
 import ReservationModify from './pages/ReservationModify';
+import ReservationPay from './pages/ReservationPay';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Route path="/admin-login" element={<Login />} />
         <Route path="/devis/validate" element={<DevisValidate />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/payment" element={<ReservationPay />} />
         <Route path="/reservation/occupants" element={<OccupantsCollect />} />
         <Route path="/reservation/modify" element={<ReservationModify />} />
       </Routes>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, AlertTriangle, Loader2, Calendar, Users, CreditCard, Info, ShieldCheck, Mail, Phone, Home } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Loader2, Calendar, Users, CreditCard, Info, ShieldCheck, Mail, Phone, Home, Landmark, Copy, Check } from 'lucide-react';
 import { API_URL } from '../config';
 
 const CHAMBRES_INFO = {
@@ -24,6 +24,16 @@ const DevisValidate = () => {
   const [occupants, setOccupants] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const [paymentMethod, setPaymentMethod] = useState('stripe');
+  const [virementResult, setVirementResult] = useState(null);
+  const [copiedField, setCopiedField] = useState(null);
+
+  const copyToClipboard = (text, field) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   useEffect(() => {
     const fetchDevisInfo = async () => {
@@ -124,7 +134,7 @@ const DevisValidate = () => {
       const res = await fetch(validateUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ occupants })
+        body: JSON.stringify({ occupants, paymentMethod })
       });
 
       if (res.ok) {
@@ -132,6 +142,9 @@ const DevisValidate = () => {
         if (data.url) {
           // Rediriger vers Stripe Checkout
           window.location.href = data.url;
+        } else if (data.method === 'virement') {
+          setVirementResult(data);
+          setStatus('virement_success');
         } else {
           setStatus('success');
         }
@@ -439,6 +452,41 @@ const DevisValidate = () => {
                     <p>Vos données sont protégées et cryptées. Les informations d'identité sont récoltées uniquement à des fins administratives réglementaires.</p>
                   </div>
 
+                  <div className="space-y-2.5 my-3">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest">Mode de règlement de l'acompte</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer select-none text-xs font-bold ${paymentMethod === 'stripe' ? 'bg-blue-50/50 border-[#004B93] text-slate-800' : 'bg-slate-50/30 border-slate-100 text-slate-500 hover:border-slate-200'}`}>
+                        <input 
+                          type="radio" 
+                          name="paymentMethod" 
+                          value="stripe" 
+                          checked={paymentMethod === 'stripe'} 
+                          onChange={() => setPaymentMethod('stripe')} 
+                          className="accent-[#004B93] w-4 h-4 shrink-0"
+                        />
+                        <div className="flex items-center gap-1.5">
+                          <CreditCard size={16} className="text-[#004B93]" />
+                          <span>Carte Bancaire (Stripe)</span>
+                        </div>
+                      </label>
+                      
+                      <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer select-none text-xs font-bold ${paymentMethod === 'virement' ? 'bg-blue-50/50 border-[#004B93] text-slate-800' : 'bg-slate-50/30 border-slate-100 text-slate-500 hover:border-slate-200'}`}>
+                        <input 
+                          type="radio" 
+                          name="paymentMethod" 
+                          value="virement" 
+                          checked={paymentMethod === 'virement'} 
+                          onChange={() => setPaymentMethod('virement')} 
+                          className="accent-[#004B93] w-4 h-4 shrink-0"
+                        />
+                        <div className="flex items-center gap-1.5">
+                          <Landmark size={16} className="text-[#004B93]" />
+                          <span>Virement Bancaire</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
                   <button 
                     disabled={isSubmitting} 
                     type="submit" 
@@ -447,12 +495,17 @@ const DevisValidate = () => {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="animate-spin text-[#004B93]" size={20} />
-                        Redirection vers le paiement...
+                        Traitement en cours...
                       </>
-                    ) : (
+                    ) : paymentMethod === 'stripe' ? (
                       <>
                         <CreditCard size={20} />
                         Valider et payer l'acompte ({(devis.prixTotal * 0.3).toFixed(2)} €)
+                      </>
+                    ) : (
+                      <>
+                        <Landmark size={20} />
+                        Valider et recevoir le RIB par e-mail
                       </>
                     )}
                   </button>
@@ -476,6 +529,85 @@ const DevisValidate = () => {
             <button 
               onClick={() => navigate('/')}
               className="w-full py-4 bg-[#004B93] text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-800 transition-all shadow-lg"
+            >
+              Retour à l'accueil
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+      {status === 'virement_success' && virementResult && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 w-screen h-screen p-4 overflow-y-auto">
+          <div className="bg-white p-6 md:p-8 rounded-3xl shadow-2xl max-w-lg w-full text-center relative max-h-[95vh] overflow-y-auto font-sans">
+            <div className="bg-blue-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto text-blue-600 mb-4 border border-blue-100">
+              <Landmark size={32} />
+            </div>
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Devis Validé !</h2>
+            <p className="text-slate-500 text-xs leading-relaxed mb-5">
+              Votre devis a été validé avec succès. Pour confirmer définitivement vos dates de séjour, veuillez procéder au virement bancaire de l'acompte :
+            </p>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-6 text-left text-xs space-y-4">
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-200 border-dashed">
+                <span className="font-bold text-slate-500 uppercase text-[10px]">Montant de l'acompte</span>
+                <span className="font-black text-base text-[#004B93]">{virementResult.amount?.toFixed(2)} €</span>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="font-bold text-slate-500 uppercase text-[10px]">Libellé / Référence obligatoire</span>
+                <div className="flex items-center justify-between bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl text-amber-800 font-bold select-all">
+                  <span>{virementResult.reference}</span>
+                  <button onClick={() => copyToClipboard(virementResult.reference, 'ref')} className="text-amber-600 hover:text-amber-800 transition-colors p-1">
+                    {copiedField === 'ref' ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200 border-dashed space-y-3">
+                <span className="font-black text-slate-800 uppercase text-[10px] block">Coordonnées Bancaires</span>
+                
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-slate-400 font-bold block">Titulaire</span>
+                      <span className="font-bold text-slate-700">{virementResult.bankDetails?.holder}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-bold block">Banque</span>
+                      <span className="font-bold text-slate-700">{virementResult.bankDetails?.bankName}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold text-[9px] block">IBAN</span>
+                    <div className="flex items-center justify-between bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-mono text-slate-800 font-bold select-all mt-0.5">
+                      <span className="truncate mr-2">{virementResult.bankDetails?.iban}</span>
+                      <button onClick={() => copyToClipboard(virementResult.bankDetails?.iban, 'iban')} className="text-slate-500 hover:text-slate-800 p-0.5">
+                        {copiedField === 'iban' ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold text-[9px] block">BIC</span>
+                    <div className="flex items-center justify-between bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-mono text-slate-800 font-bold select-all mt-0.5">
+                      <span>{virementResult.bankDetails?.bic}</span>
+                      <button onClick={() => copyToClipboard(virementResult.bankDetails?.bic, 'bic')} className="text-slate-500 hover:text-slate-800 p-0.5">
+                        {copiedField === 'bic' ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-slate-400 text-[10px] italic leading-relaxed mb-6 text-center">
+              💡 Un e-mail contenant ces coordonnées bancaires et votre référence obligatoire vous a été envoyé.
+            </p>
+
+            <button 
+              onClick={() => navigate('/')}
+              className="w-full py-3.5 bg-[#004B93] text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-800 transition-all shadow-lg text-xs"
             >
               Retour à l'accueil
             </button>
