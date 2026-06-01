@@ -910,34 +910,45 @@ const Admin = () => {
             
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
               <div className="overflow-x-auto">
-                <table className="text-left border-collapse table-fixed" style={{ width: '1390px', minWidth: '1390px' }}>
+                <table className="text-left border-collapse table-fixed" style={{ width: '1410px', minWidth: '1410px' }}>
+                  <colgroup>
+                    <col style={{ width: '220px' }} />
+                    <col style={{ width: '150px' }} />
+                    <col style={{ width: '230px' }} />
+                    <col style={{ width: '110px' }} />
+                    <col style={{ width: '200px' }} />
+                    <col style={{ width: '120px' }} />
+                    <col style={{ width: '90px' }} />
+                    <col style={{ width: '120px' }} />
+                    <col style={{ width: '170px' }} />
+                  </colgroup>
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th onClick={() => handleSort('client')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[220px]">
+                      <th onClick={() => handleSort('client')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Client {sortConfig.key === 'client' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[150px]">
+                      <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Dates {sortConfig.key === 'dateDebut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('prestations')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[230px]">
+                      <th onClick={() => handleSort('prestations')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Prestations {sortConfig.key === 'prestations' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('restauration')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[110px]">
+                      <th onClick={() => handleSort('restauration')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Restauration {sortConfig.key === 'restauration' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('tarif')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[200px]">
+                      <th onClick={() => handleSort('tarif')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Tarif {sortConfig.key === 'tarif' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('statut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[120px]">
+                      <th onClick={() => handleSort('statut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Statut {sortConfig.key === 'statut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('validePar')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-[90px]">
+                      <th onClick={() => handleSort('validePar')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Validé par {sortConfig.key === 'validePar' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors select-none w-[110px]">
+                      <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
                         Date de création {sortConfig.key === 'createdAt' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right w-[160px]">Actions</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1219,7 +1230,7 @@ const Admin = () => {
                       <td className="p-4">
                         <div className="text-xs font-bold text-slate-600">{formatAdminName(res.validePar)}</div>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4">
                         <div className="text-xs font-bold text-slate-600">
                           {new Date(res.createdAt).toLocaleDateString('fr-FR')}
                           <br />
