@@ -910,34 +910,34 @@ const Admin = () => {
             
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse table-fixed" style={{ minWidth: '1312px' }}>
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th onClick={() => handleSort('client')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('client')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-48 min-w-[192px]">
                         Client {sortConfig.key === 'client' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('dateDebut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-36 min-w-[144px]">
                         Dates {sortConfig.key === 'dateDebut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('prestations')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('prestations')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-56 min-w-[224px] max-w-[224px]">
                         Prestations {sortConfig.key === 'prestations' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('restauration')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('restauration')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-28 min-w-[112px]">
                         Restauration {sortConfig.key === 'restauration' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('tarif')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest min-w-[120px] cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('tarif')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-48 min-w-[192px] max-w-[192px]">
                         Tarif {sortConfig.key === 'tarif' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('statut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('statut')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-32 min-w-[128px]">
                         Statut {sortConfig.key === 'statut' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('validePar')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest w-24 cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('validePar')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors select-none w-24 min-w-[96px]">
                         Validé par {sortConfig.key === 'validePar' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                      <th onClick={() => handleSort('createdAt')} className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors select-none w-28 min-w-[112px] max-w-[112px]">
                         Date de création {sortConfig.key === 'createdAt' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
-                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                      <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right w-28 min-w-[112px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1017,21 +1017,21 @@ const Admin = () => {
                       return 0;
                     }).map((res) => (
                       <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-slate-800">{res.client?.nom || 'Client inconnu'}</div>
-                        <div className="text-xs text-slate-500">{res.client?.email || '-'}</div>
-                        <div className="text-xs text-slate-500">{res.client?.telephone || '-'}</div>
+                      <td className="p-4 w-48 min-w-[192px]">
+                        <div className="font-bold text-slate-800 truncate" title={res.client?.nom || 'Client inconnu'}>{res.client?.nom || 'Client inconnu'}</div>
+                        <div className="text-xs text-slate-500 truncate" title={res.client?.email || '-'}>{res.client?.email || '-'}</div>
+                        <div className="text-xs text-slate-500 truncate">{res.client?.telephone || '-'}</div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 w-36 min-w-[144px]">
                         <div className="text-sm font-medium text-slate-700">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
                         <div className="text-sm font-medium text-slate-700">Au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</div>
                       </td>
-                      <td className="p-4">
-                        <div className="text-sm font-bold text-muc-blue">
+                      <td className="p-4 w-56 min-w-[224px] max-w-[224px]">
+                        <div className="text-sm font-bold text-muc-blue leading-tight">
                           {(res.chambres || []).map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ')}
                         </div>
                         {res.salles && (
-                          <div className="text-sm font-bold text-indigo-600 mt-1 flex flex-col">
+                          <div className="text-xs font-bold text-indigo-600 mt-1 flex flex-col leading-tight">
                             {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
                             {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
                           </div>
@@ -1051,8 +1051,9 @@ const Admin = () => {
                           const total = totalAdultes + totalEnfants;
                           if (total === 0) return <div className="text-xs font-bold text-slate-700 mt-1">👥 0 occupant</div>;
                           return (
-                            <div className="text-xs font-bold text-slate-700 mt-1 bg-slate-100 px-2 py-1 rounded inline-block">
-                              👥 {total} occupant{total > 1 ? 's' : ''} <span className="font-normal text-slate-500 ml-1">({totalAdultes} Adultes, {totalEnfants} Enfants)</span>
+                            <div className="text-xs font-bold text-slate-700 mt-1 bg-slate-100 px-2 py-0.5 rounded inline-block leading-tight">
+                              👥 {total} occupant{total > 1 ? 's' : ''}
+                              <span className="font-normal text-slate-500 block text-[10px]">({totalAdultes} Ad., {totalEnfants} Enf.)</span>
                             </div>
                           );
                         })()}
@@ -1062,7 +1063,7 @@ const Admin = () => {
                           {res.options?.menage && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧹 Ménage</span>}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 w-28 min-w-[112px]">
                         <div className="flex flex-col gap-1 text-[11px] uppercase tracking-wider font-bold">
                           {(() => {
                             let totalPtitDej = 0;
@@ -1089,7 +1090,7 @@ const Admin = () => {
                               const hasDiner = res.repasGlobal?.DINER;
                               
                               if (!hasPtitDej && !hasDej && !hasDiner) {
-                                return <span className="text-slate-400 normal-case italic font-medium">Aucune</span>;
+                                  return <span className="text-slate-400 normal-case italic font-medium">Aucune</span>;
                               }
                               return (
                                 <>
@@ -1110,53 +1111,53 @@ const Admin = () => {
                           })()}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 w-48 min-w-[192px] max-w-[192px]">
                         <div className="text-sm font-black text-slate-800">
                           {res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}
                           {res.taxeSejour > 0 && <div className="text-[10px] text-slate-500 font-normal italic mt-0.5">dont {res.taxeSejour.toFixed(2)} € de taxe de séjour</div>}
                         </div>
                         <div className="flex flex-col gap-1 mt-2">
                           <div className="flex items-center justify-between text-[10px] gap-2">
-                            <span className="text-slate-500 font-bold uppercase">Acompte (30%)</span>
+                            <span className="text-slate-500 font-bold uppercase whitespace-nowrap">Acompte (30%)</span>
                             {res.montantAcompte === 0 ? (
-                              <span className="text-slate-400 font-bold">N/A</span>
+                              <span className="text-slate-400 font-bold whitespace-nowrap">N/A</span>
                             ) : res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold">✓ Payé</span>
+                              <span className="text-green-600 font-bold whitespace-nowrap">✓ Payé</span>
                             ) : res.stripeAcompteId ? (
-                              <span className="text-blue-600 font-bold">Lien envoyé</span>
+                              <span className="text-blue-600 font-bold whitespace-nowrap">Lien envoyé</span>
                             ) : (
-                              <span className="text-amber-600 font-bold">En attente</span>
+                              <span className="text-amber-600 font-bold whitespace-nowrap">En attente</span>
                             )}
                           </div>
                           <div className="flex items-center justify-between text-[10px] gap-2">
-                            <span className="text-slate-500 font-bold uppercase">
+                            <span className="text-slate-500 font-bold uppercase whitespace-nowrap font-bold uppercase">
                               {res.montantAcompte === 0 ? "Totalité (100%)" : "Solde (70%)"}
                             </span>
                             {res.statutPaiement === 'SOLDE_PAYE' || res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold">✓ Payé</span>
+                              <span className="text-green-600 font-bold whitespace-nowrap">✓ Payé</span>
                             ) : res.stripeSoldeId ? (
-                              <span className="text-blue-600 font-bold">Lien envoyé</span>
+                              <span className="text-blue-600 font-bold whitespace-nowrap">Lien envoyé</span>
                             ) : (
-                              <span className="text-amber-600 font-bold">En attente</span>
+                              <span className="text-amber-600 font-bold whitespace-nowrap">En attente</span>
                             )}
                           </div>
                           <div className="flex items-center justify-between text-[10px] gap-2 pt-1 border-t border-slate-100">
-                            <span className="text-slate-500 font-bold uppercase">Caution</span>
+                            <span className="text-slate-500 font-bold uppercase whitespace-nowrap">Caution</span>
                             {res.statutCaution === 'DEPOSEE' ? (
-                              <span className="text-green-600 font-bold">✓ Déposée</span>
+                              <span className="text-green-600 font-bold whitespace-nowrap">✓ Déposée</span>
                             ) : res.statutCaution === 'RESTITUEE' ? (
-                              <span className="text-slate-500 font-bold">✓ Restituée</span>
+                              <span className="text-slate-500 font-bold whitespace-nowrap">✓ Restituée</span>
                             ) : res.statutCaution === 'UTILISEE' ? (
-                              <span className="text-red-600 font-bold">⚠️ Retenue</span>
+                              <span className="text-red-600 font-bold whitespace-nowrap">⚠️ Retenue</span>
                             ) : res.stripeCautionId ? (
-                              <span className="text-blue-600 font-bold">Lien envoyé</span>
+                              <span className="text-blue-600 font-bold whitespace-nowrap">Lien envoyé</span>
                             ) : (
-                              <span className="text-amber-600 font-bold">En attente</span>
+                              <span className="text-amber-600 font-bold whitespace-nowrap">En attente</span>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 w-32 min-w-[128px]">
                         <div className="space-y-2">
                           {res.modificationProposed && (
                             <button
@@ -1215,10 +1216,10 @@ const Admin = () => {
                           </button>
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 w-24 min-w-[96px]">
                         <div className="text-xs font-bold text-slate-600">{formatAdminName(res.validePar)}</div>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right w-28 min-w-[112px] max-w-[112px]">
                         <div className="text-xs font-bold text-slate-600">
                           {new Date(res.createdAt).toLocaleDateString('fr-FR')}
                           <br />
@@ -1227,7 +1228,7 @@ const Admin = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right w-28 min-w-[112px]">
                         <div className="flex justify-end gap-1.5">
                           {res.statut === 'EN_ATTENTE' && (
                             <>
