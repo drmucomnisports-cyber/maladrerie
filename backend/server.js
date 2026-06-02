@@ -2938,8 +2938,9 @@ app.post('/api/devis/validate/:token', async (req, res) => {
 
       // Envoyer un mail de notification à l'admin pour le virement
       const targetAdminEmail = await getAdminEmailsForPreference('notifDevisValidation');
+      const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr`;
       await sendMail({
-        to: targetAdminEmail,
+        to: recipientEmails,
         subject: `🏦 [VIREMENT DEVIS] Devis ${devis.numeroDevis} validé par virement - ${montantAcompte.toFixed(2)} €`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
@@ -2980,11 +2981,12 @@ app.post('/api/devis/validate/:token', async (req, res) => {
               </div>
 
               <p style="font-size: 14px; line-height: 1.6; color: #475569; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
-                💡 <strong>Action attendue :</strong> Veuillez surveiller votre compte bancaire pour réceptionner ce virement. Une fois reçu, rendez-vous dans votre espace d'administration pour valider le paiement manuellement et finaliser le séjour.
+                💡 <strong>Action attendue :</strong> Veuillez surveiller votre compte bancaire pour réceptionner ce virement. Une fois reçu, cliquez sur le bouton ci-dessous pour valider le virement directement dans le système, ou accédez au Tableau de Bord.
               </p>
               
-              <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
-                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2);">Accéder au Tableau de Bord Admin</a>
+              <p style="text-align: center; margin-top: 25px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${devis.tokenModification}&type=acompte" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">✅ Valider le paiement (Marquer comme payé)</a>
+                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2); margin-top: 10px;">Accéder au Tableau de Bord Admin</a>
               </p>
             </div>
             
@@ -4689,8 +4691,9 @@ app.post('/api/payment/virement/:token', async (req, res) => {
 
     // Send email to admin
     const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['dr.mucomnisports@gmail.com']);
+    const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr`;
     await sendMail({
-      to: targetAdminEmail,
+      to: recipientEmails,
       subject: `🏦 [VIREMENT INTENTION] Client: ${reservation.client.nom} - ${amount.toFixed(2)} €`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
@@ -4735,11 +4738,12 @@ app.post('/api/payment/virement/:token', async (req, res) => {
             </div>
 
             <p style="font-size: 14px; line-height: 1.6; color: #475569; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
-              💡 <strong>Action attendue :</strong> Cette réservation est marquée comme "Virement attendu" sur votre espace d'administration. Une fois le virement reçu sur votre compte bancaire, veuillez enregistrer le paiement manuellement.
+              💡 <strong>Action attendue :</strong> Cette réservation est marquée comme "Virement attendu". Une fois le virement reçu sur votre compte bancaire, cliquez sur le bouton ci-dessous pour valider le virement directement dans le système, ou accédez au Tableau de Bord.
             </p>
             
-            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
-              <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2);">Accéder au Tableau de Bord Admin</a>
+            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
+              <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${reservation.tokenModification}&type=${type}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">✅ Valider le paiement (Marquer comme payé)</a>
+              <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2); margin-top: 10px;">Accéder au Tableau de Bord Admin</a>
             </p>
           </div>
           
@@ -4754,6 +4758,222 @@ app.post('/api/payment/virement/:token', async (req, res) => {
   } catch (error) {
     console.error("Erreur virement intent:", error);
     res.status(500).json({ error: "Erreur lors de l'enregistrement de l'intention de virement." });
+  }
+});
+
+app.get('/api/payment/virement/validate-by-link', async (req, res) => {
+  const { token, type } = req.query; // type: 'acompte', 'solde', 'totalite'
+  
+  if (!token || !type) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Erreur de validation</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
+          .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+          h1 { color: #ef4444; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+          p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+          <h1>Paramètres manquants</h1>
+          <p>Le jeton de validation ou le type de paiement est manquant.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token },
+      include: { client: true, intervenant: true }
+    });
+
+    if (!reservation) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Réservation introuvable</title>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
+            .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+            h1 { color: #ef4444; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+            p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+            <h1>Réservation introuvable</h1>
+            <p>La réservation associée à ce lien de validation n'a pas pu être trouvée.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    let amount = 0;
+    let label = '';
+    let targetStatus = '';
+    let nextPaymentType = '';
+
+    if (type === 'acompte') {
+      const repasTotal = calculerTotalRepasServeur(reservation.repas);
+      const montantHebergement = Math.max(0, reservation.prixTotal - repasTotal);
+      amount = reservation.montantAcompte ? reservation.montantAcompte : Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+      label = "Acompte (30% Hébergement" + (repasTotal > 0 ? " + 100% Repas)" : ")");
+      targetStatus = reservation.statutPaiement === 'SOLDE_PAYE' ? 'PAYE' : 'ACOMPTE_PAYE';
+      nextPaymentType = 'acompte';
+    } else if (type === 'solde') {
+      amount = reservation.montantSolde ? reservation.montantSolde : (reservation.prixTotal - (reservation.montantAcompte || 0));
+      label = "Solde (70%)";
+      targetStatus = reservation.statutPaiement === 'ACOMPTE_PAYE' ? 'PAYE' : 'SOLDE_PAYE';
+      nextPaymentType = 'solde';
+    } else {
+      amount = reservation.prixTotal;
+      label = "Totalité (100%)";
+      targetStatus = 'PAYE';
+      nextPaymentType = 'totalite';
+    }
+
+    if (reservation.statutPaiement === 'PAYE' || 
+       (type === 'acompte' && reservation.statutPaiement === 'ACOMPTE_PAYE') || 
+       (type === 'solde' && reservation.statutPaiement === 'SOLDE_PAYE')) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Paiement Déjà Validé</title>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
+            .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+            h1 { color: #0f172a; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+            p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+            .badge { background-color: #fef3c7; color: #b45309; font-weight: bold; padding: 6px 12px; border-radius: 9999px; display: inline-block; font-size: 14px; margin-bottom: 20px; border: 1px solid #fde68a; }
+            .btn { background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div style="font-size: 48px; margin-bottom: 15px;">ℹ️</div>
+            <h1>Paiement Déjà Validé</h1>
+            <p>Ce paiement par virement pour la réservation #${reservation.id} (${label}) a déjà été enregistré.</p>
+            <div class="badge">Statut actuel : ${reservation.statutPaiement}</div>
+            <br/>
+            <a href="${FRONTEND_URL}/admin" class="btn">Aller au Tableau de Bord</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    let stripeSoldeId = undefined;
+    let balancePaymentLink = '';
+    if (targetStatus === 'ACOMPTE_PAYE') {
+      try {
+        const soldeSession = await createStripeSessionForReservation(reservation, 'solde');
+        stripeSoldeId = soldeSession.id;
+        balancePaymentLink = soldeSession.url;
+      } catch (err) {
+        console.error("Erreur génération lien solde lors de la validation par virement:", err);
+      }
+    }
+
+    const updatedReservation = await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: {
+        statutPaiement: targetStatus,
+        statut: 'RESERVE',
+        stripeSoldeId: stripeSoldeId || undefined,
+        modePaiement: 'VIREMENT'
+      },
+      include: { client: true, intervenant: true }
+    });
+
+    console.log(`Validation Virement par lien : Réservation #${reservation.id} mise à jour à ${targetStatus}`);
+    await sendCuisineEmailIfNeeded(reservation.id);
+    await sendPaymentConfirmationEmails(updatedReservation, nextPaymentType, amount, balancePaymentLink);
+
+    if (updatedReservation.codePromo) {
+      try {
+        await prisma.promoCode.update({
+          where: { code: updatedReservation.codePromo.toUpperCase() },
+          data: { usageActuel: { increment: 1 } }
+        });
+      } catch (promoErr) {
+        console.error("Erreur incrémentation code promo:", promoErr);
+      }
+    }
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Paiement Validé avec Succès</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
+          .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+          h1 { color: #10b981; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+          p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+          .details { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; margin-bottom: 25px; }
+          .details table { width: 100%; border-collapse: collapse; font-size: 14px; }
+          .details td { padding: 8px 0; }
+          .btn { background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div style="font-size: 48px; margin-bottom: 15px;">✅</div>
+          <h1>Paiement Enregistré</h1>
+          <p>Le virement de <strong>${amount.toFixed(2)} €</strong> (${label}) pour la réservation de <strong>${reservation.client.nom}</strong> (#${reservation.id}) a bien été validé.</p>
+          
+          <div class="details">
+            <table>
+              <tr><td style="color: #64748b;">Réservation :</td><td style="font-weight: bold; text-align: right;">#${reservation.id}</td></tr>
+              <tr><td style="color: #64748b;">Client :</td><td style="font-weight: bold; text-align: right;">${reservation.client.nom}</td></tr>
+              <tr><td style="color: #64748b;">Nouveau Statut :</td><td style="font-weight: bold; text-align: right; color: #10b981;">Payé (${targetStatus})</td></tr>
+            </table>
+          </div>
+          
+          <a href="${FRONTEND_URL}/admin" class="btn">Accéder au Tableau de Bord</a>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Erreur validation virement par lien:", error);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Erreur serveur</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
+          .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+          h1 { color: #ef4444; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+          p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+          <h1>Erreur interne</h1>
+          <p>Une erreur est survenue lors de la validation du virement.</p>
+        </div>
+      </body>
+      </html>
+    `);
   }
 });
 
