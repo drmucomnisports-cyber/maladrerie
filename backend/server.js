@@ -2885,15 +2885,55 @@ app.post('/api/devis/validate/:token', async (req, res) => {
         to: targetAdminEmail,
         subject: `🏦 [VIREMENT DEVIS] Devis ${devis.numeroDevis} validé par virement - ${montantAcompte.toFixed(2)} €`,
         html: `
-          <div style="font-family: sans-serif;">
-            <h2>Devis validé par virement bancaire</h2>
-            <p>Le devis <strong>${devis.numeroDevis}</strong> du client <strong>${devis.client.nom}</strong> a été validé.</p>
-            <p>Le client a choisi de payer l'acompte par virement bancaire.</p>
-            <ul>
-              <li><strong>Montant de l'acompte attendu :</strong> ${montantAcompte.toFixed(2)} €</li>
-              <li><strong>Référence obligatoire :</strong> <code>${uniqueRef}</code></li>
-            </ul>
-            <p>Veuillez surveiller votre compte bancaire pour valider le séjour manuellement une fois les fonds reçus.</p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
+            <!-- Header banner with logo text / colors -->
+            <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+              <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
+              <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">🏦 Devis validé par virement</h2>
+            </div>
+            
+            <div style="padding: 24px;">
+              <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">
+                Bonjour,
+              </p>
+              <p style="font-size: 14px; line-height: 1.6; color: #334155;">
+                Le devis <strong>${devis.numeroDevis}</strong> du client <strong>${devis.client.nom}</strong> a été validé avec succès par virement bancaire.
+              </p>
+
+              <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+                <h4 style="margin: 0 0 15px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Informations du Virement :</h4>
+                <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
+                  <tr>
+                    <td width="40%" style="padding: 6px 0; color: #64748b; font-weight: bold;">Client :</td>
+                    <td style="padding: 6px 0; font-weight: bold;">${devis.client.nom}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">N° Devis :</td>
+                    <td style="padding: 6px 0; font-weight: bold; font-family: monospace;">${devis.numeroDevis}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Acompte attendu :</td>
+                    <td style="padding: 6px 0; font-weight: 800; color: #004B93; font-size: 15px;">${montantAcompte.toFixed(2)} €</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Référence obligatoire :</td>
+                    <td style="padding: 6px 0;"><span style="font-weight: bold; color: #b45309; background-color: #fef3c7; padding: 3px 8px; border-radius: 4px; border: 1px solid #fde68a; font-family: monospace;">${uniqueRef}</span></td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="font-size: 14px; line-height: 1.6; color: #475569; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
+                💡 <strong>Action attendue :</strong> Veuillez surveiller votre compte bancaire pour réceptionner ce virement. Une fois reçu, rendez-vous dans votre espace d'administration pour valider le paiement manuellement et finaliser le séjour.
+              </p>
+              
+              <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
+                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2);">Accéder au Tableau de Bord Admin</a>
+              </p>
+            </div>
+            
+            <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+              Cet e-mail automatique est envoyé par le système de réservation du Gîte de la Maladrerie.
+            </div>
           </div>
         `
       });
@@ -4549,15 +4589,59 @@ app.post('/api/payment/virement/:token', async (req, res) => {
       to: 'dr.mucomnisports@gmail.com',
       subject: `🏦 [VIREMENT INTENTION] Client: ${reservation.client.nom} - ${amount.toFixed(2)} €`,
       html: `
-        <div style="font-family: sans-serif;">
-          <h2>Intention de virement bancaire enregistrée</h2>
-          <p>Le client <strong>${reservation.client.nom}</strong> (${reservation.client.email}) a indiqué son intention de payer par virement pour la réservation <strong>#${reservation.id}</strong> (séjour du ${dateStr}).</p>
-          <ul>
-            <li><strong>Type de paiement :</strong> ${label}</li>
-            <li><strong>Montant attendu :</strong> ${amount.toFixed(2)} €</li>
-            <li><strong>Référence de virement :</strong> <code>${reference}</code></li>
-          </ul>
-          <p>Vous retrouverez cette réservation marquée comme "Virement attendu" sur votre espace d'administration. Une fois le virement reçu sur votre compte bancaire, veuillez enregistrer le paiement manuellement sur la réservation correspondante.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
+          <!-- Header banner with logo text / colors -->
+          <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+            <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
+            <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">🏦 Intention de virement</h2>
+          </div>
+          
+          <div style="padding: 24px;">
+            <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">
+              Bonjour,
+            </p>
+            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
+              Le client <strong>${reservation.client.nom}</strong> (${reservation.client.email}) a indiqué son intention de régler par virement bancaire pour la réservation <strong>#${reservation.id}</strong> (séjour du ${dateStr}).
+            </p>
+
+            <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+              <h4 style="margin: 0 0 15px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails de la réservation :</h4>
+              <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
+                <tr>
+                  <td width="40%" style="padding: 6px 0; color: #64748b; font-weight: bold;">Client :</td>
+                  <td style="padding: 6px 0; font-weight: bold;">${reservation.client.nom}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Réf. Réservation :</td>
+                  <td style="padding: 6px 0; font-weight: bold;">#${reservation.id}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Type de règlement :</td>
+                  <td style="padding: 6px 0; font-weight: bold;">${label}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Montant attendu :</td>
+                  <td style="padding: 6px 0; font-weight: 800; color: #004B93; font-size: 15px;">${amount.toFixed(2)} €</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Référence de virement :</td>
+                  <td style="padding: 6px 0;"><span style="font-weight: bold; color: #b45309; background-color: #fef3c7; padding: 3px 8px; border-radius: 4px; border: 1px solid #fde68a; font-family: monospace;">${reference}</span></td>
+                </tr>
+              </table>
+            </div>
+
+            <p style="font-size: 14px; line-height: 1.6; color: #475569; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
+              💡 <strong>Action attendue :</strong> Cette réservation est marquée comme "Virement attendu" sur votre espace d'administration. Une fois le virement reçu sur votre compte bancaire, veuillez enregistrer le paiement manuellement.
+            </p>
+            
+            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
+              <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2);">Accéder au Tableau de Bord Admin</a>
+            </p>
+          </div>
+          
+          <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+            Cet e-mail automatique est envoyé par le système de réservation du Gîte de la Maladrerie.
+          </div>
         </div>
       `
     });
