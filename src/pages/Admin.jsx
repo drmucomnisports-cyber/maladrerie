@@ -2801,8 +2801,11 @@ const Admin = () => {
       {/* Modale de validation de modification client */}
       {showModificationModal && selectedProposedModification && (() => {
         const current = selectedProposedModification;
-        const proposed = selectedProposedModification.modificationProposed;
+        const proposed = selectedProposedModification.modificationProposed || {};
         
+        const recalculatedPrice = proposed.prixTotal || 0;
+        const priceDifference = recalculatedPrice - (current.prixTotal || 0);
+
         // Helper to format values
         const formatOptionsList = (opt) => {
           if (!opt) return "Aucun";
@@ -2822,7 +2825,7 @@ const Admin = () => {
         };
 
         const formatMealsCount = (mealsObj) => {
-          if (!mealsObj) return "Aucun";
+          if (!mealsObj || Object.keys(mealsObj).length === 0) return "Aucun";
           let petitDej = 0, dej = 0, diner = 0;
           Object.values(mealsObj).forEach(day => {
             if (day.PETIT_DEJ) petitDej += (day.PETIT_DEJ.ADULTE || 0) + (day.PETIT_DEJ.ENFANT_MOINS_12 || 0) + (day.PETIT_DEJ.ENFANT_MOINS_5 || 0);
@@ -2836,6 +2839,93 @@ const Admin = () => {
           return parts.join(', ') || "Aucun";
         };
 
+        const formatChambresDetails = (chambresList, details) => {
+          if (!chambresList || chambresList.length === 0) return "Aucune chambre";
+          return chambresList.map(chId => {
+            const info = details?.[chId] || details?.[String(chId)] || {};
+            const adults = info.adultes || 0;
+            const kids = info.mineurs || info.enfants || 0;
+            return `Chambre ${chId} (${adults} Ad. ${kids > 0 ? `, ${kids} Enf.` : ''})`;
+          }).join(', ');
+        };
+
+        const getYYYYMMDD = (d) => {
+          if (!d) return '';
+          try {
+            return new Date(d).toISOString().split('T')[0];
+          } catch (e) {
+            return '';
+          }
+        };
+
+        const currentDatesStr = `Du ${new Date(current.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(current.dateFin).toLocaleDateString('fr-FR')}`;
+        const proposedDatesStr = `Du ${new Date(proposed.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(proposed.dateFin).toLocaleDateString('fr-FR')}`;
+        const datesChanged = getYYYYMMDD(current.dateDebut) !== getYYYYMMDD(proposed.dateDebut) || getYYYYMMDD(current.dateFin) !== getYYYYMMDD(proposed.dateFin);
+
+        const optionsChanged = JSON.stringify(current.options) !== JSON.stringify(proposed.options);
+        const sallesChanged = JSON.stringify(current.salles) !== JSON.stringify(proposed.salles);
+        const repasChanged = JSON.stringify(current.repas) !== JSON.stringify(proposed.repas);
+        const chambresChanged = JSON.stringify(current.chambres?.sort()) !== JSON.stringify(proposed.chambres?.sort()) || JSON.stringify(current.chambresDetails) !== JSON.stringify(proposed.chambresDetails);
+
+        // Occupants diff calculations
+        const curOccList = current.occupants || [];
+        const propOccList = proposed.occupants || [];
+        const maxLen = Math.max(curOccList.length, propOccList.length);
+        const occupantsDiffs = [];
+
+        for (let i = 0; i < maxLen; i++) {
+          const cur = curOccList[i];
+          const prop = propOccList[i];
+          
+          if (cur && !prop) {
+            occupantsDiffs.push({
+              index: i + 1,
+              status: 'removed',
+              cur: `${cur.nom} ${cur.prenom} (${cur.estAdulte ? 'Adulte' : `${cur.age} ans`}) - ${cur.nationalite || 'Française'}`,
+              prop: '—'
+            });
+          } else if (!cur && prop) {
+            const nationaliteStr = prop.nationalite === true || prop.nationalite === 'Française' ? 'Française' : (prop.nationalite === false || prop.nationalite === 'Étrangère' ? 'Étrangère' : prop.nationalite || 'Française');
+            occupantsDiffs.push({
+              index: i + 1,
+              status: 'added',
+              cur: '—',
+              prop: `${prop.nom} ${prop.prenom} (${prop.estAdulte ? 'Adulte' : `${prop.age} ans`}) - ${nationaliteStr}`
+            });
+          } else {
+            // Both exist
+            const nationaliteCur = cur.nationalite || 'Française';
+            const nationaliteProp = prop.nationalite === true || prop.nationalite === 'Française' ? 'Française' : (prop.nationalite === false || prop.nationalite === 'Étrangère' ? 'Étrangère' : prop.nationalite || 'Française');
+            
+            const curStr = `${cur.nom} ${cur.prenom} (${cur.estAdulte ? 'Adulte' : `${cur.age} ans`}) - ${nationaliteCur}`;
+            const propStr = `${prop.nom} ${prop.prenom} (${prop.estAdulte ? 'Adulte' : `${prop.age} ans`}) - ${nationaliteProp}`;
+            
+            const nameChanged = cur.nom !== prop.nom || cur.prenom !== prop.prenom;
+            const typeChanged = cur.estAdulte !== prop.estAdulte || cur.age !== prop.age;
+            const natChanged = nationaliteCur !== nationaliteProp;
+            
+            const changed = nameChanged || typeChanged || natChanged;
+            
+            occupantsDiffs.push({
+              index: i + 1,
+              status: changed ? 'changed' : 'unchanged',
+              cur: curStr,
+              prop: propStr,
+              diffDetails: changed ? {
+                name: nameChanged,
+                type: typeChanged,
+                nat: natChanged,
+                curName: `${cur.nom} ${cur.prenom}`,
+                propName: `${prop.nom} ${prop.prenom}`,
+                curType: cur.estAdulte ? 'Adulte' : `${cur.age} ans`,
+                propType: prop.estAdulte ? 'Adulte' : `${prop.age} ans`,
+                curNat: nationaliteCur,
+                propNat: nationaliteProp
+              } : null
+            });
+          }
+        }
+
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-300 flex flex-col max-h-[90vh]">
@@ -2848,93 +2938,96 @@ const Admin = () => {
               </div>
 
               <div className="p-6 overflow-y-auto space-y-6 flex-1">
-                <table className="w-full text-left border-collapse border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left border-collapse border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                   <thead>
                     <tr className="bg-slate-50 text-slate-500 font-black text-xs uppercase tracking-wider border-b border-slate-200">
-                      <th className="p-3 border border-slate-200">Élément</th>
-                      <th className="p-3 border border-slate-200 bg-red-50/30 text-red-800">Version Actuelle</th>
-                      <th className="p-3 border border-slate-200 bg-green-50/30 text-green-800">Version Proposée</th>
+                      <th className="p-4 border border-slate-200 w-1/4">Élément</th>
+                      <th className="p-4 border border-slate-200 bg-red-50/30 text-red-800 w-3/8">Version Actuelle</th>
+                      <th className="p-4 border border-slate-200 bg-green-50/30 text-green-800 w-3/8">Version Proposée</th>
                     </tr>
                   </thead>
                   <tbody className="text-xs font-semibold text-slate-700">
+                    {/* Dates */}
                     <tr className="border-b border-slate-200">
-                      <td className="p-3 font-bold border border-slate-200">Dates</td>
-                      <td className="p-3 border border-slate-200 bg-red-50/10">
-                        Du {new Date(current.dateDebut).toLocaleDateString('fr-FR')} <br/>
-                        au {new Date(current.dateFin).toLocaleDateString('fr-FR')}
+                      <td className="p-4 font-bold border border-slate-200 bg-slate-50/50">Dates du séjour</td>
+                      <td className="p-4 border border-slate-200 bg-red-50/10">
+                        {currentDatesStr}
                       </td>
-                      <td className={`p-3 border border-slate-200 ${
-                        current.dateDebut !== proposed.dateDebut || current.dateFin !== proposed.dateFin ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      <td className={`p-4 border border-slate-200 ${
+                        datesChanged ? 'bg-green-100/50 text-green-900 font-bold border-l-4 border-l-green-500' : ''
                       }`}>
-                        Du {new Date(proposed.dateDebut).toLocaleDateString('fr-FR')} <br/>
-                        au {new Date(proposed.dateFin).toLocaleDateString('fr-FR')}
+                        {proposedDatesStr}
+                        {datesChanged && <span className="ml-2 text-[10px] bg-green-200/80 text-green-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Modifié</span>}
                       </td>
                     </tr>
+
+                    {/* Chambres */}
                     <tr className="border-b border-slate-200">
-                      <td className="p-3 font-bold border border-slate-200">Chambres</td>
-                      <td className="p-3 border border-slate-200 bg-red-50/10">
-                        {current.chambres.join(', ')}
+                      <td className="p-4 font-bold border border-slate-200 bg-slate-50/50">Chambres & Répartition</td>
+                      <td className="p-4 border border-slate-200 bg-red-50/10">
+                        {formatChambresDetails(current.chambres, current.chambresDetails)}
                       </td>
-                      <td className={`p-3 border border-slate-200 ${
-                        JSON.stringify(current.chambres.sort()) !== JSON.stringify(proposed.chambres.sort()) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      <td className={`p-4 border border-slate-200 ${
+                        chambresChanged ? 'bg-green-100/50 text-green-900 font-bold border-l-4 border-l-green-500' : ''
                       }`}>
-                        {proposed.chambres.join(', ')}
+                        {formatChambresDetails(proposed.chambres, proposed.chambresDetails)}
+                        {chambresChanged && <span className="ml-2 text-[10px] bg-green-200/80 text-green-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Modifié</span>}
                       </td>
                     </tr>
+
+                    {/* Options */}
                     <tr className="border-b border-slate-200">
-                      <td className="p-3 font-bold border border-slate-200">Options</td>
-                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                      <td className="p-4 font-bold border border-slate-200 bg-slate-50/50">Options & Services</td>
+                      <td className="p-4 border border-slate-200 bg-red-50/10">
                         {formatOptionsList(current.options)}
                       </td>
-                      <td className={`p-3 border border-slate-200 ${
-                        JSON.stringify(current.options) !== JSON.stringify(proposed.options) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      <td className={`p-4 border border-slate-200 ${
+                        optionsChanged ? 'bg-green-100/50 text-green-900 font-bold border-l-4 border-l-green-500' : ''
                       }`}>
                         {formatOptionsList(proposed.options)}
+                        {optionsChanged && <span className="ml-2 text-[10px] bg-green-200/80 text-green-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Modifié</span>}
                       </td>
                     </tr>
+
+                    {/* Salles */}
                     <tr className="border-b border-slate-200">
-                      <td className="p-3 font-bold border border-slate-200">Salles</td>
-                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                      <td className="p-4 font-bold border border-slate-200 bg-slate-50/50">Salles de réunion</td>
+                      <td className="p-4 border border-slate-200 bg-red-50/10">
                         {formatSallesList(current.salles)}
                       </td>
-                      <td className={`p-3 border border-slate-200 ${
-                        JSON.stringify(current.salles) !== JSON.stringify(proposed.salles) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      <td className={`p-4 border border-slate-200 ${
+                        sallesChanged ? 'bg-green-100/50 text-green-900 font-bold border-l-4 border-l-green-500' : ''
                       }`}>
                         {formatSallesList(proposed.salles)}
+                        {sallesChanged && <span className="ml-2 text-[10px] bg-green-200/80 text-green-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Modifié</span>}
                       </td>
                     </tr>
+
+                    {/* Repas */}
                     <tr className="border-b border-slate-200">
-                      <td className="p-3 font-bold border border-slate-200">Repas</td>
-                      <td className="p-3 border border-slate-200 bg-red-50/10">
+                      <td className="p-4 font-bold border border-slate-200 bg-slate-50/50">Restauration (Repas)</td>
+                      <td className="p-4 border border-slate-200 bg-red-50/10">
                         {formatMealsCount(current.repas)}
                       </td>
-                      <td className={`p-3 border border-slate-200 ${
-                        JSON.stringify(current.repas) !== JSON.stringify(proposed.repas) ? 'bg-green-100/50 text-green-900 font-bold' : ''
+                      <td className={`p-4 border border-slate-200 ${
+                        repasChanged ? 'bg-green-100/50 text-green-900 font-bold border-l-4 border-l-green-500' : ''
                       }`}>
                         {formatMealsCount(proposed.repas)}
+                        {repasChanged && <span className="ml-2 text-[10px] bg-green-200/80 text-green-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Modifié</span>}
                       </td>
                     </tr>
-                    <tr className="border-b border-slate-200">
-                      <td className="p-3 font-bold border border-slate-200">Voyageurs</td>
-                      <td className="p-3 border border-slate-200 bg-red-50/10">
-                        {current.occupants?.length || 0} occupant(s)
-                      </td>
-                      <td className={`p-3 border border-slate-200 ${
-                        (current.occupants?.length || 0) !== proposed.occupants?.length ? 'bg-green-100/50 text-green-900 font-bold' : ''
-                      }`}>
-                        {proposed.occupants?.length || 0} occupant(s)
-                      </td>
-                    </tr>
-                    <tr className="bg-slate-50 font-black">
-                      <td className="p-3 border border-slate-200">Prix total</td>
-                      <td className="p-3 border border-slate-200 bg-red-50/10 text-red-800">
+
+                    {/* Prix total */}
+                    <tr className="bg-slate-50 font-black text-sm">
+                      <td className="p-4 border border-slate-200">Tarif Total (TTC)</td>
+                      <td className="p-4 border border-slate-200 bg-red-50/10 text-red-800">
                         {current.prixTotal?.toFixed(2)} €
                       </td>
-                      <td className="p-3 border border-slate-200 bg-green-50 text-green-900">
-                        {proposed.recalculatedPrice?.toFixed(2)} € 
-                        {proposed.priceDifference !== 0 && (
-                          <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full ${proposed.priceDifference > 0 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
-                            {proposed.priceDifference > 0 ? `+${proposed.priceDifference.toFixed(2)} €` : `${proposed.priceDifference.toFixed(2)} €`}
+                      <td className={`p-4 border border-slate-200 bg-green-50 text-green-950 font-black`}>
+                        {recalculatedPrice?.toFixed(2)} € 
+                        {priceDifference !== 0 && (
+                          <span className={`ml-2 text-xs px-2.5 py-1 rounded-full ${priceDifference > 0 ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-green-100 text-green-900 font-bold'}`}>
+                            {priceDifference > 0 ? `+${priceDifference.toFixed(2)} €` : `${priceDifference.toFixed(2)} €`}
                           </span>
                         )}
                       </td>
@@ -2942,29 +3035,98 @@ const Admin = () => {
                   </tbody>
                 </table>
 
-                {/* Occupants detailed lists comparison */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/30">
-                    <h4 className="font-black text-xs text-slate-500 uppercase tracking-wider mb-2">Occupants Actuels ({current.occupants?.length || 0})</h4>
-                    <ul className="text-xs space-y-1.5 list-disc pl-4 font-semibold text-slate-700">
-                      {(current.occupants || []).map((o, idx) => (
-                        <li key={idx}>
-                          {o.nom} {o.prenom} ({o.estAdulte ? 'Adulte' : `${o.age} ans`}) - {o.nationalite || 'Française'}
-                        </li>
-                      ))}
-                      {(current.occupants || []).length === 0 && <li className="text-slate-400 italic">Aucun occupant renseigné</li>}
-                    </ul>
+                {/* Detailed Occupants Diff Table */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white mt-6">
+                  <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                    <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                      <Users size={16} className="text-[#004B93]" />
+                      Comparatif détaillé des Voyageurs ({curOccList.length} actuels vs {propOccList.length} proposés)
+                    </h4>
                   </div>
-                  <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/30">
-                    <h4 className="font-black text-xs text-slate-500 uppercase tracking-wider mb-2">Occupants Proposés ({proposed.occupants?.length || 0})</h4>
-                    <ul className="text-xs space-y-1.5 list-disc pl-4 font-semibold text-slate-700">
-                      {(proposed.occupants || []).map((o, idx) => (
-                        <li key={idx}>
-                          {o.nom} {o.prenom} ({o.estAdulte ? 'Adulte' : `${o.age} ans`}) - {o.nationalite || 'Française'}
-                        </li>
-                      ))}
-                      {(proposed.occupants || []).length === 0 && <li className="text-slate-400 italic">Aucun occupant renseigné</li>}
-                    </ul>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50/50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                          <th className="p-3 w-10 text-center">N°</th>
+                          <th className="p-3 w-5/12">Version Actuelle</th>
+                          <th className="p-3 w-5/12">Version Proposée</th>
+                          <th className="p-3 w-2/12 text-center">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-xs font-semibold text-slate-700">
+                        {occupantsDiffs.map((occ, idx) => (
+                          <tr 
+                            key={idx} 
+                            className={`border-b border-slate-100 transition-all ${
+                              occ.status === 'added' ? 'bg-green-50/50 hover:bg-green-50' :
+                              occ.status === 'removed' ? 'bg-red-50/30 hover:bg-red-50/50' :
+                              occ.status === 'changed' ? 'bg-amber-50/40 hover:bg-amber-50/60' : 'hover:bg-slate-50/40'
+                            }`}
+                          >
+                            <td className="p-3 text-center text-slate-400 font-bold">{occ.index}</td>
+                            <td className={`p-3 ${occ.status === 'removed' ? 'text-red-900/60 line-through' : ''}`}>
+                              {occ.cur}
+                            </td>
+                            <td className="p-3">
+                              {occ.status === 'changed' && occ.diffDetails ? (
+                                <div className="space-y-0.5">
+                                  {occ.diffDetails.name ? (
+                                    <span>
+                                      Nom : <span className="bg-amber-100 text-amber-900 px-1 py-0.5 rounded font-bold">{occ.diffDetails.propName}</span>
+                                      <span className="text-[10px] text-slate-400 font-medium ml-1.5">(ex: {occ.diffDetails.curName})</span>
+                                    </span>
+                                  ) : (
+                                    <span>{occ.diffDetails.propName}</span>
+                                  )}
+                                  <div className="text-[10px] text-slate-500 flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 font-medium">
+                                    {occ.diffDetails.type ? (
+                                      <span>
+                                        Type/Âge : <span className="bg-amber-100 text-amber-900 px-1 py-0.2 rounded font-bold">{occ.diffDetails.propType}</span>
+                                        <span className="text-[9px] text-slate-400 font-normal ml-1">(ex: {occ.diffDetails.curType})</span>
+                                      </span>
+                                    ) : (
+                                      <span>Type/Âge : {occ.diffDetails.propType}</span>
+                                    )}
+                                    {occ.diffDetails.nat && (
+                                      <span>
+                                        Nat. : <span className="bg-amber-100 text-amber-900 px-1 py-0.2 rounded font-bold">{occ.diffDetails.propNat}</span>
+                                        <span className="text-[9px] text-slate-400 font-normal ml-1">(ex: {occ.diffDetails.curNat})</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : occ.status === 'added' ? (
+                                <span className="text-green-900 font-bold">{occ.prop}</span>
+                              ) : (
+                                <span>{occ.prop}</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              {occ.status === 'added' && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full border border-green-200">
+                                  + Ajouté
+                                </span>
+                              )}
+                              {occ.status === 'removed' && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full border border-red-200">
+                                  - Supprimé
+                                </span>
+                              )}
+                              {occ.status === 'changed' && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200">
+                                  ✏ Modifié
+                                </span>
+                              )}
+                              {occ.status === 'unchanged' && (
+                                <span className="text-[10px] text-slate-400 font-bold">
+                                  Identique
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>

@@ -4666,43 +4666,243 @@ app.post('/api/reservation/modify/:token', async (req, res) => {
     const dDebutNew = new Date(dateDebut).toLocaleDateString('fr-FR');
     const dFinNew = new Date(dateFin).toLocaleDateString('fr-FR');
 
+    const getYYYYMMDD = (d) => {
+      if (!d) return '';
+      try {
+        return new Date(d).toISOString().split('T')[0];
+      } catch (e) {
+        return '';
+      }
+    };
+    
+    // Comparaison des dates
+    const datesChanged = getYYYYMMDD(reservation.dateDebut) !== getYYYYMMDD(dateDebut) || getYYYYMMDD(reservation.dateFin) !== getYYYYMMDD(dateFin);
+
+    // Comparaison des chambres et de la répartition
+    const formatChambresDetails = (chambresList, details) => {
+      if (!chambresList || chambresList.length === 0) return "Aucune chambre";
+      return chambresList.map(chId => {
+        const info = details?.[chId] || details?.[String(chId)] || {};
+        const adults = info.adultes || 0;
+        const kids = info.mineurs || info.enfants || 0;
+        return `Chambre ${chId} (${adults} Ad. ${kids > 0 ? `, ${kids} Enf.` : ''})`;
+      }).join(', ');
+    };
+    const chDetailsOld = formatChambresDetails(reservation.chambres, reservation.chambresDetails);
+    const chDetailsNew = formatChambresDetails(chambres, chambresDetails);
+    const chambresChanged = chDetailsOld !== chDetailsNew;
+
+    // Comparaison des options
+    const formatOptionsList = (opt) => {
+      if (!opt) return "Aucun";
+      const list = [];
+      if (opt.litsFaits) list.push("Lits faits");
+      if (opt.lingeFourni) list.push("Linge de toilette");
+      if (opt.menage) list.push("Ménage");
+      return list.join(', ') || "Aucun";
+    };
+    const optOld = formatOptionsList(reservation.options);
+    const optNew = formatOptionsList(options);
+    const optionsChanged = optOld !== optNew;
+
+    // Comparaison des salles
+    const formatSallesList = (sl) => {
+      if (!sl) return "Aucune";
+      const list = [];
+      if (sl.salle15) list.push("Salle 15 pers.");
+      if (sl.salle12) list.push("Salle 12 pers.");
+      return list.join(', ') || "Aucune";
+    };
+    const sallesOld = formatSallesList(reservation.salles);
+    const sallesNew = formatSallesList(salles);
+    const sallesChanged = sallesOld !== sallesNew;
+
+    // Comparaison des repas
+    const formatMealsCount = (mealsObj) => {
+      if (!mealsObj || Object.keys(mealsObj).length === 0) return "Aucun";
+      let petitDej = 0, dej = 0, diner = 0;
+      Object.values(mealsObj).forEach(day => {
+        if (day.PETIT_DEJ) petitDej += (day.PETIT_DEJ.ADULTE || 0) + (day.PETIT_DEJ.ENFANT_MOINS_12 || 0) + (day.PETIT_DEJ.ENFANT_MOINS_5 || 0);
+        if (day.DEJEUNER) dej += (day.DEJEUNER.ADULTE || 0) + (day.DEJEUNER.ENFANT_MOINS_12 || 0) + (day.DEJEUNER.ENFANT_MOINS_5 || 0);
+        if (day.DINER) diner += (day.DINER.ADULTE || 0) + (day.DINER.ENFANT_MOINS_12 || 0) + (day.DINER.ENFANT_MOINS_5 || 0);
+      });
+      const parts = [];
+      if (petitDej) parts.push(`${petitDej} P-Dej`);
+      if (dej) parts.push(`${dej} Dej`);
+      if (diner) parts.push(`${diner} Din`);
+      return parts.join(', ') || "Aucun";
+    };
+    const repasOld = formatMealsCount(reservation.repas);
+    const repasNew = formatMealsCount(repas);
+    const repasChanged = repasOld !== repasNew;
+
+    // Comparaison détaillée des Occupants
+    const curOccList = reservation.occupants || [];
+    const propOccList = occupants || [];
+    const maxLen = Math.max(curOccList.length, propOccList.length);
+    const occupantsDiffs = [];
+
+    for (let i = 0; i < maxLen; i++) {
+      const cur = curOccList[i];
+      const prop = propOccList[i];
+      
+      if (cur && !prop) {
+        occupantsDiffs.push({
+          status: 'removed',
+          text: `❌ Supprimé : ${cur.nom} ${cur.prenom} (${cur.estAdulte ? 'Adulte' : `${cur.age} ans`}) - ${cur.nationalite || 'Française'}`
+        });
+      } else if (!cur && prop) {
+        const nationaliteStr = prop.nationalite === true || prop.nationalite === 'Française' ? 'Française' : (prop.nationalite === false || prop.nationalite === 'Étrangère' ? 'Étrangère' : prop.nationalite || 'Française');
+        occupantsDiffs.push({
+          status: 'added',
+          text: `🟢 Ajouté : ${prop.nom} ${prop.prenom} (${prop.estAdulte ? 'Adulte' : `${prop.age} ans`}) - ${nationaliteStr}`
+        });
+      } else {
+        const nationaliteCur = cur.nationalite || 'Française';
+        const nationaliteProp = prop.nationalite === true || prop.nationalite === 'Française' ? 'Française' : (prop.nationalite === false || prop.nationalite === 'Étrangère' ? 'Étrangère' : prop.nationalite || 'Française');
+        
+        const curStr = `${cur.nom} ${cur.prenom} (${cur.estAdulte ? 'Adulte' : `${cur.age} ans`}) - ${nationaliteCur}`;
+        const propStr = `${prop.nom} ${prop.prenom} (${prop.estAdulte ? 'Adulte' : `${prop.age} ans`}) - ${nationaliteProp}`;
+        
+        const nameChanged = cur.nom !== prop.nom || cur.prenom !== prop.prenom;
+        const typeChanged = cur.estAdulte !== prop.estAdulte || cur.age !== prop.age;
+        const natChanged = nationaliteCur !== nationaliteProp;
+        
+        if (nameChanged || typeChanged || natChanged) {
+          const modfs = [];
+          if (nameChanged) modfs.push(`Nom : ${prop.nom} ${prop.prenom} (était ${cur.nom} ${cur.prenom})`);
+          if (typeChanged) modfs.push(`Type/Âge : ${prop.estAdulte ? 'Adulte' : `${prop.age} ans`} (était ${cur.estAdulte ? 'Adulte' : `${cur.age} ans`})`);
+          if (natChanged) modfs.push(`Nat. : ${nationaliteProp} (était ${nationaliteCur})`);
+          occupantsDiffs.push({
+            status: 'changed',
+            text: `🟠 Modifié : ${modfs.join(', ')}`
+          });
+        } else {
+          occupantsDiffs.push({
+            status: 'unchanged',
+            text: `Identique : ${curStr}`
+          });
+        }
+      }
+    }
+
+    const priceDifference = proposedPrice - (reservation.prixTotal || 0);
+    const priceChanged = priceDifference !== 0;
+
     await sendMail({
       to: adminEmail,
       subject: `⚡ Demande de modification de réservation - ${reservation.client.nom}`,
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <h2 style="color: #004B93; margin-top: 0;">Demande de modification reçue</h2>
-          <p>Le client <strong>${reservation.client.nom}</strong> a soumis une demande de modification pour sa réservation <strong>#${reservation.id}</strong>.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
+          <!-- Header banner with logo text / colors -->
+          <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+            <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
+            <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Demande de modification de séjour</h2>
+          </div>
           
-          <table width="100%" cellpadding="10" cellspacing="0" style="border-collapse: collapse; margin: 20px 0;">
-            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-              <th align="left">Détail</th>
-              <th align="left">Actuel</th>
-              <th align="left" style="color: #004B93;">Proposé</th>
-            </tr>
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td><strong>Dates</strong></td>
-              <td>Du ${dDebutOld} au ${dFinOld}</td>
-              <td style="color: #004B93; font-weight: bold;">Du ${dDebutNew} au ${dFinNew}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td><strong>Chambres</strong></td>
-              <td>${reservation.chambres.join(', ')}</td>
-              <td style="color: #004B93; font-weight: bold;">${chambres.join(', ')}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td><strong>Prix</strong></td>
-              <td>${(reservation.prixTotal || 0).toFixed(2)} €</td>
-              <td style="color: #004B93; font-weight: bold;">${proposedPrice.toFixed(2)} €</td>
-            </tr>
-          </table>
+          <div style="padding: 24px;">
+            <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">
+              Bonjour,
+            </p>
+            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
+              Le client <strong>${reservation.client.nom}</strong> a soumis une demande de modification pour sa réservation <strong>#${reservation.id}</strong>.
+            </p>
+
+            <div style="margin: 20px 0; background-color: #f8fafc; border-radius: 8px; padding: 16px; border: 1px dashed #e2e8f0;">
+              <h4 style="margin: 0 0 10px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Résumé de la demande :</h4>
+              <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #475569; line-height: 1.6;">
+                ${datesChanged ? '<li>📅 Dates modifiées</li>' : ''}
+                ${chambresChanged ? '<li>🛌 Chambres ou répartition modifiée</li>' : ''}
+                ${optionsChanged ? '<li>⚙ Options modifiées</li>' : ''}
+                ${sallesChanged ? '<li>💼 Salles de réunion modifiées</li>' : ''}
+                ${repasChanged ? '<li>🍽 Restauration modifiée</li>' : ''}
+                ${occupantsDiffs.some(d => d.status !== 'unchanged') ? '<li>👥 Liste des voyageurs mise à jour</li>' : ''}
+                ${priceChanged ? `<li>💰 Prix : <strong>${proposedPrice.toFixed(2)} €</strong> (Écart: <strong style="color: ${priceDifference > 0 ? '#b45309' : '#15803d'};">${priceDifference > 0 ? '+' : ''}${priceDifference.toFixed(2)} €</strong>)</li>` : '<li>💰 Tarif identique</li>'}
+              </ul>
+            </div>
+            
+            <h3 style="color: #004B93; font-size: 15px; font-weight: 800; margin-top: 24px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 2px solid #f1f5f9; padding-bottom: 6px;">Comparatif détaillé</h3>
+            
+            <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
+              <thead>
+                <tr style="background-color: #f1f5f9; border-bottom: 2px solid #e2e8f0;">
+                  <th align="left" style="color: #475569; font-weight: bold;">Élément</th>
+                  <th align="left" style="color: #475569; font-weight: bold;">Actuel</th>
+                  <th align="left" style="color: #004B93; font-weight: bold;">Proposé</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Dates -->
+                <tr style="border-bottom: 1px solid #e2e8f0; ${datesChanged ? 'background-color: #ecfdf5;' : ''}">
+                  <td style="padding: 10px; font-weight: bold; color: #475569;">Dates</td>
+                  <td style="padding: 10px; color: #64748b; ${datesChanged ? 'text-decoration: line-through;' : ''}">Du ${dDebutOld} au ${dFinOld}</td>
+                  <td style="padding: 10px; font-weight: bold; color: ${datesChanged ? '#047857' : '#004B93'};">Du ${dDebutNew} au ${dFinNew}</td>
+                </tr>
+                <!-- Chambres -->
+                <tr style="border-bottom: 1px solid #e2e8f0; ${chambresChanged ? 'background-color: #ecfdf5;' : ''}">
+                  <td style="padding: 10px; font-weight: bold; color: #475569;">Chambres</td>
+                  <td style="padding: 10px; color: #64748b; ${chambresChanged ? 'text-decoration: line-through;' : ''}">${chDetailsOld}</td>
+                  <td style="padding: 10px; font-weight: bold; color: ${chambresChanged ? '#047857' : '#004B93'};">${chDetailsNew}</td>
+                </tr>
+                <!-- Salles -->
+                <tr style="border-bottom: 1px solid #e2e8f0; ${sallesChanged ? 'background-color: #ecfdf5;' : ''}">
+                  <td style="padding: 10px; font-weight: bold; color: #475569;">Salles</td>
+                  <td style="padding: 10px; color: #64748b; ${sallesChanged ? 'text-decoration: line-through;' : ''}">${sallesOld}</td>
+                  <td style="padding: 10px; font-weight: bold; color: ${sallesChanged ? '#047857' : '#004B93'};">${sallesNew}</td>
+                </tr>
+                <!-- Options -->
+                <tr style="border-bottom: 1px solid #e2e8f0; ${optionsChanged ? 'background-color: #ecfdf5;' : ''}">
+                  <td style="padding: 10px; font-weight: bold; color: #475569;">Options</td>
+                  <td style="padding: 10px; color: #64748b; ${optionsChanged ? 'text-decoration: line-through;' : ''}">${optOld}</td>
+                  <td style="padding: 10px; font-weight: bold; color: ${optionsChanged ? '#047857' : '#004B93'};">${optNew}</td>
+                </tr>
+                <!-- Repas -->
+                <tr style="border-bottom: 1px solid #e2e8f0; ${repasChanged ? 'background-color: #ecfdf5;' : ''}">
+                  <td style="padding: 10px; font-weight: bold; color: #475569;">Repas</td>
+                  <td style="padding: 10px; color: #64748b; ${repasChanged ? 'text-decoration: line-through;' : ''}">${repasOld}</td>
+                  <td style="padding: 10px; font-weight: bold; color: ${repasChanged ? '#047857' : '#004B93'};">${repasNew}</td>
+                </tr>
+                <!-- Prix total -->
+                <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                  <td style="padding: 12px 10px; font-weight: 800; color: #334155;">Total TTC</td>
+                  <td style="padding: 12px 10px; color: #64748b; font-weight: bold;">${(reservation.prixTotal || 0).toFixed(2)} €</td>
+                  <td style="padding: 12px 10px; font-weight: 800; color: #004B93;">
+                    ${proposedPrice.toFixed(2)} €
+                    ${priceChanged ? `<span style="font-size: 11px; padding: 2px 6px; border-radius: 10px; margin-left: 6px; display: inline-block; font-weight: bold; background-color: ${priceDifference > 0 ? '#fef3c7; color: #b45309;' : '#d1fae5; color: #065f46;'}">${priceDifference > 0 ? '+' : ''}${priceDifference.toFixed(2)} €</span>` : ''}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Occupants comparison details if any changes -->
+            ${occupantsDiffs.some(d => d.status !== 'unchanged') ? `
+              <h3 style="color: #004B93; font-size: 15px; font-weight: 800; margin-top: 24px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 2px solid #f1f5f9; padding-bottom: 6px;">Détails des Voyageurs</h3>
+              <div style="background-color: #fafaf9; border: 1px solid #e7e5e4; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 12px; border-collapse: collapse;">
+                  <tbody>
+                    ${occupantsDiffs.map((occ, i) => `
+                      <tr style="border-bottom: 1px solid #f5f5f4; ${occ.status === 'added' ? 'background-color: #f0fdf4; color: #166534;' : occ.status === 'removed' ? 'background-color: #fef2f2; color: #991b1b; text-decoration: line-through;' : occ.status === 'changed' ? 'background-color: #fffbeb; color: #92400e;' : ''}">
+                        <td style="padding: 6px 10px; font-weight: bold; width: 30px;">#${i+1}</td>
+                        <td style="padding: 6px 10px;">${occ.text}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : ''}
+
+            <p style="margin-top: 30px; margin-bottom: 25px; font-size: 14px; line-height: 1.6; color: #334155; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+              Veuillez vous connecter à l'espace administrateur pour valider ou refuser cette modification.
+            </p>
+            
+            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
+              <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2);">Accéder au Tableau de Bord Admin</a>
+            </p>
+          </div>
           
-          <p style="margin-top: 25px;">
-            Veuillez vous connecter à l'espace administrateur pour valider ou refuser cette modification.
-          </p>
-          <p style="text-align: center; margin-top: 25px;">
-            <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder au Tableau de Bord Admin</a>
-          </p>
+          <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+            Cet e-mail automatique est envoyé par le système de réservation du Gîte de la Maladrerie.
+          </div>
         </div>
       `
     });
