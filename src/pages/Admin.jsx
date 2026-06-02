@@ -134,7 +134,18 @@ const Admin = () => {
   const [adminUser, setAdminUser] = useState(null);
 
   // Profil admin
-  const [profileForm, setProfileForm] = useState({ nom: '', prenom: '', email: '', telephone: '' });
+  const [profileForm, setProfileForm] = useState({ 
+    nom: '', 
+    prenom: '', 
+    email: '', 
+    telephone: '',
+    notifNewReservation: true,
+    notifNewDevis: true,
+    notifDevisValidation: true,
+    notifPaymentReceived: true,
+    notifModificationRequest: true,
+    notifIntervenantMissions: true
+  });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Paiement manuel
@@ -195,7 +206,13 @@ const Admin = () => {
           prenom: parts.length > 1 ? parts[0] : '',
           nom: parts.length > 1 ? parts.slice(1).join(' ') : (data.nom || ''),
           email: data.email || '',
-          telephone: data.telephone || ''
+          telephone: data.telephone || '',
+          notifNewReservation: data.notifNewReservation ?? true,
+          notifNewDevis: data.notifNewDevis ?? true,
+          notifDevisValidation: data.notifDevisValidation ?? true,
+          notifPaymentReceived: data.notifPaymentReceived ?? true,
+          notifModificationRequest: data.notifModificationRequest ?? true,
+          notifIntervenantMissions: data.notifIntervenantMissions ?? true
         });
       }
     } catch (err) {
@@ -3185,6 +3202,92 @@ const Admin = () => {
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Téléphone</label>
                 <input type="tel" value={profileForm.telephone} onChange={e => setProfileForm({...profileForm, telephone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium transition-all" placeholder="04 XX XX XX XX" />
               </div>
+
+              <div className="mt-6 pt-6 border-t border-slate-100">
+                <h3 className="text-sm font-black text-muc-blue uppercase tracking-wider mb-2">Préférences de notification</h3>
+                <p className="text-xs text-slate-500 mb-4">Sélectionnez les e-mails d'alerte que vous souhaitez recevoir :</p>
+                
+                <div className="space-y-3">
+                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                    <input 
+                      type="checkbox" 
+                      checked={profileForm.notifNewReservation} 
+                      onChange={e => setProfileForm({...profileForm, notifNewReservation: e.target.checked})} 
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 block">Demandes de réservation</span>
+                      <span className="text-xs text-slate-500">Alertes lors d'une nouvelle demande de réservation client.</span>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                    <input 
+                      type="checkbox" 
+                      checked={profileForm.notifNewDevis} 
+                      onChange={e => setProfileForm({...profileForm, notifNewDevis: e.target.checked})} 
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 block">Nouveaux devis émis</span>
+                      <span className="text-xs text-slate-500">Notification lorsqu'un devis est émis pour un séjour.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                    <input 
+                      type="checkbox" 
+                      checked={profileForm.notifDevisValidation} 
+                      onChange={e => setProfileForm({...profileForm, notifDevisValidation: e.target.checked})} 
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 block">Confirmations de devis</span>
+                      <span className="text-xs text-slate-500">Lorsqu'un client accepte un devis (par carte ou par virement).</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                    <input 
+                      type="checkbox" 
+                      checked={profileForm.notifPaymentReceived} 
+                      onChange={e => setProfileForm({...profileForm, notifPaymentReceived: e.target.checked})} 
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 block">Paiements reçus</span>
+                      <span className="text-xs text-slate-500">Alertes lors d'un paiement effectué ou d'une intention de virement déclarée.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                    <input 
+                      type="checkbox" 
+                      checked={profileForm.notifModificationRequest} 
+                      onChange={e => setProfileForm({...profileForm, notifModificationRequest: e.target.checked})} 
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 block">Demandes de modification</span>
+                      <span className="text-xs text-slate-500">Lorsqu'un client soumet une demande de modification de séjour.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                    <input 
+                      type="checkbox" 
+                      checked={profileForm.notifIntervenantMissions} 
+                      onChange={e => setProfileForm({...profileForm, notifIntervenantMissions: e.target.checked})} 
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 block">Missions des intervenants</span>
+                      <span className="text-xs text-slate-500">Lorsqu'un intervenant accepte ou refuse ses missions assignées.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <button type="submit" disabled={isSavingProfile} className={`w-full py-4 bg-muc-blue text-white font-black uppercase tracking-widest rounded-xl hover:bg-muc-blue/90 shadow-lg transition-all ${isSavingProfile ? 'opacity-70 cursor-not-allowed' : ''}`}>
                 {isSavingProfile ? 'Enregistrement...' : 'Enregistrer les modifications'}
               </button>

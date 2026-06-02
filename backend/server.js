@@ -469,11 +469,59 @@ const sendMail = async (options) => {
       })) : undefined
     });
     
-    console.log(`Email envoyé via API Brevo avec succès à : ${options.to}`);
+    console.log(`Email envoyé via API Brevo avec succès à : ${options.to}`);
   } catch (error) {
     console.error("Erreur lors de l'envoi de l'email via API:", error.message || error);
   }
 };
+
+async function getAdminEmailsForPreference(preferenceKey, fallbackEmails = []) {
+  try {
+    const admins = await prisma.adminAccount.findMany({
+      where: {
+        [preferenceKey]: true
+      },
+      select: {
+        email: true
+      }
+    });
+
+    const emailsSet = new Set();
+    
+    if (admins.length === 0) {
+      if (process.env.ADMIN_EMAIL) emailsSet.add(process.env.ADMIN_EMAIL);
+      emailsSet.add('david.roujet@mucomnisports.fr');
+    } else {
+      admins.forEach(a => {
+        if (a.email && a.email.includes('@')) {
+          emailsSet.add(a.email.trim());
+        }
+      });
+    }
+
+    fallbackEmails.forEach(email => {
+      if (email && email.includes('@')) {
+        emailsSet.add(email.trim());
+      }
+    });
+
+    if (emailsSet.size === 0) {
+      emailsSet.add('david.roujet@mucomnisports.fr');
+    }
+
+    return Array.from(emailsSet).join(',');
+  } catch (error) {
+    console.error(`Erreur getAdminEmailsForPreference pour ${preferenceKey}:`, error);
+    const fallbackSet = new Set(['david.roujet@mucomnisports.fr']);
+    if (process.env.ADMIN_EMAIL) fallbackSet.add(process.env.ADMIN_EMAIL);
+    fallbackEmails.forEach(email => {
+      if (email && email.includes('@')) {
+        fallbackSet.add(email.trim());
+      }
+    });
+    return Array.from(fallbackSet).join(',');
+  }
+}
 
 const sendCuisineEmailIfNeeded = async (reservationId) => {
   try {
@@ -709,7 +757,7 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
     }
 
     // 2. Email pour l'Administrateur
-    const adminEmail = process.env.ADMIN_EMAIL || 'david.roujet@mucomnisports.fr';
+    const adminEmail = await getAdminEmailsForPreference('notifPaymentReceived');
     await sendMail({
       to: adminEmail,
       subject: `💰 Nouveau paiement reçu - ${typeLabel} (${reservation.client?.nom || 'Client'})`,
@@ -1203,11 +1251,11 @@ app.post('/api/reservations', async (req, res) => {
 
     const optionsHTML = generateOptionsHTML(options, reservation.repas, reservation.salles);
 
-    const adminEmails = ['david.roujet@mucomnisports.fr', 'philippe.morereau@mucomnisports.fr'];
-    console.log(`Tentative d'envoi d'alerte admin à : ${adminEmails.join(', ')}`);
+    const adminEmails = await getAdminEmailsForPreference('notifNewReservation', ['david.roujet@mucomnisports.fr', 'philippe.morereau@mucomnisports.fr']);
+    console.log(`Tentative d'envoi d'alerte admin à : ${adminEmails}`);
     
     await sendMail({
-      to: adminEmails.join(','),
+      to: adminEmails,
       subject: "Nouvelle demande de réservation - Gîte de La Maladrerie",
       html: `
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
@@ -1880,8 +1928,9 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
     });
 
     // 7. Notifier l'administrateur
+    const targetAdminEmail = await getAdminEmailsForPreference('notifNewDevis');
     await sendMail({
-      to: ADMIN_EMAIL,
+      to: targetAdminEmail,
       subject: `Nouveau devis émis : ${numeroDevis} - ${nom}`,
       html: `
         <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 20px; text-align: center;">
@@ -2880,7 +2929,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       });
 
       // Envoyer un mail de notification à l'admin pour le virement
-      const targetAdminEmail = process.env.ADMIN_EMAIL || 'david.roujet@mucomnisports.fr';
+      const targetAdminEmail = await getAdminEmailsForPreference('notifDevisValidation');
       await sendMail({
         to: targetAdminEmail,
         subject: `🏦 [VIREMENT DEVIS] Devis ${devis.numeroDevis} validé par virement - ${montantAcompte.toFixed(2)} €`,
@@ -2978,12 +3027,14 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       });
     }
 
-    // Envoyer un e-mail à  l'admin créateur du devis pour l'alerter
-    if (devis.validePar && devis.validePar !== 'Admin' && devis.validePar.includes('@')) {
-      try {
-        await sendMail({
-          to: devis.validePar,
-          subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
+    // Envoyer un e-mail à l'admin créateur du devis pour l'alerter, ainsi qu'aux admins abonnés
+    try {
+      const recipientEmails = await getAdminEmailsForPreference('notifDevisValidation', 
+        (devis.validePar && devis.validePar !== 'Admin' && devis.validePar.includes('@')) ? [devis.validePar] : []
+      );
+      await sendMail({
+        to: recipientEmails,
+        subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eeeeee; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
               <div style="text-align: center; margin-bottom: 20px;">
@@ -3023,7 +3074,6 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       } catch (mailErr) {
         console.error("Erreur envoi notification mail à  l'admin créateur du devis:", mailErr);
       }
-    }
 
     res.json({ success: true, url: sessionUrl, method: paymentMethod, bankDetails, reference, amount: montantAcompte });
   } catch (error) {
@@ -3091,12 +3141,14 @@ app.get('/api/devis/validate/:token', async (req, res) => {
       }
     });
 
-    // Envoyer un e-mail à  l'admin créateur du devis pour l'alerter
-    if (devis.validePar && devis.validePar !== 'Admin' && devis.validePar.includes('@')) {
-      try {
-        await sendMail({
-          to: devis.validePar,
-          subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
+    // Envoyer un e-mail à l'admin créateur du devis pour l'alerter, ainsi qu'aux admins abonnés
+    try {
+      const recipientEmails = await getAdminEmailsForPreference('notifDevisValidation', 
+        (devis.validePar && devis.validePar !== 'Admin' && devis.validePar.includes('@')) ? [devis.validePar] : []
+      );
+      await sendMail({
+        to: recipientEmails,
+        subject: `⚡ Devis ${devis.numeroDevis} validé par le client !`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eeeeee; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
               <div style="text-align: center; margin-bottom: 20px;">
@@ -3137,7 +3189,6 @@ app.get('/api/devis/validate/:token', async (req, res) => {
       } catch (mailErr) {
         console.error("Erreur envoi notification mail à  l'admin créateur du devis:", mailErr);
       }
-    }
 
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
@@ -3556,7 +3607,29 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     // 1. Check SuperAdmin (Env Var) - Toujours prioritaire pour le dépannage
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      const token = jwt.sign({ email, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+      let dbAdmin = await prisma.adminAccount.findUnique({ where: { email } });
+      if (!dbAdmin) {
+        try {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          dbAdmin = await prisma.adminAccount.create({
+            data: {
+              email,
+              password: hashedPassword,
+              nom: 'David ROUJET',
+              telephone: '',
+              notifNewReservation: true,
+              notifNewDevis: true,
+              notifDevisValidation: true,
+              notifPaymentReceived: true,
+              notifModificationRequest: true,
+              notifIntervenantMissions: true
+            }
+          });
+        } catch (dbErr) {
+          console.error("Erreur creation auto SuperAdmin dans DB:", dbErr);
+        }
+      }
+      const token = jwt.sign({ id: dbAdmin ? dbAdmin.id : 0, email, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
       return res.json({ success: true, token, role: 'admin' });
     }
 
@@ -3599,10 +3672,32 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/admin/auth', (req, res) => {
+app.post('/api/admin/auth', async (req, res) => {
   const { password } = req.body;
   if (password === ADMIN_PASSWORD) {
-    const token = jwt.sign({ email: ADMIN_EMAIL, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+    let dbAdmin = await prisma.adminAccount.findUnique({ where: { email: ADMIN_EMAIL } });
+    if (!dbAdmin) {
+      try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        dbAdmin = await prisma.adminAccount.create({
+          data: {
+            email: ADMIN_EMAIL,
+            password: hashedPassword,
+            nom: 'David ROUJET',
+            telephone: '',
+            notifNewReservation: true,
+            notifNewDevis: true,
+            notifDevisValidation: true,
+            notifPaymentReceived: true,
+            notifModificationRequest: true,
+            notifIntervenantMissions: true
+          }
+        });
+      } catch (dbErr) {
+        console.error("Erreur creation auto SuperAdmin dans DB (admin/auth):", dbErr);
+      }
+    }
+    const token = jwt.sign({ id: dbAdmin ? dbAdmin.id : 0, email: ADMIN_EMAIL, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ success: true, token });
   } else {
     res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
@@ -4585,8 +4680,9 @@ app.post('/api/payment/virement/:token', async (req, res) => {
     });
 
     // Send email to admin
+    const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['dr.mucomnisports@gmail.com']);
     await sendMail({
-      to: 'dr.mucomnisports@gmail.com',
+      to: targetAdminEmail,
       subject: `🏦 [VIREMENT INTENTION] Client: ${reservation.client.nom} - ${amount.toFixed(2)} €`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
@@ -4744,7 +4840,7 @@ app.post('/api/reservation/modify/:token', async (req, res) => {
       }
     });
 
-    const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
+    const adminEmail = await getAdminEmailsForPreference('notifModificationRequest', [reservation.validePar]);
     const dDebutOld = new Date(reservation.dateDebut).toLocaleDateString('fr-FR');
     const dFinOld = new Date(reservation.dateFin).toLocaleDateString('fr-FR');
     const dDebutNew = new Date(dateDebut).toLocaleDateString('fr-FR');
@@ -5236,7 +5332,9 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/accept', async (req, 
 
     // Envoyer mail à  l'admin
     try {
-      const adminEmail = (reservation?.validePar && reservation.validePar.includes('@')) ? reservation.validePar : (process.env.ADMIN_EMAIL || 'dr.mucomnisports@gmail.com');
+      const adminEmail = await getAdminEmailsForPreference('notifIntervenantMissions', 
+        (reservation?.validePar && reservation.validePar.includes('@')) ? [reservation.validePar] : []
+      );
       await sendMail({
         to: adminEmail,
         subject: `Missions acceptées par ${intervenant ? intervenant.prenom + ' ' + intervenant.nom : 'un intervenant'}`,
@@ -5279,7 +5377,9 @@ app.get('/api/reservations/:id/intervenants/:intervenantId/reject', async (req, 
 
     // Envoyer mail à  l'admin
     try {
-      const adminEmail = (reservation?.validePar && reservation.validePar.includes('@')) ? reservation.validePar : (process.env.ADMIN_EMAIL || 'dr.mucomnisports@gmail.com');
+      const adminEmail = await getAdminEmailsForPreference('notifIntervenantMissions', 
+        (reservation?.validePar && reservation.validePar.includes('@')) ? [reservation.validePar] : []
+      );
       await sendMail({
         to: adminEmail,
         subject: `Missions refusées par ${intervenant ? intervenant.prenom + ' ' + intervenant.nom : 'un intervenant'}`,
@@ -5312,7 +5412,18 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
     if (req.user && req.user.id) {
       const admin = await prisma.adminAccount.findUnique({
         where: { id: req.user.id },
-        select: { id: true, email: true, nom: true, telephone: true }
+        select: { 
+          id: true, 
+          email: true, 
+          nom: true, 
+          telephone: true,
+          notifNewReservation: true,
+          notifNewDevis: true,
+          notifDevisValidation: true,
+          notifPaymentReceived: true,
+          notifModificationRequest: true,
+          notifIntervenantMissions: true
+        }
       });
       if (admin) return res.json(admin);
     }
@@ -5321,7 +5432,13 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
     res.json({ 
       id: 0, 
       email: (req.user && req.user.email) || ADMIN_EMAIL, 
-      nom: 'Administrateur MUC' 
+      nom: 'Administrateur MUC',
+      notifNewReservation: true,
+      notifNewDevis: true,
+      notifDevisValidation: true,
+      notifPaymentReceived: true,
+      notifModificationRequest: true,
+      notifIntervenantMissions: true
     });
   } catch (err) {
     console.error("Erreur dans /api/admin/me:", err);
@@ -5332,7 +5449,18 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
 // Mise à  jour du profil administrateur
 app.put('/api/admin/profile', checkAuth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
-  const { nom, prenom, email, telephone } = req.body;
+  const { 
+    nom, 
+    prenom, 
+    email, 
+    telephone,
+    notifNewReservation,
+    notifNewDevis,
+    notifDevisValidation,
+    notifPaymentReceived,
+    notifModificationRequest,
+    notifIntervenantMissions
+  } = req.body;
 
   try {
     // Construire le nom complet si prénom fourni
@@ -5344,9 +5472,26 @@ app.put('/api/admin/profile', checkAuth, async (req, res) => {
         data: {
           ...(fullNom && { nom: fullNom }),
           ...(email && { email }),
-          ...(telephone !== undefined && { telephone })
+          ...(telephone !== undefined && { telephone }),
+          ...(notifNewReservation !== undefined && { notifNewReservation }),
+          ...(notifNewDevis !== undefined && { notifNewDevis }),
+          ...(notifDevisValidation !== undefined && { notifDevisValidation }),
+          ...(notifPaymentReceived !== undefined && { notifPaymentReceived }),
+          ...(notifModificationRequest !== undefined && { notifModificationRequest }),
+          ...(notifIntervenantMissions !== undefined && { notifIntervenantMissions })
         },
-        select: { id: true, email: true, nom: true, telephone: true }
+        select: { 
+          id: true, 
+          email: true, 
+          nom: true, 
+          telephone: true,
+          notifNewReservation: true,
+          notifNewDevis: true,
+          notifDevisValidation: true,
+          notifPaymentReceived: true,
+          notifModificationRequest: true,
+          notifIntervenantMissions: true
+        }
       });
       return res.json(updated);
     }

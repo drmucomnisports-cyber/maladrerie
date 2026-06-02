@@ -115,12 +115,20 @@ model PromoCode {
   createdAt     DateTime  @default(now())
 }
 model AdminAccount {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  nom       String?
-  telephone String?
-  createdAt DateTime @default(now())
+  id                      Int      @id @default(autoincrement())
+  email                   String   @unique
+  password                String
+  nom                     String?
+  telephone               String?
+  createdAt               DateTime @default(now())
+
+  // Préférences de notification
+  notifNewReservation     Boolean  @default(true)
+  notifNewDevis           Boolean  @default(true)
+  notifDevisValidation    Boolean  @default(true)
+  notifPaymentReceived    Boolean  @default(true)
+  notifModificationRequest Boolean  @default(true)
+  notifIntervenantMissions Boolean  @default(true)
 }
 
 model Expense {
