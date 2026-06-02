@@ -127,9 +127,21 @@ const Admin = () => {
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureReservationId, setCaptureReservationId] = useState(null);
 
-  const [adminForm, setAdminForm] = useState({ email: '', password: '', nom: '' });
+  const [adminForm, setAdminForm] = useState({
+    email: '',
+    password: '',
+    nom: '',
+    telephone: '',
+    notifNewReservation: true,
+    notifNewDevis: true,
+    notifDevisValidation: true,
+    notifPaymentReceived: true,
+    notifModificationRequest: true,
+    notifIntervenantMissions: true
+  });
   const [adminAccounts, setAdminAccounts] = useState([]);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState(null);
   const [captureMontant, setCaptureMontant] = useState('');
   const [adminUser, setAdminUser] = useState(null);
 
@@ -417,21 +429,73 @@ const Admin = () => {
     } catch (err) { console.error(err); }
   };
 
+  const openNewAdminModal = () => {
+    setEditingAdmin(null);
+    setAdminForm({
+      email: '',
+      password: '',
+      nom: '',
+      telephone: '',
+      notifNewReservation: true,
+      notifNewDevis: true,
+      notifDevisValidation: true,
+      notifPaymentReceived: true,
+      notifModificationRequest: true,
+      notifIntervenantMissions: true
+    });
+    setShowAdminModal(true);
+  };
+
+  const editAdminAccount = (acc) => {
+    setEditingAdmin(acc);
+    setAdminForm({
+      email: acc.email || '',
+      password: '',
+      nom: acc.nom || '',
+      telephone: acc.telephone || '',
+      notifNewReservation: acc.notifNewReservation ?? true,
+      notifNewDevis: acc.notifNewDevis ?? true,
+      notifDevisValidation: acc.notifDevisValidation ?? true,
+      notifPaymentReceived: acc.notifPaymentReceived ?? true,
+      notifModificationRequest: acc.notifModificationRequest ?? true,
+      notifIntervenantMissions: acc.notifIntervenantMissions ?? true
+    });
+    setShowAdminModal(true);
+  };
+
   const saveAdminAccount = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_URL}/api/admin/accounts`, {
-        method: 'POST',
+      const url = editingAdmin 
+        ? `${API_URL}/api/admin/accounts/${editingAdmin.id}`
+        : `${API_URL}/api/admin/accounts`;
+      const method = editingAdmin ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(adminForm)
       });
       if (res.ok) {
         setShowAdminModal(false);
-        setAdminForm({ email: '', password: '', nom: '' });
+        setAdminForm({
+          email: '',
+          password: '',
+          nom: '',
+          telephone: '',
+          notifNewReservation: true,
+          notifNewDevis: true,
+          notifDevisValidation: true,
+          notifPaymentReceived: true,
+          notifModificationRequest: true,
+          notifIntervenantMissions: true
+        });
+        setEditingAdmin(null);
         fetchAdminAccounts();
-        showFeedback("Compte administrateur créé.");
+        showFeedback(editingAdmin ? "Compte administrateur modifié." : "Compte administrateur créé.");
       } else {
-        showFeedback("Erreur lors de la création de l'admin.", "error");
+        const errData = await res.json();
+        showFeedback(errData.error || "Erreur lors de l'enregistrement.", "error");
       }
     } catch (err) { console.error(err); }
   };
@@ -981,7 +1045,9 @@ const Admin = () => {
               <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
               <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
               <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'promos' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Promos</button>
-              <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'accounts' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Comptes</button>
+              {adminUser?.isSuperAdmin && (
+                <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'accounts' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Comptes</button>
+              )}
               <button onClick={() => setActiveTab('profil')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'profil' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Mon Profil</button>
             </div>
           </div>
@@ -2187,7 +2253,7 @@ const Admin = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">Gestion des Comptes Administrateurs</h2>
-            <button onClick={() => setShowAdminModal(true)} className="bg-muc-blue text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-800 transition-all shadow-md">+ Nouvel Admin</button>
+            <button onClick={openNewAdminModal} className="bg-muc-blue text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-800 transition-all shadow-md">+ Nouvel Admin</button>
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
@@ -2207,7 +2273,10 @@ const Admin = () => {
                     <td className="px-6 py-4 text-slate-600">{acc.email}</td>
                     <td className="px-6 py-4 text-slate-500">{new Date(acc.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex justify-end gap-1.5 animate-fadeIn">
+                        <button onClick={() => editAdminAccount(acc)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Modifier ce compte">
+                          <Edit3 size={18} />
+                        </button>
                         <button onClick={() => deleteAdminAccount(acc.id)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Supprimer ce compte">
                           <Trash2 size={18} />
                         </button>
@@ -2276,8 +2345,10 @@ const Admin = () => {
 
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 p-6">
-            <h3 className="text-lg font-black text-muc-blue uppercase tracking-tight mb-6">Nouvel Administrateur</h3>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-100 p-6 animate-fadeIn">
+            <h3 className="text-lg font-black text-muc-blue uppercase tracking-tight mb-6 pb-2 border-b border-slate-100">
+              {editingAdmin ? "Modifier l'Administrateur" : "Nouvel Administrateur"}
+            </h3>
             <form onSubmit={saveAdminAccount} className="space-y-4">
               <div>
                 <label className="block text-xs font-black uppercase text-slate-500 mb-1 ml-1">Nom (Affichage)</label>
@@ -2288,12 +2359,99 @@ const Admin = () => {
                 <input required type="email" value={adminForm.email} onChange={e => setAdminForm({ ...adminForm, email: e.target.value })} className="w-full p-3 bg-slate-50 border-2 border-transparent focus:border-muc-blue rounded-xl outline-none font-bold" placeholder="admin@exemple.com" />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1 ml-1">Mot de passe</label>
-                <input required type="password" value={adminForm.password} onChange={e => setAdminForm({ ...adminForm, password: e.target.value })} className="w-full p-3 bg-slate-50 border-2 border-transparent focus:border-muc-blue rounded-xl outline-none font-bold" placeholder="••••••••" />
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1 ml-1">Téléphone</label>
+                <input type="tel" value={adminForm.telephone || ''} onChange={e => setAdminForm({ ...adminForm, telephone: e.target.value })} className="w-full p-3 bg-slate-50 border-2 border-transparent focus:border-muc-blue rounded-xl outline-none font-bold" placeholder="06 XX XX XX XX" />
               </div>
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 mb-1 ml-1">
+                  Mot de passe {editingAdmin && <span className="text-slate-400 font-normal lowercase">(optionnel)</span>}
+                </label>
+                <input required={!editingAdmin} type="password" value={adminForm.password} onChange={e => setAdminForm({ ...adminForm, password: e.target.value })} className="w-full p-3 bg-slate-50 border-2 border-transparent focus:border-muc-blue rounded-xl outline-none font-bold" placeholder={editingAdmin ? "•••••••• (laisser vide)" : "••••••••"} />
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 mt-4">
+                <h4 className="text-xs font-black text-muc-blue uppercase tracking-wider mb-3">Préférences de notification</h4>
+                <div className="space-y-2.5">
+                  <div className="flex items-center">
+                    <input 
+                      id="modal_notifNewReservation"
+                      type="checkbox" 
+                      checked={!!adminForm.notifNewReservation} 
+                      onChange={e => setAdminForm({ ...adminForm, notifNewReservation: e.target.checked })} 
+                      className="rounded text-muc-blue focus:ring-muc-blue border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="modal_notifNewReservation" className="ml-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                      Demandes de réservation
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input 
+                      id="modal_notifNewDevis"
+                      type="checkbox" 
+                      checked={!!adminForm.notifNewDevis} 
+                      onChange={e => setAdminForm({ ...adminForm, notifNewDevis: e.target.checked })} 
+                      className="rounded text-muc-blue focus:ring-muc-blue border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="modal_notifNewDevis" className="ml-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                      Nouveaux devis émis
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input 
+                      id="modal_notifDevisValidation"
+                      type="checkbox" 
+                      checked={!!adminForm.notifDevisValidation} 
+                      onChange={e => setAdminForm({ ...adminForm, notifDevisValidation: e.target.checked })} 
+                      className="rounded text-muc-blue focus:ring-muc-blue border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="modal_notifDevisValidation" className="ml-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                      Confirmations de devis
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input 
+                      id="modal_notifPaymentReceived"
+                      type="checkbox" 
+                      checked={!!adminForm.notifPaymentReceived} 
+                      onChange={e => setAdminForm({ ...adminForm, notifPaymentReceived: e.target.checked })} 
+                      className="rounded text-muc-blue focus:ring-muc-blue border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="modal_notifPaymentReceived" className="ml-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                      Paiements reçus
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input 
+                      id="modal_notifModificationRequest"
+                      type="checkbox" 
+                      checked={!!adminForm.notifModificationRequest} 
+                      onChange={e => setAdminForm({ ...adminForm, notifModificationRequest: e.target.checked })} 
+                      className="rounded text-muc-blue focus:ring-muc-blue border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="modal_notifModificationRequest" className="ml-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                      Demandes de modification
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input 
+                      id="modal_notifIntervenantMissions"
+                      type="checkbox" 
+                      checked={!!adminForm.notifIntervenantMissions} 
+                      onChange={e => setAdminForm({ ...adminForm, notifIntervenantMissions: e.target.checked })} 
+                      className="rounded text-muc-blue focus:ring-muc-blue border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="modal_notifIntervenantMissions" className="ml-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                      Missions des intervenants
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowAdminModal(false)} className="flex-1 px-6 py-3 border-2 border-slate-100 text-slate-500 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-slate-50 transition-all">Annuler</button>
-                <button type="submit" className="flex-1 px-6 py-3 bg-muc-blue text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 transition-all shadow-lg shadow-blue-200">Créer le compte</button>
+                <button type="button" onClick={() => { setShowAdminModal(false); setEditingAdmin(null); }} className="flex-1 px-6 py-3 border-2 border-slate-100 text-slate-500 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-slate-50 transition-all">Annuler</button>
+                <button type="submit" className="flex-1 px-6 py-3 bg-muc-blue text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 transition-all shadow-lg shadow-blue-200">
+                  {editingAdmin ? "Enregistrer" : "Créer le compte"}
+                </button>
               </div>
             </form>
           </div>

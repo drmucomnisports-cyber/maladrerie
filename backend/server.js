@@ -281,6 +281,14 @@ const checkAdmin = (req, res, next) => {
   }
 };
 
+const checkSuperAdmin = (req, res, next) => {
+  if (req.user && req.user.email === ADMIN_EMAIL) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Accès réservé au SuperAdmin' });
+  }
+};
+
 /**
  * Formate les détails d'une mission pour l'affichage HTML dans les e-mails.
  * @param {Object} m - L'objet mission
@@ -5425,7 +5433,12 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
           notifIntervenantMissions: true
         }
       });
-      if (admin) return res.json(admin);
+      if (admin) {
+        return res.json({
+          ...admin,
+          isSuperAdmin: admin.email === ADMIN_EMAIL
+        });
+      }
     }
     
     // Sinon on renvoie les infos par défaut de l'admin principal
@@ -5433,6 +5446,7 @@ app.get('/api/admin/me', checkAuth, async (req, res) => {
       id: 0, 
       email: (req.user && req.user.email) || ADMIN_EMAIL, 
       nom: 'Administrateur MUC',
+      isSuperAdmin: true,
       notifNewReservation: true,
       notifNewDevis: true,
       notifDevisValidation: true,
@@ -6027,10 +6041,22 @@ app.delete('/api/admin/intervenants/:id', checkAuth, async (req, res) => {
 });
 
 // CRUD AdminAccounts
-app.get('/api/admin/accounts', checkAuth, checkAdmin, async (req, res) => {
+app.get('/api/admin/accounts', checkAuth, checkSuperAdmin, async (req, res) => {
   try {
     const admins = await prisma.adminAccount.findMany({
-      select: { id: true, email: true, nom: true, createdAt: true }
+      select: { 
+        id: true, 
+        email: true, 
+        nom: true, 
+        telephone: true,
+        createdAt: true,
+        notifNewReservation: true,
+        notifNewDevis: true,
+        notifDevisValidation: true,
+        notifPaymentReceived: true,
+        notifModificationRequest: true,
+        notifIntervenantMissions: true
+      }
     });
     res.json(admins);
   } catch (error) {
@@ -6038,21 +6064,85 @@ app.get('/api/admin/accounts', checkAuth, checkAdmin, async (req, res) => {
   }
 });
 
-app.post('/api/admin/accounts', checkAuth, checkAdmin, async (req, res) => {
-  const { email, password, nom } = req.body;
+app.post('/api/admin/accounts', checkAuth, checkSuperAdmin, async (req, res) => {
+  const { 
+    email, 
+    password, 
+    nom, 
+    telephone,
+    notifNewReservation,
+    notifNewDevis,
+    notifDevisValidation,
+    notifPaymentReceived,
+    notifModificationRequest,
+    notifIntervenantMissions
+  } = req.body;
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     const admin = await prisma.adminAccount.create({
-      data: { email, password: hashedPassword, nom }
+      data: { 
+        email, 
+        password: hashedPassword, 
+        nom,
+        telephone: telephone || '',
+        notifNewReservation: notifNewReservation ?? true,
+        notifNewDevis: notifNewDevis ?? true,
+        notifDevisValidation: notifDevisValidation ?? true,
+        notifPaymentReceived: notifPaymentReceived ?? true,
+        notifModificationRequest: notifModificationRequest ?? true,
+        notifIntervenantMissions: notifIntervenantMissions ?? true
+      }
     });
     const { password: _, ...adminWithoutPassword } = admin;
     res.json(adminWithoutPassword);
   } catch (error) {
+    console.error("Erreur lors de la création de l'admin:", error);
     res.status(500).json({ error: 'Erreur lors de la création de l\'admin' });
   }
 });
 
-app.delete('/api/admin/accounts/:id', checkAuth, checkAdmin, async (req, res) => {
+app.put('/api/admin/accounts/:id', checkAuth, checkSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { 
+    email, 
+    password, 
+    nom, 
+    telephone,
+    notifNewReservation,
+    notifNewDevis,
+    notifDevisValidation,
+    notifPaymentReceived,
+    notifModificationRequest,
+    notifIntervenantMissions
+  } = req.body;
+  try {
+    const dataToUpdate = {
+      email,
+      nom,
+      telephone: telephone || '',
+      notifNewReservation: notifNewReservation ?? true,
+      notifNewDevis: notifNewDevis ?? true,
+      notifDevisValidation: notifDevisValidation ?? true,
+      notifPaymentReceived: notifPaymentReceived ?? true,
+      notifModificationRequest: notifModificationRequest ?? true,
+      notifIntervenantMissions: notifIntervenantMissions ?? true
+    };
+    if (password && password.trim() !== '') {
+      dataToUpdate.password = await bcrypt.hash(password, 10);
+    }
+    const admin = await prisma.adminAccount.update({
+      where: { id: parseInt(id) },
+      data: dataToUpdate
+    });
+    const { password: _, ...adminWithoutPassword } = admin;
+    res.json(adminWithoutPassword);
+  } catch (error) {
+    console.error("Erreur lors de la modification de l'admin:", error);
+    res.status(500).json({ error: 'Erreur lors de la modification de l\'admin' });
+  }
+});
+
+app.delete('/api/admin/accounts/:id', checkAuth, checkSuperAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     await prisma.adminAccount.delete({ where: { id: parseInt(id) } });
