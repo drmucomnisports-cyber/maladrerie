@@ -3208,83 +3208,89 @@ const Admin = () => {
                 <p className="text-xs text-slate-500 mb-4">Sélectionnez les e-mails d'alerte que vous souhaitez recevoir :</p>
                 
                 <div className="space-y-3">
-                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                  <div className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl transition-all border border-slate-100">
                     <input 
+                      id="notifNewReservation"
                       type="checkbox" 
-                      checked={profileForm.notifNewReservation} 
+                      checked={!!profileForm.notifNewReservation} 
                       onChange={e => setProfileForm({...profileForm, notifNewReservation: e.target.checked})} 
-                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300 cursor-pointer"
                     />
-                    <div>
+                    <label htmlFor="notifNewReservation" className="cursor-pointer select-none flex-1">
                       <span className="text-sm font-semibold text-slate-800 block">Demandes de réservation</span>
                       <span className="text-xs text-slate-500">Alertes lors d'une nouvelle demande de réservation client.</span>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
                   
-                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                  <div className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl transition-all border border-slate-100">
                     <input 
+                      id="notifNewDevis"
                       type="checkbox" 
-                      checked={profileForm.notifNewDevis} 
+                      checked={!!profileForm.notifNewDevis} 
                       onChange={e => setProfileForm({...profileForm, notifNewDevis: e.target.checked})} 
-                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300 cursor-pointer"
                     />
-                    <div>
+                    <label htmlFor="notifNewDevis" className="cursor-pointer select-none flex-1">
                       <span className="text-sm font-semibold text-slate-800 block">Nouveaux devis émis</span>
                       <span className="text-xs text-slate-500">Notification lorsqu'un devis est émis pour un séjour.</span>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
 
-                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                  <div className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl transition-all border border-slate-100">
                     <input 
+                      id="notifDevisValidation"
                       type="checkbox" 
-                      checked={profileForm.notifDevisValidation} 
+                      checked={!!profileForm.notifDevisValidation} 
                       onChange={e => setProfileForm({...profileForm, notifDevisValidation: e.target.checked})} 
-                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300 cursor-pointer"
                     />
-                    <div>
+                    <label htmlFor="notifDevisValidation" className="cursor-pointer select-none flex-1">
                       <span className="text-sm font-semibold text-slate-800 block">Confirmations de devis</span>
                       <span className="text-xs text-slate-500">Lorsqu'un client accepte un devis (par carte ou par virement).</span>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
 
-                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                  <div className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl transition-all border border-slate-100">
                     <input 
+                      id="notifPaymentReceived"
                       type="checkbox" 
-                      checked={profileForm.notifPaymentReceived} 
+                      checked={!!profileForm.notifPaymentReceived} 
                       onChange={e => setProfileForm({...profileForm, notifPaymentReceived: e.target.checked})} 
                       className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
                     />
-                    <div>
+                    <label htmlFor="notifPaymentReceived" className="cursor-pointer select-none flex-1">
                       <span className="text-sm font-semibold text-slate-800 block">Paiements reçus</span>
                       <span className="text-xs text-slate-500">Alertes lors d'un paiement effectué ou d'une intention de virement déclarée.</span>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
 
-                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                  <div className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl transition-all border border-slate-100">
                     <input 
+                      id="notifModificationRequest"
                       type="checkbox" 
-                      checked={profileForm.notifModificationRequest} 
+                      checked={!!profileForm.notifModificationRequest} 
                       onChange={e => setProfileForm({...profileForm, notifModificationRequest: e.target.checked})} 
-                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300 cursor-pointer"
                     />
-                    <div>
+                    <label htmlFor="notifModificationRequest" className="cursor-pointer select-none flex-1">
                       <span className="text-sm font-semibold text-slate-800 block">Demandes de modification</span>
                       <span className="text-xs text-slate-500">Lorsqu'un client soumet une demande de modification de séjour.</span>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
 
-                  <label className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl cursor-pointer transition-all border border-slate-100">
+                  <div className="flex items-start p-3 bg-slate-50 hover:bg-slate-100/75 rounded-xl transition-all border border-slate-100">
                     <input 
+                      id="notifIntervenantMissions"
                       type="checkbox" 
-                      checked={profileForm.notifIntervenantMissions} 
+                      checked={!!profileForm.notifIntervenantMissions} 
                       onChange={e => setProfileForm({...profileForm, notifIntervenantMissions: e.target.checked})} 
-                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300"
+                      className="mt-1 mr-3 rounded text-muc-blue focus:ring-muc-blue focus:ring-opacity-20 border-slate-300 cursor-pointer"
                     />
-                    <div>
+                    <label htmlFor="notifIntervenantMissions" className="cursor-pointer select-none flex-1">
                       <span className="text-sm font-semibold text-slate-800 block">Missions des intervenants</span>
                       <span className="text-xs text-slate-500">Lorsqu'un intervenant accepte ou refuse ses missions assignées.</span>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
                 </div>
               </div>
 
