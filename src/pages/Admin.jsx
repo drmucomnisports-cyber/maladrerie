@@ -2638,6 +2638,7 @@ const Admin = () => {
                     <option value="ESPECES">Espèces</option>
                     <option value="CHEQUE">Chèque</option>
                     <option value="VIREMENT">Virement</option>
+                    <option value="STRIPE">Stripe (Carte Bancaire)</option>
                   </select>
                 </div>
                 <div>
