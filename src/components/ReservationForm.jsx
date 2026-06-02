@@ -476,7 +476,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
     const dates = [];
     let current = new Date(formData.dateDebut);
     const end = new Date(formData.dateFin);
-    while (current < end) {
+    while (current <= end) {
       dates.push(new Date(current));
       current.setDate(current.getDate() + 1);
     }
