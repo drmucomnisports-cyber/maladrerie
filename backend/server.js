@@ -4089,6 +4089,81 @@ app.put('/api/admin/reservations/:id', checkAuth, async (req, res) => {
   }
 });
 
+// Rembourser une réservation (Stripe ou manuel)
+app.post('/api/admin/reservations/:id/refund', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const { montant, mode, description } = req.body;
+
+  if (!montant || isNaN(parseFloat(montant)) || parseFloat(montant) <= 0) {
+    return res.status(400).json({ error: "Montant invalide." });
+  }
+
+  const amt = parseFloat(montant);
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+
+    let stripeRefundId = null;
+
+    if (mode === 'STRIPE') {
+      const sessionId = reservation.stripeSoldeId || reservation.stripeAcompteId || reservation.stripeSessionId;
+      if (!sessionId) {
+        return res.status(400).json({ error: "Aucun identifiant de session Stripe trouvé pour cette réservation." });
+      }
+
+      try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        if (!session.payment_intent) {
+          return res.status(400).json({ error: "Impossible de récupérer l'intention de paiement Stripe associée." });
+        }
+
+        const refund = await stripe.refunds.create({
+          payment_intent: session.payment_intent,
+          amount: Math.round(amt * 100), // convert to cents
+          reason: 'requested_by_customer'
+        });
+
+        stripeRefundId = refund.id;
+      } catch (stripeErr) {
+        console.error("Stripe Refund Error:", stripeErr);
+        return res.status(400).json({ error: `Erreur Stripe : ${stripeErr.message}` });
+      }
+    }
+
+    // Enregistrer le remboursement comme une Dépense
+    const pcgCode = "709"; // Rabais, remises, ristournes accordés (remboursements)
+    const label = `Remboursement (${mode}) - Réservation #${reservation.id} - ${reservation.client.nom}`;
+    const desc = description || `Remboursement partiel/total suite à modification ou annulation. Stripe Refund ID: ${stripeRefundId || 'N/A'}`;
+
+    await prisma.expense.create({
+      data: {
+        label,
+        montant: amt,
+        categorie: "Remboursement client",
+        comptePcg: pcgCode,
+        description: desc
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: `Remboursement de ${amt.toFixed(2)} € enregistré avec succès (${mode}).`,
+      stripeRefundId
+    });
+
+  } catch (error) {
+    console.error("Refund Handler Error:", error);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement du remboursement." });
+  }
+});
+
 // Suppression du doublon cancel-caution car défini plus haut
 
 // Notifier un intervenant pour ses missions sur une réservation

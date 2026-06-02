@@ -143,6 +143,12 @@ const Admin = () => {
   const [manualPaymentRes, setManualPaymentRes] = useState(null);
   const [manualPaymentForm, setManualPaymentForm] = useState({ montant: '', mode: 'ESPECES', typePaiement: 'ACOMPTE' });
 
+  // Remboursement
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundRes, setRefundRes] = useState(null);
+  const [refundForm, setRefundForm] = useState({ montant: '', mode: 'STRIPE', description: '' });
+  const [isRefunding, setIsRefunding] = useState(false);
+
   // Modifications clients
   const [showModificationModal, setShowModificationModal] = useState(false);
   const [selectedProposedModification, setSelectedProposedModification] = useState(null);
@@ -843,6 +849,45 @@ const Admin = () => {
     }
   };
 
+  const handleRefund = async (e) => {
+    e.preventDefault();
+    if (!refundRes) return;
+    if (!refundForm.montant || isNaN(parseFloat(refundForm.montant)) || parseFloat(refundForm.montant) <= 0) {
+      alert("Veuillez entrer un montant valide supérieur à 0.");
+      return;
+    }
+
+    setIsRefunding(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${refundRes.id}/refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          montant: parseFloat(refundForm.montant),
+          mode: refundForm.mode,
+          description: refundForm.description
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showFeedback(data.message || "Remboursement enregistré avec succès !");
+        setShowRefundModal(false);
+        setRefundRes(null);
+        fetchReservations();
+        fetchFinances();
+      } else {
+        showFeedback(data.error || "Erreur lors du remboursement.", "error");
+      }
+    } catch (err) {
+      showFeedback("Erreur réseau.", "error");
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
   useEffect(() => {
     console.log('Admin Component Mounted. Token:', token ? 'Present' : 'Missing');
     if (!token) {
@@ -1333,6 +1378,23 @@ const Admin = () => {
                           >
                             <Banknote size={18} />
                           </button>
+                          {res.statutPaiement !== 'EN_ATTENTE' && (
+                            <button
+                              onClick={() => {
+                                setRefundRes(res);
+                                setRefundForm({
+                                  montant: '',
+                                  mode: (res.modePaiement === 'STRIPE' || res.stripeSessionId || res.stripeAcompteId || res.stripeSoldeId) ? 'STRIPE' : 'VIREMENT',
+                                  description: ''
+                                });
+                                setShowRefundModal(true);
+                              }}
+                              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-500 hover:text-white transition-colors"
+                              title="Effectuer un remboursement"
+                            >
+                              <Coins size={18} />
+                            </button>
+                          )}
                           <button onClick={() => setEditingReservation(res)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-500 hover:text-white transition-colors" title="Modifier la réservation">
                             <Edit3 size={18} />
                           </button>
@@ -2654,6 +2716,83 @@ const Admin = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale Remboursement */}
+      {showRefundModal && refundRes && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-rose-600 p-6 text-white">
+              <h3 className="text-xl font-black uppercase tracking-tight">Rembourser un client</h3>
+              <p className="text-sm opacity-90">Client : {refundRes.client?.nom || 'Inconnu'}</p>
+            </div>
+            <form onSubmit={handleRefund} className="p-8">
+              <div className="space-y-6">
+                <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-rose-900 text-xs font-semibold leading-relaxed">
+                  ⚠️ <strong>Attention :</strong> Si vous choisissez le mode **Carte Bancaire (Stripe)**, le montant saisi sera **réellement remboursé** sur le compte bancaire du client via Stripe (à partir du paiement enregistré). Les autres modes (Virement, Espèces, Chèque) ne font que consigner la transaction dans vos finances.
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Montant à rembourser (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={refundForm.montant}
+                    onChange={(e) => setRefundForm({ ...refundForm, montant: e.target.value })}
+                    placeholder="Ex: 100.00"
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-rose-600 outline-none transition-all font-bold text-slate-800"
+                  />
+                  <div className="text-[10px] text-slate-400 mt-1 font-medium">
+                    Coût actuel séjour : {(refundRes.prixTotal || 0).toFixed(2)} € (Acompte : {(refundRes.montantAcompte || 0).toFixed(2)} €, Solde : {(refundRes.montantSolde || 0).toFixed(2)} €)
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Mode de remboursement</label>
+                  <select
+                    value={refundForm.mode}
+                    onChange={(e) => setRefundForm({ ...refundForm, mode: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-rose-600 outline-none transition-all font-bold text-slate-800"
+                  >
+                    <option value="STRIPE">Carte Bancaire (Stripe)</option>
+                    <option value="VIREMENT">Virement Bancaire</option>
+                    <option value="ESPECES">Espèces</option>
+                    <option value="CHEQUE">Chèque</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Motif / Description (Optionnel)</label>
+                  <textarea
+                    value={refundForm.description}
+                    onChange={(e) => setRefundForm({ ...refundForm, description: e.target.value })}
+                    placeholder="Ex: Remboursement partiel suite à la suppression d'une chambre"
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-rose-600 outline-none transition-all text-xs font-medium text-slate-700 h-20 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4 mt-8">
+                <button
+                  type="button"
+                  onClick={() => setShowRefundModal(false)}
+                  className="flex-1 py-4 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-all"
+                  disabled={isRefunding}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRefunding}
+                  className="flex-1 py-4 bg-rose-600 text-white font-black uppercase tracking-wider rounded-xl hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all flex items-center justify-center gap-2"
+                >
+                  {isRefunding ? 'Traitement...' : 'Confirmer'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
