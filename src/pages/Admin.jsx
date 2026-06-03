@@ -2028,7 +2028,9 @@ const Admin = () => {
 
                         {/* 2. Étape Validation */}
                         <div className="relative">
-                          <div className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white ${res.valideLe ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                          <div className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white ${
+                            (res.valideLe || res.statut === 'RESERVE' || res.statut === 'ACCEPTEE') ? 'bg-green-500' : 'bg-slate-300'
+                          }`}></div>
                           <p className="text-xs font-bold text-slate-700">Validation</p>
                           {res.valideLe ? (
                             <>
@@ -2039,6 +2041,13 @@ const Admin = () => {
                                 Validé {res.validePar ? `par ${res.validePar}` : ''}
                               </p>
                             </>
+                          ) : (res.statut === 'RESERVE' || res.statut === 'ACCEPTEE') ? (
+                            <>
+                              <p className="text-xs text-slate-500 italic">Validé (Date de validation antérieure ou inconnue)</p>
+                              <p className="text-xs text-slate-600 mt-0.5">
+                                Statut : {res.statut} {res.validePar ? `par ${res.validePar}` : ''}
+                              </p>
+                            </>
                           ) : (
                             <p className="text-xs text-slate-400 italic">En attente de validation</p>
                           )}
@@ -2047,9 +2056,7 @@ const Admin = () => {
                         {/* 3. Étape Paiement */}
                         <div className="relative">
                           <div className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white ${
-                            res.statutPaiement === 'PAYE' ? 'bg-emerald-500' :
-                            res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'SOLDE_PAYE' ? 'bg-amber-500' :
-                            'bg-slate-300'
+                            (res.payeLe || res.statutPaiement === 'PAYE' || res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'SOLDE_PAYE') ? 'bg-emerald-500' : 'bg-slate-300'
                           }`}></div>
                           <p className="text-xs font-bold text-slate-700">Règlement</p>
                           {res.payeLe ? (
@@ -2058,11 +2065,25 @@ const Admin = () => {
                                 {new Date(res.payeLe).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                               </p>
                               <p className="text-xs text-slate-600 mt-0.5">
+                                Réglé par <strong className="uppercase">{res.modePaiement || 'N/A'}</strong> (Statut : <strong>{res.statutPaiement}</strong>)
+                              </p>
+                            </>
+                          ) : (res.statutPaiement === 'PAYE' || res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'SOLDE_PAYE') ? (
+                            <>
+                              <p className="text-xs text-slate-500 italic">Payé (Date de transaction antérieure ou inconnue)</p>
+                              <p className="text-xs text-slate-600 mt-0.5">
                                 Mode : <strong className="uppercase">{res.modePaiement || 'N/A'}</strong> (Statut : <strong>{res.statutPaiement}</strong>)
                               </p>
                             </>
                           ) : (
-                            <p className="text-xs text-slate-400 italic">En attente de règlement (Statut : {res.statutPaiement})</p>
+                            <div>
+                              <p className="text-xs text-slate-400 italic">En attente de règlement (Statut : {res.statutPaiement})</p>
+                              {res.modePaiement && (
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  Moyen attendu : <strong className="uppercase">{res.modePaiement}</strong>
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
 
