@@ -6885,6 +6885,135 @@ cron.schedule('0 9 * * *', async () => {
   }
 });
 
+// ===== CRON JOB : DÉCLARATION MENSUELLE DE TAXE DE SÉJOUR =====
+// S'exécute le 1er de chaque mois à 09:00
+cron.schedule('0 9 1 * *', async () => {
+  console.log("Exécution du Cron Job : Rapport mensuel de Taxe de Séjour...");
+  try {
+    const today = new Date();
+    let prevMonth = today.getMonth() - 1;
+    let prevYear = today.getFullYear();
+    if (prevMonth < 0) {
+      prevMonth = 11;
+      prevYear -= 1;
+    }
+
+    const prevMonthStart = new Date(prevYear, prevMonth, 1);
+    const prevMonthEnd = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59, 999);
+
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        statut: { in: ['RESERVE', 'TERMINE'] },
+        dateDebut: {
+          gte: prevMonthStart,
+          lte: prevMonthEnd
+        }
+      },
+      include: { occupants: true }
+    });
+
+    let totalTaxeSejour = 0;
+    let nbAdultesTotal = 0;
+    let nbNuitsTotal = 0;
+
+    reservations.forEach(r => {
+      const { taxeSejour } = calculerDetailsFinanciersReservation(r);
+      totalTaxeSejour += taxeSejour;
+
+      // Calcul des détails pour affichage informatif
+      if (r.dateDebut && r.dateFin) {
+        const start = new Date(r.dateDebut);
+        const end = new Date(r.dateFin);
+        const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+        nbNuitsTotal += nuits;
+
+        let nbAdultes = 0;
+        if (r.occupants && r.occupants.length > 0) {
+          nbAdultes = r.occupants.filter(o => o.estAdulte).length;
+        } else if (r.chambresDetails && typeof r.chambresDetails === 'object') {
+          Object.values(r.chambresDetails).forEach(room => {
+            nbAdultes += parseInt(room.adultes || 0);
+          });
+        }
+        nbAdultesTotal += nbAdultes;
+      }
+    });
+
+    totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
+
+    const monthNames = [
+      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+    ];
+    const prevMonthLabel = monthNames[prevMonth];
+    const currentYearLabel = prevYear;
+
+    const toEmails = 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr';
+
+    await sendMail({
+      to: toEmails,
+      subject: `📊 [TAXE DE SÉJOUR] Déclaration mensuelle - ${prevMonthLabel} ${currentYearLabel}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
+          <!-- Header -->
+          <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+            <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
+            <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">📊 Taxe de Séjour à Déclarer</h2>
+          </div>
+          
+          <div style="padding: 24px;">
+            <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">
+              Bonjour,
+            </p>
+            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
+              Voici le récapitulatif de la taxe de séjour collectée pour les séjours ayant débuté durant le mois de <strong>${prevMonthLabel} ${currentYearLabel}</strong> :
+            </p>
+
+            <div style="margin: 24px 0; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; text-align: center;">
+              <span style="color: #166534; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px;">Montant Total à Déclarer</span>
+              <span style="font-size: 32px; font-weight: 900; color: #15803d;">${totalTaxeSejour.toFixed(2)} €</span>
+            </div>
+
+            <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
+              <h4 style="margin: 0 0 12px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails de la période (${prevMonthLabel} ${currentYearLabel}) :</h4>
+              <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
+                <tr>
+                  <td width="50%" style="padding: 6px 0; color: #64748b;">Nombre de réservations :</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${reservations.length}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Adultes cumulés :</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${nbAdultesTotal}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Nuits cumulées :</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${nbNuitsTotal}</td>
+                </tr>
+              </table>
+            </div>
+
+            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 24px;">
+              Veuillez déclarer ce montant sur la plateforme extranet officielle de la taxe de séjour en cliquant sur le bouton vert ci-dessous :
+            </p>
+            
+            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
+              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">Accéder à la plateforme de déclaration</a>
+            </p>
+          </div>
+          
+          <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+            Cet e-mail automatique est envoyé par le système de réservation du Gîte de la Maladrerie.
+          </div>
+        </div>
+      `
+    });
+
+    console.log(`Cron mensuel taxe de séjour exécuté avec succès. E-mail envoyé à : ${toEmails}`);
+  } catch (error) {
+    console.error("Erreur dans le cron mensuel taxe de séjour :", error);
+  }
+});
+
 // Endpoint pour récupérer le statut d'une session Stripe de paiement
 app.get('/api/stripe/session-status/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
