@@ -5,6 +5,23 @@ import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock,
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
+import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+const locales = {
+  'fr': fr,
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
+
 const CHAMBRES_NAMES = {
   1: "Chambre 1",
   2: "Chambre 2",
@@ -148,6 +165,33 @@ const Admin = () => {
   const [captureMontant, setCaptureMontant] = useState('');
   const [adminUser, setAdminUser] = useState(null);
 
+  // Planning
+  const [planningEvents, setPlanningEvents] = useState([]);
+  const [loadingPlanning, setLoadingPlanning] = useState(false);
+  const [selectedPlanningEvent, setSelectedPlanningEvent] = useState(null);
+
+  const fetchPlanningEvents = async () => {
+    setLoadingPlanning(true);
+    try {
+      const res = await fetch(`${API_URL}/api/equipe/planning`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const formatted = data.map(evt => ({
+          ...evt,
+          start: new Date(evt.start),
+          end: new Date(evt.end)
+        }));
+        setPlanningEvents(formatted);
+      }
+    } catch (err) {
+      console.error("Erreur lors de la récupération du planning:", err);
+    } finally {
+      setLoadingPlanning(false);
+    }
+  };
+
   // Profil admin
   const [profileForm, setProfileForm] = useState({ 
     nom: '', 
@@ -190,6 +234,12 @@ const Admin = () => {
       fetchAdminMe();
     }
   }, [token]);
+
+  useEffect(() => {
+    if (token && activeTab === 'planning') {
+      fetchPlanningEvents();
+    }
+  }, [token, activeTab]);
 
   useEffect(() => {
     const clientMap = new Map();
@@ -1088,6 +1138,7 @@ const Admin = () => {
               <button onClick={() => setActiveTab('devis')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'devis' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Devis</button>
               <button onClick={() => setActiveTab('clients')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'clients' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Clients</button>
               <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
+              <button onClick={() => setActiveTab('planning')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'planning' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Planning</button>
               <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
               <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'promos' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Promos</button>
               {adminUser?.isSuperAdmin && (
@@ -3380,6 +3431,35 @@ const Admin = () => {
               </div>
 
               <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                {(() => {
+                  const listModifs = [];
+                  if (datesChanged) listModifs.push("Dates de séjour");
+                  if (chambresChanged) listModifs.push("Chambres & Répartition");
+                  if (optionsChanged) listModifs.push("Options & Services");
+                  if (sallesChanged) listModifs.push("Salles de réunion");
+                  if (repasChanged) listModifs.push("Restauration (Repas)");
+                  if (occupantsDiffs.some(d => d.status !== 'unchanged')) listModifs.push("Voyageurs (Noms/Nombre)");
+
+                  if (listModifs.length === 0) return null;
+
+                  return (
+                    <div className="bg-purple-50 border-l-4 border-l-purple-600 rounded-r-xl p-4 shadow-sm">
+                      <h4 className="text-sm font-black text-purple-900 uppercase tracking-wide flex items-center gap-2">
+                        <AlertTriangle className="text-purple-600 shrink-0" size={16} />
+                        Récapitulatif des modifications détectées
+                      </h4>
+                      <p className="text-xs text-purple-800 mt-1.5 font-semibold">
+                        Le client demande des modifications sur : <span className="bg-purple-200/80 text-purple-950 px-2 py-0.5 rounded font-black ml-1 inline-block">{listModifs.join(', ')}</span>
+                      </p>
+                      {priceDifference !== 0 && (
+                        <p className="text-xs text-purple-800 mt-2 font-bold">
+                          💼 Impact financier : le montant total passera de <span className="line-through text-slate-500">{(current.prixTotal || 0).toFixed(2)} €</span> à <span className="text-purple-950 font-black bg-purple-200/60 px-1.5 py-0.5 rounded">{recalculatedPrice.toFixed(2)} €</span> ({priceDifference > 0 ? `hausse de +${priceDifference.toFixed(2)} €` : `baisse de ${priceDifference.toFixed(2)} €`}).
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <table className="w-full text-left border-collapse border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                   <thead>
                     <tr className="bg-slate-50 text-slate-500 font-black text-xs uppercase tracking-wider border-b border-slate-200">
@@ -3456,6 +3536,28 @@ const Admin = () => {
                       }`}>
                         {formatMealsCount(proposed.repas)}
                         {repasChanged && <span className="ml-2 text-[10px] bg-green-200/80 text-green-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Modifié</span>}
+                      </td>
+                    </tr>
+
+                    {/* Voyageurs */}
+                    <tr className="border-b border-slate-200">
+                      <td className="p-4 font-bold border border-slate-200 bg-slate-50/50">Voyageurs (Occupants)</td>
+                      <td className="p-4 border border-slate-200 bg-red-50/10">
+                        {(() => {
+                          const adults = curOccList.filter(o => o.estAdulte).length;
+                          const kids = curOccList.filter(o => !o.estAdulte).length;
+                          return `${adults} Adulte(s)${kids > 0 ? `, ${kids} Enfant(s)` : ''}`;
+                        })()}
+                      </td>
+                      <td className={`p-4 border border-slate-200 ${
+                        occupantsDiffs.some(d => d.status !== 'unchanged') ? 'bg-green-100/50 text-green-900 font-bold border-l-4 border-l-green-500' : ''
+                      }`}>
+                        {(() => {
+                          const adults = propOccList.filter(o => o.estAdulte).length;
+                          const kids = propOccList.filter(o => !o.estAdulte).length;
+                          return `${adults} Adulte(s)${kids > 0 ? `, ${kids} Enfant(s)` : ''}`;
+                        })()}
+                        {occupantsDiffs.some(d => d.status !== 'unchanged') && <span className="ml-2 text-[10px] bg-green-200/80 text-green-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Modifié</span>}
                       </td>
                     </tr>
 
@@ -3603,6 +3705,223 @@ const Admin = () => {
           </div>
         );
       })()}
+
+      {activeTab === 'planning' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-xl font-black text-muc-blue uppercase tracking-tight">Planning Équipe & Missions</h2>
+                <p className="text-xs text-slate-500 mt-1">Consultez en temps réel les réservations, disponibilités et missions assignées aux intervenants.</p>
+              </div>
+              <button 
+                onClick={fetchPlanningEvents}
+                disabled={loadingPlanning}
+                className="px-4 py-2 bg-muc-blue text-white rounded-lg hover:bg-muc-blue/90 transition-all text-sm font-bold flex items-center gap-2 shadow-sm"
+              >
+                {loadingPlanning ? "Chargement..." : "Rafraîchir"}
+              </button>
+            </div>
+
+            {loadingPlanning ? (
+              <div className="flex justify-center items-center h-96">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-muc-blue"></div>
+              </div>
+            ) : (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <BigCalendar
+                  localizer={localizer}
+                  events={planningEvents}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{ height: 600 }}
+                  messages={{
+                    next: "Suivant",
+                    previous: "Précédent",
+                    today: "Aujourd'hui",
+                    month: "Mois",
+                    week: "Semaine",
+                    day: "Jour",
+                    agenda: "Agenda",
+                    date: "Date",
+                    time: "Heure",
+                    event: "Événement",
+                    noEventsInRange: "Aucun événement dans cette période",
+                  }}
+                  culture="fr"
+                  eventPropGetter={(event) => {
+                    let style = {
+                      backgroundColor: '#3b82f6',
+                      borderRadius: '8px',
+                      opacity: 0.9,
+                      color: 'white',
+                      border: 'none',
+                      display: 'block',
+                      padding: '4px 8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 'bold',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      cursor: 'pointer'
+                    };
+
+                    if (event.type === 'dispo') {
+                      style.backgroundColor = '#10b981';
+                    } else if (event.type === 'reservation') {
+                      style.backgroundColor = '#4f46e5';
+                      if (event.statut === 'EN_ATTENTE') {
+                        style.backgroundColor = '#8b5cf6';
+                      }
+                    } else if (event.type === 'mission') {
+                      if (event.statut === 'ACCEPTEE') {
+                        style.backgroundColor = '#0d9488';
+                      } else if (event.statut === 'REFUSEE') {
+                        style.backgroundColor = '#e11d48';
+                      } else {
+                        style.backgroundColor = '#f59e0b';
+                        style.border = '1px dashed #d97706';
+                      }
+                    }
+                    return { style };
+                  }}
+                  onSelectEvent={(event) => setSelectedPlanningEvent(event)}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Modal Détails Événement */}
+          {selectedPlanningEvent && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 transition-all">
+              <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                {/* Header */}
+                <div className="bg-muc-blue text-white p-6 flex justify-between items-center">
+                  <h3 className="font-black text-lg uppercase tracking-tight flex items-center gap-2">
+                    {selectedPlanningEvent.type === 'reservation' && '🗓️ Détails Réservation'}
+                    {selectedPlanningEvent.type === 'mission' && '📌 Détails Mission'}
+                    {selectedPlanningEvent.type === 'dispo' && '✅ Disponibilité'}
+                  </h3>
+                  <button 
+                    onClick={() => setSelectedPlanningEvent(null)}
+                    className="text-white/80 hover:text-white transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-6 space-y-4">
+                  <div>
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Titre</h4>
+                    <p className="text-sm font-bold text-slate-800 mt-1">{selectedPlanningEvent.title}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Début</h4>
+                      <p className="text-sm font-medium text-slate-800 mt-1">
+                        {new Date(selectedPlanningEvent.start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Fin</h4>
+                      <p className="text-sm font-medium text-slate-800 mt-1">
+                        {new Date(selectedPlanningEvent.end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedPlanningEvent.type === 'mission' && selectedPlanningEvent.mission && (
+                    <div className="border-t border-slate-100 pt-4 space-y-3">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Intervenant</h4>
+                        <p className="text-sm font-bold text-slate-800 mt-1">
+                          {selectedPlanningEvent.mission.intervenantName}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {selectedPlanningEvent.mission.intervenantEmail} {selectedPlanningEvent.mission.intervenantPhone ? `• ${selectedPlanningEvent.mission.intervenantPhone}` : ''}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Rémunération</h4>
+                          <p className="text-sm font-black text-muc-blue mt-1">
+                            {selectedPlanningEvent.mission.montant.toFixed(2)} €
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Statut Mission</h4>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black uppercase mt-1 ${
+                            selectedPlanningEvent.mission.statut === 'ACCEPTEE' 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : selectedPlanningEvent.mission.statut === 'REFUSEE' 
+                              ? 'bg-rose-100 text-rose-800' 
+                              : 'bg-amber-100 text-amber-800 animate-pulse'
+                          }`}>
+                            {selectedPlanningEvent.mission.statut === 'ACCEPTEE' ? 'Validé (Accepté)' : selectedPlanningEvent.mission.statut === 'REFUSEE' ? 'Refusé' : 'En attente'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {selectedPlanningEvent.reservation && (
+                        <div className="border-t border-slate-100 pt-3">
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Client & Séjour lié</h4>
+                          <p className="text-xs font-bold text-slate-700 mt-1">
+                            Client : {selectedPlanningEvent.reservation.clientNom}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            ID Réservation : #{selectedPlanningEvent.reservation.id} ({selectedPlanningEvent.reservation.statut === 'RESERVE' ? 'Confirmée' : 'Option'})
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedPlanningEvent.type === 'reservation' && (
+                    <div className="border-t border-slate-100 pt-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Client</h4>
+                          <p className="text-sm font-bold text-slate-800 mt-1">{selectedPlanningEvent.clientNom}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Statut Réservation</h4>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black uppercase mt-1 ${
+                            selectedPlanningEvent.statut === 'RESERVE' ? 'bg-indigo-100 text-indigo-800' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {selectedPlanningEvent.statut === 'RESERVE' ? 'Confirmée' : 'Option / En attente'}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Responsable principal</h4>
+                        <p className="text-xs text-slate-700 font-semibold mt-1">{selectedPlanningEvent.intervenantName}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPlanningEvent.type === 'dispo' && (
+                    <div className="border-t border-slate-100 pt-4">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Intervenant Disponible</h4>
+                      <p className="text-sm font-bold text-slate-800 mt-1">{selectedPlanningEvent.intervenantName}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="bg-slate-50 px-6 py-4 flex justify-end border-t border-slate-100">
+                  <button 
+                    onClick={() => setSelectedPlanningEvent(null)}
+                    className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors text-sm"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'profil' && (
         <div className="max-w-xl mx-auto">

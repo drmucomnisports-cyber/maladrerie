@@ -6460,7 +6460,15 @@ app.get('/api/equipe/planning', checkAuth, async (req, res) => {
       where: {
         statut: { in: ['RESERVE', 'EN_ATTENTE'] }
       },
-      include: { intervenant: true, client: true }
+      include: { 
+        intervenant: true, 
+        client: true,
+        missions: {
+          include: {
+            intervenant: true
+          }
+        }
+      }
     });
 
     // Transformer tout en événements pour react-big-calendar
@@ -6469,34 +6477,67 @@ app.get('/api/equipe/planning', checkAuth, async (req, res) => {
     // Ajouter les disponibilités
     disponibilites.forEach(dispo => {
       events.push({
-        id: `dispo-${dispo.id}`,
-        title: `âœ… Dispo : ${dispo.intervenant.prenom} ${dispo.intervenant.nom}`,
+        id: 'dispo-' + dispo.id,
+        title: '✅ Dispo : ' + dispo.intervenant.prenom + ' ' + dispo.intervenant.nom,
         start: new Date(dispo.dateDebut),
-        // On décale la fin pour que le composant de calendrier affiche la bonne journée entière
         end: new Date(dispo.dateFin), 
         type: 'dispo',
         allDay: true,
-        intervenantName: `${dispo.intervenant.prenom} ${dispo.intervenant.nom}`
+        intervenantName: dispo.intervenant.prenom + ' ' + dispo.intervenant.nom
       });
     });
 
-    // Ajouter les réservations
+    // Ajouter les réservations et leurs missions
     reservations.forEach(reser => {
       events.push({
-        id: `res-${reser.id}`,
-        title: `&#x26A0;  Réservation : ${reser.client.nom}${reser.intervenant ? ` (${reser.intervenant.prenom})` : ' (Non assigné)'}`,
+        id: 'res-' + reser.id,
+        title: '🗓️ Réservation : ' + reser.client.nom + (reser.intervenant ? ' (' + reser.intervenant.prenom + ')' : ' (Non assigné)'),
         start: new Date(reser.dateDebut),
         end: new Date(reser.dateFin),
         type: 'reservation',
         allDay: true,
-        intervenantName: reser.intervenant ? `${reser.intervenant.prenom} ${reser.intervenant.nom}` : 'Aucun',
-        statut: reser.statut
+        intervenantName: reser.intervenant ? reser.intervenant.prenom + ' ' + reser.intervenant.nom : 'Aucun',
+        statut: reser.statut,
+        clientNom: reser.client.nom
       });
+
+      if (reser.missions && reser.missions.length > 0) {
+        reser.missions.forEach(m => {
+          if (m.intervenant) {
+            const statusLabel = m.statut === 'ACCEPTEE' ? 'Validé' : m.statut === 'REFUSEE' ? 'Refusé' : 'En attente';
+            events.push({
+              id: 'mission-' + m.id,
+              title: '📌 ' + m.intervenant.prenom + ' : ' + m.typeMission + ' (' + statusLabel + ')',
+              start: new Date(reser.dateDebut),
+              end: new Date(reser.dateFin),
+              type: 'mission',
+              allDay: true,
+              statut: m.statut,
+              mission: {
+                id: m.id,
+                typeMission: m.typeMission,
+                montant: m.montant,
+                statut: m.statut,
+                intervenantName: m.intervenant.prenom + ' ' + m.intervenant.nom,
+                intervenantEmail: m.intervenant.email,
+                intervenantPhone: m.intervenant.telephone
+              },
+              reservation: {
+                id: reser.id,
+                clientNom: reser.client.nom,
+                dateDebut: reser.dateDebut,
+                dateFin: reser.dateFin,
+                statut: reser.statut
+              }
+            });
+          }
+        });
+      }
     });
 
     res.json(events);
   } catch (error) {
-    console.error("Erreur planning équipe:", error);
+    console.error('Erreur planning équipe:', error);
     res.status(500).json({ error: 'Erreur lors de la récupération du planning' });
   }
 });
@@ -7217,6 +7258,121 @@ app.post('/api/reservation/occupants/:token', async (req, res) => {
   } catch (error) {
     console.error("Erreur enregistrement occupants:", error);
     res.status(500).json({ error: "Erreur serveur lors de la validation des occupants." });
+  }
+});
+
+// ===================================
+// PORTAIL INTERVENANT ME & PROFILE & MISSIONS STATUS
+// ===================================
+
+// Obtenir le profil de l'intervenant connecté
+app.get('/api/intervenant/me', checkAuth, async (req, res) => {
+  if (req.user.role !== 'intervenant') {
+    return res.status(403).json({ error: 'Accès interdit - Droits intervenant requis' });
+  }
+  try {
+    const intervenant = await prisma.intervenant.findUnique({
+      where: { id: req.user.id },
+      include: { disponibilites: true }
+    });
+    if (!intervenant) return res.status(404).json({ error: 'Compte non trouvé' });
+    res.json(intervenant);
+  } catch (error) {
+    console.error('Erreur récup profil intervenant:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération du profil' });
+  }
+});
+
+// Mettre à jour le profil et les disponibilités de l'intervenant connecté
+app.put('/api/intervenant/profile', checkAuth, async (req, res) => {
+  if (req.user.role !== 'intervenant') {
+    return res.status(403).json({ error: 'Accès interdit - Droits intervenant requis' });
+  }
+  const { nom, prenom, email, telephone, password, disponibilites } = req.body;
+  try {
+    const dataToUpdate = { nom, prenom, email, telephone };
+    if (password && password.trim() !== '') {
+      dataToUpdate.password = await bcrypt.hash(password, 10);
+    }
+
+    // Supprimer les anciennes disponibilités
+    await prisma.disponibilite.deleteMany({ where: { intervenantId: req.user.id } });
+
+    const updated = await prisma.intervenant.update({
+      where: { id: req.user.id },
+      data: {
+        ...dataToUpdate,
+        disponibilites: {
+          create: (disponibilites || []).map(d => ({
+            dateDebut: new Date(d.dateDebut),
+            dateFin: new Date(d.dateFin)
+          }))
+        }
+      },
+      include: { disponibilites: true }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Erreur mise à jour profil intervenant:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du profil' });
+  }
+});
+
+// Accepter/refuser une mission spécifique
+app.put('/api/intervenant/missions/:id/status', checkAuth, async (req, res) => {
+  if (req.user.role !== 'intervenant') {
+    return res.status(403).json({ error: 'Accès interdit - Droits intervenant requis' });
+  }
+  const { id } = req.params;
+  const { statut } = req.body; // ACCEPTEE ou REFUSEE
+
+  if (!['ACCEPTEE', 'REFUSEE'].includes(statut)) {
+    return res.status(400).json({ error: 'Statut invalide' });
+  }
+
+  try {
+    const mission = await prisma.mission.findUnique({
+      where: { id: parseInt(id) },
+      include: { reservation: true }
+    });
+
+    if (!mission) {
+      return res.status(404).json({ error: 'Mission non trouvée' });
+    }
+
+    if (mission.intervenantId !== req.user.id) {
+      return res.status(403).json({ error: 'Vous ne pouvez modifier que vos propres missions' });
+    }
+
+    const updated = await prisma.mission.update({
+      where: { id: parseInt(id) },
+      data: { statut },
+      include: { intervenant: true }
+    });
+
+    // Envoyer mail à l'admin
+    try {
+      const reservation = mission.reservation;
+      const intervenant = updated.intervenant;
+      const actionLabel = statut === 'ACCEPTEE' ? 'accepté' : 'refusé';
+      const adminEmail = await getAdminEmailsForPreference('notifIntervenantMissions',
+        (reservation?.validePar && reservation.validePar.includes('@')) ? [reservation.validePar] : []
+      );
+
+      await sendMail({
+        to: adminEmail,
+        subject: 'Mission ' + actionLabel + 'e par ' + intervenant.prenom + ' ' + intervenant.nom,
+        html: '<div style="font-family: sans-serif;"><p>Bonjour,</p><p>L\'intervenant <strong>' + intervenant.prenom + ' ' + intervenant.nom + '</strong> a <strong>' + actionLabel + '</strong> sa mission de <strong>' + updated.typeMission + '</strong> pour la réservation du <strong>' + (reservation ? new Date(reservation.dateDebut).toLocaleDateString('fr-FR') : '') + ' au ' + (reservation ? new Date(reservation.dateFin).toLocaleDateString('fr-FR') : '') + '</strong>.</p><p>Vous pouvez consulter les détails sur l\'espace administration.</p></div>'
+      });
+    } catch (err) {
+      console.error('Erreur envoi email admin statut mission:', err);
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Erreur mise à jour statut mission:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour de la mission' });
   }
 });
 

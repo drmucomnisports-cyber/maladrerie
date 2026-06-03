@@ -29,7 +29,7 @@ const Login = () => {
           navigate('/admin');
         } else if (data.role === 'intervenant') {
           localStorage.setItem('staffToken', data.token);
-          navigate('/planning-equipe');
+          navigate('/portail-intervenant');
         }
       } else {
         setError(data.error || 'Identifiants invalides');
