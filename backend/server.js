@@ -182,12 +182,15 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
           }
         }
 
+        const existingRes = await prisma.reservation.findUnique({ where: { id: parseInt(reservationId) } });
         const reservation = await prisma.reservation.update({
           where: { id: parseInt(reservationId) },
           data: { 
             statutPaiement: targetStatus,
             statut: 'RESERVE',
-            stripeSoldeId: stripeSoldeId || undefined
+            stripeSoldeId: stripeSoldeId || undefined,
+            modePaiement: 'STRIPE',
+            payeLe: (existingRes && existingRes.payeLe) ? existingRes.payeLe : new Date()
           },
           include: { client: true, intervenant: true }
         });
@@ -216,7 +219,11 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
         }
         const reservation = await prisma.reservation.update({
           where: { id: parseInt(reservationId) },
-          data: { statutPaiement: targetStatus },
+          data: { 
+            statutPaiement: targetStatus,
+            modePaiement: 'STRIPE',
+            payeLe: (resDb && resDb.payeLe) ? resDb.payeLe : new Date()
+          },
           include: { client: true, intervenant: true }
         });
         console.log(`Solde/Totalité payé (statut final: ${targetStatus}) pour la réservation ${reservationId}`);
@@ -2891,7 +2898,8 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           tokenDevis: null,
           montantAcompte: montantAcompte,
           montantSolde: montantSolde,
-          modePaiement: 'VIREMENT'
+          modePaiement: 'VIREMENT',
+          valideLe: new Date()
         }
       });
 
@@ -3032,7 +3040,8 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           tokenDevis: null,
           montantAcompte: montantAcompte,
           montantSolde: montantSolde,
-          stripeSessionId: session.id
+          stripeSessionId: session.id,
+          valideLe: new Date()
         }
       });
     }
@@ -4217,11 +4226,29 @@ app.post('/api/admin/reservations/:id/payment-link', checkAuth, async (req, res)
   }
 });
 
-// Mettre à  jour une réservation (ex: passage manuel en PAYE ou autre statut)
+// Mettre à jour une réservation (ex: passage manuel en PAYE ou autre statut)
 app.put('/api/admin/reservations/:id', checkAuth, async (req, res) => {
   const { id } = req.params;
   const dataToUpdate = req.body;
   try {
+    // Gérer valideLe et payeLe s'ils transitent ou si le statut change
+    if (dataToUpdate.statut === 'RESERVE' || dataToUpdate.statut === 'ACCEPTEE') {
+      if (!dataToUpdate.valideLe) {
+        const existing = await prisma.reservation.findUnique({ where: { id: parseInt(id) } });
+        if (existing && !existing.valideLe) {
+          dataToUpdate.valideLe = new Date();
+        }
+      }
+    }
+    if (dataToUpdate.statutPaiement === 'PAYE' || dataToUpdate.statutPaiement === 'ACOMPTE_PAYE' || dataToUpdate.statutPaiement === 'SOLDE_PAYE') {
+      if (!dataToUpdate.payeLe) {
+        const existing = await prisma.reservation.findUnique({ where: { id: parseInt(id) } });
+        if (existing && !existing.payeLe) {
+          dataToUpdate.payeLe = new Date();
+        }
+      }
+    }
+
     const updated = await prisma.reservation.update({
       where: { id: parseInt(id) },
       data: dataToUpdate,
@@ -4418,7 +4445,8 @@ app.post('/api/admin/reservations/:id/convert-devis', checkAuth, async (req, res
       where: { id: parseInt(id) },
       data: { 
         statut: 'RESERVE',
-        validePar: req.user.email
+        validePar: req.user.email,
+        valideLe: new Date()
       }
     });
     res.json({ success: true, reservation });
@@ -4480,6 +4508,9 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
     }
 
     data.statutPaiement = targetStatus;
+    if (targetStatus === 'PAYE' || targetStatus === 'ACOMPTE_PAYE' || targetStatus === 'SOLDE_PAYE') {
+      data.payeLe = existing.payeLe ? existing.payeLe : new Date();
+    }
     
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(id) },
@@ -4894,7 +4925,8 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
         statutPaiement: targetStatus,
         statut: 'RESERVE',
         stripeSoldeId: stripeSoldeId || undefined,
-        modePaiement: 'VIREMENT'
+        modePaiement: 'VIREMENT',
+        payeLe: reservation.payeLe ? reservation.payeLe : new Date()
       },
       include: { client: true, intervenant: true }
     });
@@ -5763,6 +5795,7 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
         montantSolde: prixTotal ? Math.round(parseFloat(prixTotal) * 0.7 * 100) / 100 : null,
         statut: 'RESERVE',
         statutPaiement: 'EN_ATTENTE',
+        valideLe: new Date(),
         structure: structure || null,
         validePar: req.user.email,
         tokenDevis: token,
@@ -6389,6 +6422,27 @@ app.get('/api/admin/clients/:id', checkAuth, async (req, res) => {
     res.json(client);
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la récupération du client' });
+  }
+});
+
+// Modifier les informations d'un client
+app.put('/api/admin/clients/:id', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const { nom, email, telephone, adressePostale } = req.body;
+  try {
+    const updatedClient = await prisma.client.update({
+      where: { id: parseInt(id) },
+      data: {
+        nom,
+        email,
+        telephone,
+        adressePostale
+      }
+    });
+    res.json(updatedClient);
+  } catch (error) {
+    console.error("Erreur modification client:", error);
+    res.status(500).json({ error: 'Erreur lors de la modification du client' });
   }
 });
 

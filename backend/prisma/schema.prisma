@@ -55,6 +55,8 @@ model Reservation {
   intervenantId   Int?
   missions        Mission[]
   occupants       Occupant[]
+  valideLe        DateTime?
+  payeLe          DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }

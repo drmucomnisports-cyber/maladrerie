@@ -112,6 +112,9 @@ const Admin = () => {
 
   const [selectedClient, setSelectedClient] = useState(null);
   const [showClientModal, setShowClientModal] = useState(false);
+  const [isEditingClient, setIsEditingClient] = useState(false);
+  const [isSavingClient, setIsSavingClient] = useState(false);
+  const [editClientForm, setEditClientForm] = useState({ nom: '', email: '', telephone: '', adressePostale: '' });
 
   const [showIntervenantModal, setShowIntervenantModal] = useState(false);
   const [currentIntervenant, setCurrentIntervenant] = useState(null);
@@ -203,6 +206,12 @@ const Admin = () => {
     });
     setClients(Array.from(clientMap.values()));
   }, [reservations]);
+
+  useEffect(() => {
+    if (!showClientModal) {
+      setIsEditingClient(false);
+    }
+  }, [showClientModal]);
 
   const fetchAdminMe = async () => {
     try {
@@ -327,6 +336,42 @@ const Admin = () => {
       disponibilites: interv.disponibilites || []
     });
     setShowIntervenantModal(true);
+  };
+
+  const startEditClient = (client) => {
+    setEditClientForm({
+      nom: client.nom || '',
+      email: client.email || '',
+      telephone: client.telephone || '',
+      adressePostale: client.adressePostale || ''
+    });
+    setIsEditingClient(true);
+  };
+
+  const saveClient = async (e) => {
+    if (e) e.preventDefault();
+    setIsSavingClient(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/clients/${selectedClient.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(editClientForm)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSelectedClient(prev => ({ ...prev, ...updated }));
+        setIsEditingClient(false);
+        showFeedback("Informations client mises à jour avec succès.");
+        fetchReservations();
+      } else {
+        showFeedback("Erreur lors de la mise à jour des informations client.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showFeedback("Erreur réseau ou serveur inaccessible.", "error");
+    } finally {
+      setIsSavingClient(false);
+    }
   };
 
   const addDisponibilite = () => {
@@ -1869,54 +1914,255 @@ const Admin = () => {
               <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-2xl">&times;</button>
             </div>
             <div className="space-y-6">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <h3 className="font-bold text-slate-800 mb-2">Informations</h3>
-                <p className="text-sm text-slate-600"><strong>Nom:</strong> {selectedClient.nom}</p>
-                <p className="text-sm text-slate-600"><strong>Email:</strong> {selectedClient.email}</p>
-                <p className="text-sm text-slate-600"><strong>Téléphone:</strong> {selectedClient.telephone}</p>
-                {selectedClient.adressePostale && <p className="text-sm text-slate-600"><strong>Adresse:</strong> {selectedClient.adressePostale}</p>}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 relative">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-slate-800">Informations</h3>
+                  {!isEditingClient && (
+                    <button
+                      onClick={() => startEditClient(selectedClient)}
+                      className="px-3 py-1 bg-muc-blue text-white rounded-md text-xs font-bold hover:bg-muc-blue/90 transition-colors"
+                    >
+                      ✏️ Modifier
+                    </button>
+                  )}
+                </div>
+                {isEditingClient ? (
+                  <form onSubmit={saveClient} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Nom complet</label>
+                      <input
+                        required
+                        type="text"
+                        value={editClientForm.nom}
+                        onChange={e => setEditClientForm({ ...editClientForm, nom: e.target.value })}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-muc-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Adresse email</label>
+                      <input
+                        required
+                        type="email"
+                        value={editClientForm.email}
+                        onChange={e => setEditClientForm({ ...editClientForm, email: e.target.value })}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-muc-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Téléphone</label>
+                      <input
+                        required
+                        type="text"
+                        value={editClientForm.telephone}
+                        onChange={e => setEditClientForm({ ...editClientForm, telephone: e.target.value })}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-muc-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Adresse postale</label>
+                      <textarea
+                        value={editClientForm.adressePostale}
+                        onChange={e => setEditClientForm({ ...editClientForm, adressePostale: e.target.value })}
+                        rows="2"
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-muc-blue resize-none"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingClient(false)}
+                        className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-md text-xs font-bold hover:bg-slate-300 transition-colors"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingClient}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-bold hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        {isSavingClient ? 'Enregistrement...' : 'Enregistrer'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm text-slate-600"><strong>Nom:</strong> {selectedClient.nom}</p>
+                    <p className="text-sm text-slate-600"><strong>Email:</strong> {selectedClient.email}</p>
+                    <p className="text-sm text-slate-600"><strong>Téléphone:</strong> {selectedClient.telephone}</p>
+                    <p className="text-sm text-slate-600"><strong>Adresse:</strong> {selectedClient.adressePostale || 'Non renseignée'}</p>
+                  </div>
+                )}
               </div>
               <div>
                 <h3 className="font-bold text-slate-800 mb-3">Historique des Réservations</h3>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {selectedClient.reservations.map(res => (
-                    <div key={res.id} className="border border-slate-100 p-4 rounded-lg bg-white shadow-sm">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-bold text-muc-blue">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')} au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</span>
-                        <span className="text-xs px-2 py-1 bg-slate-100 rounded-md uppercase font-bold text-slate-600">{res.statut}</span>
+                    <div key={res.id} className="border border-slate-100 p-4 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-bold text-muc-blue">Réf: {res.numeroDevis || `Résa #${res.id}`}</span>
+                        <span className={`text-xs px-2 py-1 rounded-md uppercase font-bold ${
+                          res.statut === 'RESERVE' ? 'bg-green-100 text-green-700' :
+                          res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700' :
+                          res.statut === 'DEVIS_EXPIRE' ? 'bg-red-100 text-red-700' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>{res.statut}</span>
                       </div>
-                      <p className="text-xs text-slate-500">Chambres : {(res.chambres || []).join(', ')}</p>
-                      <p className="text-xs text-slate-500">Prix Total : {res.prixTotal ? `${res.prixTotal} €` : 'N/A'}</p>
-                      {(() => {
-                        let taxe = 0;
-                        if (res.dateDebut && res.dateFin) {
-                          const nuits = Math.max(1, Math.ceil((new Date(res.dateFin) - new Date(res.dateDebut)) / (1000 * 60 * 60 * 24)));
-                          let nbAdultes = 0;
-                          let nbOccupants = 0;
-                          if (res.occupants && res.occupants.length > 0) {
-                            nbAdultes = res.occupants.filter(o => o.estAdulte).length;
-                            nbOccupants = res.occupants.length;
-                          } else if (res.chambresDetails && Object.keys(res.chambresDetails).length > 0) {
-                            Object.values(res.chambresDetails).forEach(room => {
-                              nbAdultes += parseInt(room.adultes || 0);
-                              nbOccupants += parseInt(room.adultes || 0) + parseInt(room.mineurs || 0);
-                            });
+
+                      {/* Timeline */}
+                      <div className="relative border-l-2 border-slate-100 pl-4 ml-2 space-y-4 my-4">
+                        {/* 1. Étape Création */}
+                        <div className="relative">
+                          <div className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></div>
+                          <p className="text-xs font-bold text-slate-700">Création</p>
+                          <p className="text-xs text-slate-500">
+                            {new Date(res.createdAt).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <p className="text-xs text-slate-600 mt-0.5">
+                            {res.numeroDevis ? (
+                              <span>📋 Devis Initial (N° <strong>{res.numeroDevis}</strong>)</span>
+                            ) : (
+                              <span>⚡ Réservation Directe</span>
+                            )}
+                          </p>
+                        </div>
+
+                        {/* 2. Étape Validation */}
+                        <div className="relative">
+                          <div className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white ${res.valideLe ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                          <p className="text-xs font-bold text-slate-700">Validation</p>
+                          {res.valideLe ? (
+                            <>
+                              <p className="text-xs text-slate-500">
+                                {new Date(res.valideLe).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <p className="text-xs text-slate-600 mt-0.5">
+                                Validé {res.validePar ? `par ${res.validePar}` : ''}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">En attente de validation</p>
+                          )}
+                        </div>
+
+                        {/* 3. Étape Paiement */}
+                        <div className="relative">
+                          <div className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white ${
+                            res.statutPaiement === 'PAYE' ? 'bg-emerald-500' :
+                            res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'SOLDE_PAYE' ? 'bg-amber-500' :
+                            'bg-slate-300'
+                          }`}></div>
+                          <p className="text-xs font-bold text-slate-700">Règlement</p>
+                          {res.payeLe ? (
+                            <>
+                              <p className="text-xs text-slate-500">
+                                {new Date(res.payeLe).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <p className="text-xs text-slate-600 mt-0.5">
+                                Mode : <strong className="uppercase">{res.modePaiement || 'N/A'}</strong> (Statut : <strong>{res.statutPaiement}</strong>)
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">En attente de règlement (Statut : {res.statutPaiement})</p>
+                          )}
+                        </div>
+
+                        {/* 4. Étape Délai de traitement (si validé et payé) */}
+                        {res.valideLe && res.payeLe && (
+                          <div className="relative bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <div className="absolute -left-[25px] top-3 w-3 h-3 rounded-full bg-purple-500 border-2 border-white"></div>
+                            <p className="text-[11px] font-bold text-purple-700">Délai de traitement</p>
+                            <p className="text-xs text-slate-600 font-medium">
+                              {(() => {
+                                const diffMs = new Date(res.payeLe) - new Date(res.valideLe);
+                                if (diffMs < 0) return "Paiement enregistré avant validation";
+                                const diffMin = Math.floor(diffMs / (1000 * 60));
+                                const diffHours = Math.floor(diffMin / 60);
+                                const diffDays = Math.floor(diffHours / 24);
+                                
+                                if (diffDays > 0) {
+                                  const hoursLeft = diffHours % 24;
+                                  return `${diffDays} jour(s) et ${hoursLeft} heure(s) entre la validation et le paiement`;
+                                } else if (diffHours > 0) {
+                                  const minsLeft = diffMin % 60;
+                                  return `${diffHours} heure(s) et ${minsLeft} minute(s) entre la validation et le paiement`;
+                                } else {
+                                  return `${diffMin} minute(s) entre la validation et le paiement`;
+                                }
+                              })()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stay & Estimation details */}
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-600 space-y-1 mt-3">
+                        <div className="flex justify-between">
+                          <span>Séjour :</span>
+                          <span className="font-bold">Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')} au {new Date(res.dateFin).toLocaleDateString('fr-FR')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Chambres :</span>
+                          <span>{(res.chambres || []).join(', ')}</span>
+                        </div>
+                        {res.structure && (
+                          <div className="flex justify-between">
+                            <span>Structure :</span>
+                            <span className="font-semibold">{res.structure}</span>
+                          </div>
+                        )}
+                        <hr className="border-slate-200 my-1" />
+                        <div className="flex justify-between font-bold text-slate-800">
+                          <span>Estimation Prix Total :</span>
+                          <span>{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</span>
+                        </div>
+                        {res.montantAcompte && (
+                          <div className="flex justify-between text-slate-500">
+                            <span>Acompte estimé :</span>
+                            <span>{res.montantAcompte.toFixed(2)} €</span>
+                          </div>
+                        )}
+                        {res.montantSolde && (
+                          <div className="flex justify-between text-slate-500">
+                            <span>Solde estimé :</span>
+                            <span>{res.montantSolde.toFixed(2)} €</span>
+                          </div>
+                        )}
+                        {(() => {
+                          let taxe = 0;
+                          if (res.dateDebut && res.dateFin) {
+                            const nuits = Math.max(1, Math.ceil((new Date(res.dateFin) - new Date(res.dateDebut)) / (1000 * 60 * 60 * 24)));
+                            let nbAdultes = 0;
+                            let nbOccupants = 0;
+                            if (res.occupants && res.occupants.length > 0) {
+                              nbAdultes = res.occupants.filter(o => o.estAdulte).length;
+                              nbOccupants = res.occupants.length;
+                            } else if (res.chambresDetails && Object.keys(res.chambresDetails).length > 0) {
+                              Object.values(res.chambresDetails).forEach(room => {
+                                nbAdultes += parseInt(room.adultes || 0);
+                                nbOccupants += parseInt(room.adultes || 0) + parseInt(room.mineurs || 0);
+                              });
+                            }
+                            if (nbAdultes > 0 && res.chambres && res.chambres.length > 0) {
+                               const tarifPers = (nbOccupants >= res.chambres.length * 4) ? 22 : 25;
+                               taxe = nbAdultes * tarifPers * nuits * 0.044;
+                            }
                           }
-                          if (nbAdultes > 0 && res.chambres && res.chambres.length > 0) {
-                             const tarifPers = (nbOccupants >= res.chambres.length * 4) ? 22 : 25;
-                             taxe = nbAdultes * tarifPers * nuits * 0.044;
-                          }
-                        }
-                        return taxe > 0 ? (
-                          <p className="text-xs text-slate-500 font-bold mt-1 text-muc-blue/80">Dont taxe de séjour (estimée) : {taxe.toFixed(2)} €</p>
-                        ) : null;
-                      })()}
+                          return taxe > 0 ? (
+                            <div className="flex justify-between text-muc-blue/80 font-bold mt-1">
+                              <span>Taxe de séjour (estimée) :</span>
+                              <span>{taxe.toFixed(2)} €</span>
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+
+                      {/* Occupants list */}
                       {res.occupants && res.occupants.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-slate-50">
-                          <p className="text-xs font-bold text-slate-700 mb-1">Occupants:</p>
-                          <ul className="text-xs text-slate-500 list-disc list-inside">
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <p className="text-xs font-bold text-slate-700 mb-1">Occupants ({res.occupants.length}) :</p>
+                          <ul className="text-xs text-slate-500 list-disc list-inside grid grid-cols-2 gap-x-2 gap-y-0.5">
                             {res.occupants.map(o => (
-                              <li key={o.id}>{o.prenom} {o.nom} {o.estAdulte ? '(Adulte)' : `(Enfant, ${o.age} ans)`}</li>
+                              <li key={o.id} className="truncate">{o.prenom} {o.nom} {o.estAdulte ? '(Ad)' : `(Enf, ${o.age} ans)`}</li>
                             ))}
                           </ul>
                         </div>
