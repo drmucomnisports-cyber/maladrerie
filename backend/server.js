@@ -669,7 +669,7 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
     if (isCaution) {
       typeLabel = 'Dépôt de garantie (Caution)';
       descriptionText = `Une empreinte bancaire temporaire de <strong>${amount.toFixed(2)} €</strong> a été enregistrée à titre de caution. Aucun montant n'a été débité de votre compte.`;
-      cgvReference = `Conformément à l'Article 8 de nos CGV, cette caution est destinée à couvrir les éventuels dommages, manquements au règlement intérieur, ou frais de ménage. Elle sera automatiquement annulée/libérée dans un délai de 30 jours maximum après votre départ.`;
+      cgvReference = `Conformément à l'Article 9 de nos CGV, cette caution est destinée à couvrir les éventuels dommages, manquements au règlement intérieur, ou frais de ménage. Elle sera automatiquement annulée/libérée dans un délai de 30 jours maximum après votre départ.`;
     } else if (isAcompte) {
       typeLabel = "Acompte (30%)";
       descriptionText = `Le paiement de l'acompte de 30% d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Vos dates de séjour sont désormais réservées.`;
@@ -6280,6 +6280,87 @@ app.put('/api/admin/intervenants/:id', checkAuth, async (req, res) => {
     res.json(intervenant);
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la modification de l\'intervenant' });
+  }
+});
+
+// Inviter un intervenant par email (envoi identifiants et lien de connexion)
+app.post('/api/admin/intervenants/:id/invite', checkAuth, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Accès interdit - Droits admin requis' });
+  }
+  const { id } = req.params;
+  try {
+    const intervenant = await prisma.intervenant.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!intervenant) {
+      return res.status(404).json({ error: 'Intervenant non trouvé' });
+    }
+
+    const hasPassword = !!intervenant.password;
+    const tempPasswordText = hasPassword 
+      ? "votre mot de passe habituel" 
+      : "le mot de passe temporaire : <strong>equipe2024</strong> (nous vous conseillons de le modifier dès votre première connexion dans l'onglet 'Mon Profil').";
+
+    const emailHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+        <div style="background-color: #004B93; padding: 30px 20px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Gîte de la Maladrerie</h1>
+          <p style="color: rgba(255, 255, 255, 0.8); margin: 5px 0 0 0; font-size: 14px;">Invitation de l'équipe d'intervenants</p>
+        </div>
+        
+        <div style="padding: 30px 24px; color: #334155; line-height: 1.6;">
+          <p style="font-size: 16px; font-weight: bold; margin-top: 0; color: #0f172a;">Bonjour ${intervenant.prenom} ${intervenant.nom},</p>
+          
+          <p style="font-size: 14px;">
+            Vous êtes invité(e) à rejoindre l'espace réservation du <strong>Gîte de la Maladrerie</strong> en tant que membre de l'équipe.
+          </p>
+          
+          <p style="font-size: 14px;">
+            Cet espace vous permettra de consulter votre agenda de missions, de valider ou décliner les tâches qui vous sont affectées (ménage, accueil, etc.), de déclarer vos disponibilités, et de consulter les réservations et clients en lecture seule.
+          </p>
+          
+          <div style="background-color: #f8fafc; border-left: 4px solid #004B93; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 13px; font-weight: 800; color: #004B93; text-transform: uppercase; letter-spacing: 0.5px;">Vos identifiants de connexion :</h3>
+            <table cellpadding="4" cellspacing="0" style="font-size: 13px; color: #334155; width: 100%;">
+              <tr>
+                <td width="120" style="font-weight: bold; color: #64748b;">Adresse e-mail :</td>
+                <td style="font-weight: bold; color: #0f172a;">${intervenant.email}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; color: #64748b; vertical-align: top;">Mot de passe :</td>
+                <td style="color: #0f172a;">${tempPasswordText}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <p style="text-align: center; margin-top: 25px; margin-bottom: 25px;">
+            <a href="${FRONTEND_URL}/login" target="_blank" style="background-color: #004B93; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.15);">Accéder à mon espace</a>
+          </p>
+          
+          <p style="font-size: 12px; color: #64748b; margin-bottom: 0;">
+            Si le bouton ci-dessus ne fonctionne pas, vous pouvez copier et coller ce lien dans votre navigateur : <br/>
+            <a href="${FRONTEND_URL}/login" style="color: #004B93; text-decoration: underline;">${FRONTEND_URL}/login</a>
+          </p>
+        </div>
+        
+        <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+          Cet e-mail automatique est envoyé par le système de gestion du Gîte de la Maladrerie.
+        </div>
+      </div>
+    `;
+
+    await sendMail({
+      to: intervenant.email,
+      subject: "Invitation à rejoindre votre espace intervenant - Gîte de la Maladrerie",
+      html: emailHtml
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Erreur envoi invitation:", error);
+    res.status(500).json({ error: "Erreur lors de l'envoi de l'invitation par e-mail" });
   }
 });
 

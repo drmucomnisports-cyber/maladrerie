@@ -1,5 +1,5 @@
 Conditions Générales de Vente et de Location - Gîte de la Maladrerie
-Version 1.9 - Mai 2026
+Version 2.0 - Juin 2026
 
 1. Réservation et Paiement de l'acompte
 Pour valider toute réservation, un acompte de 30 % du montant total (incluant la totalité du montant des repas commandés) doit être réglé selon les modalités suivantes :
@@ -18,14 +18,19 @@ En cas d'annulation de la part du client, les conditions suivantes s'appliquent 
 - Non-présentation (No-show) ou séjour écourté : la totalité du montant du séjour reste due à l'établissement.
 Si l'annulation est du fait de l'établissement, l'intégralité des sommes versées sera remboursée au client.
 
-4. Pénalités de retard
+4. Modification de séjour
+- Diminution du séjour : aucune demande de réduction de la durée du séjour ou de modification des dates à la baisse ne pourra être acceptée à moins de 30 jours de la date d’arrivée prévue. La totalité des nuitées initialement réservées restera exigible.
+- Ajout de prestations / voyageurs : toute demande d'ajout (voyageurs supplémentaires, options, repas) est réalisable sous réserve de disponibilité de l'établissement, jusqu'à 72 heures avant votre arrivée.
+
+5. Pénalités de retard
 Tout retard de paiement des sommes dues à l'échéance entraînera de plein droit l'application de pénalités de retard. Celles-ci sont calculées sur la base de trois fois le taux d'intérêt légal en vigueur. En sus des indemnités de retard, une indemnité forfaitaire de 40 € pour frais de recouvrement sera exigée (Art. L441-6 du Code de commerce).
 
-5. Régime fiscal et tarifs
+6. Régime fiscal et tarifs
 Les tarifs appliqués sont ceux indiqués sur le devis accepté par le client ou lors de la réservation en ligne effectuée par ce dernier. Les tarifs précis des nuitées ne sont pas détaillés dans les présentes conditions générales et figurent directement sur les outils de réservation.
+Conformément à l'article 293 B du Code Général des Impôts (CGI), la TVA est non applicable sur les prestations fournies par l'association.
 Taxe de séjour : en sus du prix de l'hébergement, une taxe de séjour est perçue pour le compte de la collectivité. Son montant est fixé à 4 % du prix de la nuitée par personne majeure, auquel s'ajoute la taxe additionnelle départementale de 10 % (soit un taux global de 4,4 % du prix de la nuitée par adulte). Elle sera calculée lors de la facturation finale.
 
-6. Location des salles de formation
+7. Location des salles de formation
 L'établissement propose la location de deux salles de formation (une salle de 15 personnes et une salle de 12 personnes, équipées de tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo). Les conditions spécifiques suivantes s'appliquent :
 Périodes de location :
 - Hors vacances scolaires : la location est possible du vendredi au dimanche.
@@ -33,27 +38,27 @@ Périodes de location :
 Horaires et durée de location : la location d'une salle prend effet de 9h le matin jusqu'à 9h le lendemain matin. Exception faite pour le vendredi hors vacances scolaires, où la salle est disponible à partir de 17h jusqu'au lendemain 9h, comptant pour un jour de location.
 Tarification : le tarif est fixé à 100 € par jour si les salles sont louées en complément de chambres du gîte. Dans le cas contraire (location des salles seules), le tarif est de 150 € par jour.
 
-7. Service de restauration
+8. Service de restauration
 L'établissement propose un service de restauration optionnel en partenariat avec la cuisine centrale de la Ville de Millau (produits frais, 63 % bio, partenariats locaux). Les modalités de ce service sont strictes :
 Tarifs des repas (par personne) :
 - Adulte : 6 € par petit-déjeuner, 11,50 € par déjeuner, 14 € par dîner.
 - Enfant (< 12 ans) : 5 € par petit-déjeuner, 9,50 € par déjeuner, 12 € par dîner.
 - Enfant (< 5 ans) : 4 € par petit-déjeuner, 8 € par déjeuner, 10 € par dîner.
 Organisation : les repas sont conditionnés en bacs inox et livrés le matin avant 10h (le vendredi pour l'ensemble du week-end). Ils comprennent une entrée, un plat et un dessert. Les paniers-repas et pique-niques ne sont pas proposés.
-Modalités de commande : les commandes de repas doivent être impérativement transmises et validées au plus tard le jeudi pour la semaine suivante. Passé ce délai, aucune commande ne pourra être enregistrée.
+Modalités de commande : les commandes de repas doivent être impérativement transmises et validées au plus tard le jeudi pour la semaine suivante. Passé ce délai, aucune commande ne pourra être enregistrée sur l'espace de réservation.
 Condition de validation : pour que la commande de repas soit transmise au prestataire, le client doit avoir réglé la totalité (100 %) du montant des repas commandés lors du paiement de l'acompte de la réservation. À défaut de paiement dans les délais impartis, la commande de repas est automatiquement annulée.
 
-8. Dépôt de garantie (Caution)
+9. Dépôt de garantie (Caution)
 Une empreinte bancaire d'un montant de 500 € est requise avant l'entrée dans les lieux. Cette somme n'est pas débitée au moment de la saisie, mais bloquée temporairement. Cette caution est destinée à couvrir :
 - D'éventuels dommages ou dégradations constatés sur le bâtiment ou le matériel.
 - Les manquements au règlement intérieur.
 - Les frais de remise en état ou de ménage si les locaux ne sont pas rendus propres.
 La direction se réserve le droit de conserver tout ou partie de cette somme en fonction de l'état des lieux de sortie. La caution sera intégralement libérée dans un délai de 30 jours après le départ, déduction faite des éventuels frais de réparation ou d'indemnisation.
 
-9. État des lieux et inventaire
+10. État des lieux et inventaire
 Le présent contrat est complété par un état des lieux et un inventaire du matériel joint en annexe. Il appartient aux occupants de vérifier l'exactitude de ces documents dès leur arrivée. Tout écart ou anomalie constaté doit impérativement être signalé dans les premières heures de l'entrée dans les lieux. Passé ce délai, toute dégradation ou manque constaté lors du départ pourra faire l'objet d'une retenue sur le dépôt de garantie.
 
-10. Respect des lieux et voisinage
+11. Respect des lieux et voisinage
 Le groupe s'engage à respecter la tranquillité des lieux. Les nuisances sonores excessives ou le non-respect des règles de vie commune sont strictement interdits et pourront donner lieu à une retenue sur la caution.
 
 Le client reconnaît avoir pris connaissance des présentes conditions et les accepte sans réserve.

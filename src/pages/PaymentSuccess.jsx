@@ -136,7 +136,7 @@ const PaymentSuccess = () => {
                       </ul>
                     </div>
                     <p className="text-xs text-slate-500 pt-2 border-t border-slate-100">
-                      Conformément à l'Article 8 des CGV, l'empreinte bancaire sera intégralement libérée/annulée dans un délai de <strong>30 jours maximum après votre départ</strong>, déduction faite des éventuels frais de réparation ou d'indemnisation si nécessaire.
+                      Conformément à l'Article 9 des CGV, l'empreinte bancaire sera intégralement libérée/annulée dans un délai de <strong>30 jours maximum après votre départ</strong>, déduction faite des éventuels frais de réparation ou d'indemnisation si nécessaire.
                     </p>
                   </div>
                 </div>

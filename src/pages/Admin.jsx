@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText, Users } from 'lucide-react';
+import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText, Users, Mail } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 
@@ -169,6 +169,7 @@ const Admin = () => {
   const [planningEvents, setPlanningEvents] = useState([]);
   const [loadingPlanning, setLoadingPlanning] = useState(false);
   const [selectedPlanningEvent, setSelectedPlanningEvent] = useState(null);
+  const [invitingId, setInvitingId] = useState(null);
 
   const fetchPlanningEvents = async () => {
     setLoadingPlanning(true);
@@ -359,6 +360,27 @@ const Admin = () => {
       showFeedback("Erreur réseau ou serveur inaccessible.", "error");
     } finally {
       setIsSavingIntervenant(false);
+    }
+  };
+
+  const inviteIntervenant = async (interv) => {
+    setInvitingId(interv.id);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/intervenants/${interv.id}/invite`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showFeedback(`Invitation envoyée par email à ${interv.prenom} ${interv.nom}.`);
+      } else {
+        const data = await res.json();
+        showFeedback(data.error || "Erreur lors de l'envoi de l'invitation.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showFeedback("Erreur réseau lors de l'envoi de l'invitation.", "error");
+    } finally {
+      setInvitingId(null);
     }
   };
 
@@ -1941,6 +1963,14 @@ const Admin = () => {
                       </div>
                     </div>
                     <div className="flex gap-1.5 shrink-0 ml-4">
+                      <button 
+                        onClick={() => inviteIntervenant(interv)} 
+                        disabled={invitingId === interv.id}
+                        className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors" 
+                        title="Inviter par e-mail"
+                      >
+                        <Mail size={18} />
+                      </button>
                       <button onClick={() => editIntervenant(interv)} className="p-2 bg-blue-50 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors" title="Modifier">
                         <Edit3 size={18} />
                       </button>
