@@ -669,7 +669,7 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
     if (isCaution) {
       typeLabel = 'Dépôt de garantie (Caution)';
       descriptionText = `Une empreinte bancaire temporaire de <strong>${amount.toFixed(2)} €</strong> a été enregistrée à titre de caution. Aucun montant n'a été débité de votre compte.`;
-      cgvReference = `Conformément à l'Article 9 de nos CGV, cette caution est destinée à couvrir les éventuels dommages, manquements au règlement intérieur, ou frais de ménage. Elle sera automatiquement annulée/libérée dans un délai de 30 jours maximum après votre départ.`;
+      cgvReference = `Conformément à l'Article 10 de nos CGV, cette caution est destinée à couvrir les éventuels dommages, manquements au règlement intérieur, ou frais de ménage. Elle sera automatiquement annulée/libérée dans un délai de 30 jours maximum après votre départ.`;
     } else if (isAcompte) {
       typeLabel = "Acompte (30%)";
       descriptionText = `Le paiement de l'acompte de 30% d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Vos dates de séjour sont désormais réservées.`;

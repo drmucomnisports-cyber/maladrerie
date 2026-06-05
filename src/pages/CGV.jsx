@@ -38,7 +38,7 @@ const CGV = () => {
 
           <section>
             <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">3. Annulation</h2>
-            <p>En cas d'annulation de la part du client, les conditions suivantes s'applient :</p>
+            <p>En cas d'annulation de la part du client, les conditions suivantes s'appliquent :</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
               <li>Plus de 30 jours avant l'arrivée : l'acompte de 30 % est restitué au client, déduction faite de 30 € pour frais de dossier et de gestion administrative. Ce montant de frais de dossier ne pourra en aucun cas excéder le montant total de l'acompte versé.</li>
               <li>Moins de 30 jours avant l'arrivée : l'acompte de 30 % reste acquis à l'établissement et ne fera l'objet d'aucun remboursement.</li>
@@ -57,19 +57,27 @@ const CGV = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">5. Pénalités de retard</h2>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">5. Modalités d'arrivée et de départ</h2>
+            <ul className="space-y-2 list-disc list-inside">
+              <li><strong>Horaires d'arrivée :</strong> les chambres sont disponibles à partir de 17h. Les arrivées doivent s'effectuer avant 19h. En cas d'imprévu ou d'arrivée tardive, le client est tenu d'en informer la direction dès que possible.</li>
+              <li><strong>Horaire de départ :</strong> les chambres doivent être impérativement libérées avant 11h le jour du départ.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">6. Pénalités de retard</h2>
             <p>Tout retard de paiement des sommes dues à l'échéance entraînera de plein droit l'application de pénalités de retard. Celles-ci sont calculées sur la base de trois fois le taux d'intérêt légal en vigueur. En sus des indemnités de retard, une indemnité forfaitaire de 40 € pour frais de recouvrement sera exigée (Art. L441-6 du Code de commerce).</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">6. Régime fiscal et tarifs</h2>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">7. Régime fiscal et tarifs</h2>
             <p>Les tarifs appliqués sont ceux indiqués sur le devis accepté par le client ou lors de la réservation en ligne effectuée par ce dernier. Les tarifs précis des nuitées ne sont pas détaillés dans les présentes conditions générales et figurent directement sur les outils de réservation.</p>
-            <p className="mt-4">Conformément à l'article 293 B du Code Général des Impôts (CGI), la TVA est non applicable sur les prestations fournies par l'association.</p>
-            <p className="mt-4"><strong>Taxe de séjour :</strong> en sus du prix de l'hébergement, une taxe de séjour est perçue pour le compte de la collectivité. Son montant est fixé à 4 % du prix de la nuitée par personne majeure, auquel s'ajoute la taxe additionnelle départementale de 10 % (soit un taux global de 4,4 % du prix de la nuitée par adulte). Elle sera calculée lors de la facturation finale.</p>
+            <p className="mt-4 font-semibold text-muc-yellow">Conformément à l'article 293 B du Code Général des Impôts (CGI), la TVA est non applicable sur les prestations fournies par l'association.</p>
+            <p className="mt-4"><strong>Taxe de séjour :</strong> en sus du prix de l'hébergement, une taxe de séjour est perçue pour le compte de la collectivité. Son montant est fixé à 4% du prix de la nuitée par personne majeure (dans la limite du plafond légal). Elle sera calculée lors de la facturation finale.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">7. Location des salles de formation</h2>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">8. Location des salles de formation</h2>
             <p>L'établissement propose la location de deux salles de formation (une salle de 15 personnes et une salle de 12 personnes, équipées de tables, chaises, écran numérique ou vidéoprojecteur, WC et lavabo). Les conditions spécifiques suivantes s'appliquent :</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
               <li><strong>Périodes de location :</strong> Hors vacances scolaires : la location est possible du vendredi au dimanche. Vacances scolaires (zone de Millau) : la location est possible tous les jours de la semaine.</li>
@@ -79,7 +87,7 @@ const CGV = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">8. Service de restauration</h2>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">9. Service de restauration</h2>
             <p>L'établissement propose un service de restauration optionnel en partenariat avec la cuisine centrale de la Ville de Millau (produits frais, 63 % bio, partenariats locaux). Les modalités de ce service sont strictes :</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
               <li><strong>Tarifs adulte :</strong> 6 € par petit-déjeuner, 11,50 € par déjeuner, 14 € par dîner.</li>
@@ -92,7 +100,7 @@ const CGV = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">9. Dépôt de garantie (Caution)</h2>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">10. Dépôt de garantie (Caution)</h2>
             <p>Une empreinte bancaire d'un montant de 500 € est requise avant l'entrée dans les lieux. Cette somme n'est pas débitée au moment de la saisie, mais bloquée temporairement. Cette caution est destinée à couvrir :</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
               <li>D'éventuels dommages ou dégradations constatés sur le bâtiment ou le matériel.</li>
@@ -103,12 +111,12 @@ const CGV = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">10. État des lieux et inventaire</h2>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">11. État des lieux et inventaire</h2>
             <p>Le présent contrat est complété par un état des lieux et un inventaire du matériel joint en annexe. Il appartient aux occupants de vérifier l'exactitude de ces documents dès leur arrivée. Tout écart ou anomalie constaté doit impérativement être signalé dans les premières heures de l'entrée dans les lieux. Passé ce délai, toute dégradation ou manque constaté lors du départ pourra faire l'objet d'une retenue sur le dépôt de garantie.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">11. Respect des lieux et voisinage</h2>
+            <h2 className="text-xl font-bold text-muc-yellow uppercase tracking-widest mb-4">12. Respect des lieux et voisinage</h2>
             <p>Le groupe s'engage à respecter la tranquillité des lieux. Les nuisances sonores excessives ou le non-respect des règles de vie commune sont strictement interdits et pourront donner lieu à une retenue sur la caution.</p>
           </section>
           
