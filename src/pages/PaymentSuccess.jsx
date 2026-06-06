@@ -231,6 +231,35 @@ const PaymentSuccess = () => {
               </div>
             )}
 
+            {/* Documents Section */}
+            {paymentType !== 'caution' && (
+              <div className="border border-green-100 rounded-2xl p-6 bg-green-50/20 space-y-4 animate-in fade-in duration-300">
+                <h4 className="text-sm font-black text-green-800 uppercase tracking-tight flex items-center gap-2 pb-2 border-b border-green-100">
+                  <FileText size={18} className="text-green-700" />
+                  Documents de séjour obligatoires
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                  Votre réservation étant validée, veuillez télécharger et vérifier les documents ci-dessous. En cas d'écart constaté à votre arrivée, merci de nous le signaler rapidement.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                  <a
+                    href={`${API_URL}/api/documents/inventaire`}
+                    download
+                    className="flex-1 py-3 px-4 bg-white border border-green-200 hover:bg-green-50/50 text-green-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    📥 Télécharger l'Inventaire
+                  </a>
+                  <a
+                    href={`${API_URL}/api/documents/etat-des-lieux`}
+                    download
+                    className="flex-1 py-3 px-4 bg-white border border-green-200 hover:bg-green-50/50 text-green-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    📥 Télécharger l'État des lieux
+                  </a>
+                </div>
+              </div>
+            )}
+
             {/* Helpful Actions / Links */}
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-4">
               <button 

@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const { BrevoClient } = require('@getbrevo/brevo');
 const { generateDevisPDF } = require('./utils/generateDevisPDF');
@@ -490,6 +492,35 @@ const sendMail = async (options) => {
   }
 };
 
+const getClientAttachments = () => {
+  const attachments = [];
+  try {
+    const inventairePath = path.join(__dirname, 'assets/Inventaire - 15-04-2026.docx');
+    const etatDesLieuxPath = path.join(__dirname, 'assets/ÉTAT DES LIEUX GITE - Client.docx');
+
+    if (fs.existsSync(inventairePath)) {
+      attachments.push({
+        content: fs.readFileSync(inventairePath).toString('base64'),
+        name: "Inventaire - Gite de la Maladrerie.docx"
+      });
+    } else {
+      console.warn("Fichier inventaire manquant à :", inventairePath);
+    }
+
+    if (fs.existsSync(etatDesLieuxPath)) {
+      attachments.push({
+        content: fs.readFileSync(etatDesLieuxPath).toString('base64'),
+        name: "Etat des lieux - Gite de la Maladrerie.docx"
+      });
+    } else {
+      console.warn("Fichier état des lieux manquant à :", etatDesLieuxPath);
+    }
+  } catch (err) {
+    console.error("Erreur lors du chargement des pièces jointes client:", err);
+  }
+  return attachments;
+};
+
 async function getAdminEmailsForPreference(preferenceKey, fallbackEmails = []) {
   try {
     const admins = await prisma.adminAccount.findMany({
@@ -714,6 +745,7 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
       await sendMail({
         to: reservation.client.email,
         subject: `Confirmation de paiement - ${typeLabel} - Gîte de la Maladrerie`,
+        attachments: !isCaution ? getClientAttachments() : undefined,
         html: `
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
             <tr>
@@ -739,6 +771,12 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
                       <p style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 15px; border-radius: 8px; font-size: 13px; color: #856404; margin-top: 20px;">
                         📢 <strong>Important :</strong> ${cgvReference}
                       </p>
+                      
+                      ${!isCaution ? `
+                      <p style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-size: 13px; color: #166534; margin-top: 20px;">
+                        📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes à cet e-mail l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Nous vous invitons à en vérifier l'exactitude dès votre arrivée. Tout écart doit nous être signalé dans les premières heures de votre entrée dans les lieux (conformément à l'Article 10 de nos CGV).
+                      </p>
+                      ` : ''}
                       
                       ${(isAcompte && balancePaymentLink) ? `
                         <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
@@ -1462,6 +1500,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     await sendMail({
       to: reservation.client.email,
       subject: "Confirmation de votre réservation et Paiement - Gîte de La Maladrerie",
+      attachments: getClientAttachments(),
       html: `
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
           <tr>
@@ -1505,6 +1544,10 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
                     ` : ''}
 
                     ${generateOptionsHTML(existingReservation.options, existingReservation.repas, existingReservation.salles)}
+
+                    <p style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-size: 13px; color: #166534; margin: 25px 0;">
+                      📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes à cet e-mail l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Nous vous invitons à en vérifier l'exactitude dès votre arrivée. Tout écart doit nous être signalé dans les premières heures de votre entrée dans les lieux (conformément à l'Article 10 de nos CGV).
+                    </p>
 
                     ${paymentLink ? `
                       <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
@@ -7455,6 +7498,26 @@ app.put('/api/intervenant/missions/:id/status', checkAuth, async (req, res) => {
     console.error('Erreur mise à jour statut mission:', error);
     res.status(500).json({ error: 'Erreur lors de la mise à jour de la mission' });
   }
+});
+
+app.get('/api/documents/:filename', (req, res) => {
+  const { filename } = req.params;
+  const allowedFiles = {
+    'inventaire': 'Inventaire - 15-04-2026.docx',
+    'etat-des-lieux': 'ÉTAT DES LIEUX GITE - Client.docx'
+  };
+
+  const actualFilename = allowedFiles[filename];
+  if (!actualFilename) {
+    return res.status(404).json({ error: "Fichier non trouvé" });
+  }
+
+  const filePath = path.join(__dirname, 'assets', actualFilename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "Fichier physique introuvable sur le serveur" });
+  }
+
+  res.download(filePath, actualFilename);
 });
 
 const PORT = process.env.PORT || 5000;
