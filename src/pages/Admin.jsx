@@ -1129,12 +1129,12 @@ const Admin = () => {
       <div className="w-full max-w-[96%] mx-auto relative">
         <div className="bg-[#F8F8F8] pb-8 border-b border-slate-200 shadow-sm mb-8">
           <div className="w-full">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
                 <h1 className="text-3xl font-black text-muc-blue tracking-tight uppercase">Dashboard</h1>
                 <p className="text-sm font-medium text-slate-500">Gestion des réservations - La Maladrerie</p>
               </div>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="px-6 py-2 bg-muc-blue text-white font-bold rounded-lg hover:bg-muc-blue/90 transition-colors shadow-md"
@@ -1155,8 +1155,8 @@ const Admin = () => {
 
 
 
-            <div className="flex gap-4">
-              <button onClick={() => setActiveTab('reservations')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'reservations' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Réservations</button>
+            <div className="flex gap-2 overflow-x-auto pb-2 whitespace-nowrap scrollbar-hide">
+              <button onClick={() => setActiveTab('reservations')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all whitespace-nowrap ${activeTab === 'reservations' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Réservations</button>
               <button onClick={() => setActiveTab('devis')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'devis' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Devis</button>
               <button onClick={() => setActiveTab('clients')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'clients' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Clients</button>
               <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
@@ -2546,8 +2546,8 @@ const Admin = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-            <table className="w-full text-left">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-x-auto">
+            <table className="w-full text-left min-w-[800px]">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   <th className="px-6 py-4 text-xs font-black uppercase text-slate-500 tracking-widest">Code</th>
@@ -2604,8 +2604,8 @@ const Admin = () => {
             <button onClick={openNewAdminModal} className="bg-muc-blue text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-800 transition-all shadow-md">+ Nouvel Admin</button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-            <table className="w-full text-left">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-x-auto">
+            <table className="w-full text-left min-w-[600px]">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   <th className="px-6 py-4 text-xs font-black uppercase text-slate-500 tracking-widest">Nom</th>
@@ -3490,7 +3490,7 @@ const Admin = () => {
                   );
                 })()}
 
-                <table className="w-full text-left border-collapse border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="block overflow-x-auto w-full text-left border-collapse border border-slate-200 rounded-xl shadow-sm whitespace-nowrap">
                   <thead>
                     <tr className="bg-slate-50 text-slate-500 font-black text-xs uppercase tracking-wider border-b border-slate-200">
                       <th className="p-4 border border-slate-200 w-1/4">Élément</th>
@@ -4201,8 +4201,8 @@ const Admin = () => {
                 <p className="text-xl font-bold text-muc-blue mt-2">Total : {financeModalData.total.toFixed(2)} €</p>
             </div>
             
-            <div className="flex-1 overflow-y-auto">
-                <table className="w-full text-left border-collapse text-sm">
+            <div className="flex-1 overflow-auto">
+                <table className="w-full text-left border-collapse text-sm min-w-[600px]">
                     <thead className="sticky top-0 bg-white shadow-sm z-10">
                         <tr className="border-b-2 border-slate-200">
                             <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Date</th>
