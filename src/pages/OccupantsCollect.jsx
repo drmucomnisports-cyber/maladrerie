@@ -164,27 +164,29 @@ const OccupantsCollect = () => {
 
         {status === 'form' && reservation && (
           <div className="space-y-6">
-            {/* Tabs */}
-            <div className="flex border-b border-slate-200 mb-6 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('voyageurs')}
-                className={`flex-1 py-3 px-6 font-black uppercase text-xs tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${activeSubTab === 'voyageurs' ? 'bg-[#004B93] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-              >
-                <Users size={16} />
-                Saisie des Voyageurs
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('devis')}
-                className={`flex-1 py-3 px-6 font-black uppercase text-xs tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${activeSubTab === 'devis' ? 'bg-[#004B93] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-              >
-                <FileText size={16} />
-                Mon Devis Validé
-              </button>
-            </div>
+            {/* Tabs (only for reservations originating from a devis) */}
+            {reservation.numeroDevis && (
+              <div className="flex border-b border-slate-200 mb-6 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('voyageurs')}
+                  className={`flex-1 py-3 px-6 font-black uppercase text-xs tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${activeSubTab === 'voyageurs' ? 'bg-[#004B93] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                >
+                  <Users size={16} />
+                  Saisie des Voyageurs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('devis')}
+                  className={`flex-1 py-3 px-6 font-black uppercase text-xs tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${activeSubTab === 'devis' ? 'bg-[#004B93] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                >
+                  <FileText size={16} />
+                  Mon Devis Validé
+                </button>
+              </div>
+            )}
 
-            {activeSubTab === 'voyageurs' ? (
+            {(!reservation.numeroDevis || activeSubTab === 'voyageurs') ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Recap Card */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
