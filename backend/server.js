@@ -497,6 +497,7 @@ const getClientAttachments = () => {
   try {
     const inventairePath = path.join(__dirname, 'assets/Inventaire - 15-04-2026.docx');
     const etatDesLieuxPath = path.join(__dirname, 'assets/ÉTAT DES LIEUX GITE - Client.docx');
+    const cgvPath = path.join(__dirname, 'assets/CGV - Gite de la Maladrerie.pdf');
 
     if (fs.existsSync(inventairePath)) {
       attachments.push({
@@ -514,6 +515,15 @@ const getClientAttachments = () => {
       });
     } else {
       console.warn("Fichier état des lieux manquant à :", etatDesLieuxPath);
+    }
+
+    if (fs.existsSync(cgvPath)) {
+      attachments.push({
+        content: fs.readFileSync(cgvPath).toString('base64'),
+        name: "CGV - Gite de la Maladrerie.pdf"
+      });
+    } else {
+      console.warn("Fichier CGV PDF manquant à :", cgvPath);
     }
   } catch (err) {
     console.error("Erreur lors du chargement des pièces jointes client:", err);
@@ -774,8 +784,22 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
                       
                       ${!isCaution ? `
                       <p style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-size: 13px; color: #166534; margin-top: 20px;">
-                        📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes à cet e-mail l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Nous vous invitons à en vérifier l'exactitude dès votre arrivée. Tout écart doit nous être signalé dans les premières heures de votre entrée dans les lieux (conformément à l'Article 10 de nos CGV).
+                        📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes les <strong>CGV (PDF)</strong>, l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Le présent contrat est complété par l'état des lieux et l'inventaire en annexe. Il appartient aux occupants d'en vérifier l'exactitude dès leur arrivée. Tout écart doit impérativement nous être signalé dans les premières heures de l'entrée dans les lieux.
                       </p>
+                      ` : ''}
+
+                      ${isAcompte ? `
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 8px; margin: 20px 0; font-size: 13px; border-left: 4px solid #10b981;">
+                        <p style="margin-top: 0; font-weight: bold; color: #10b981; font-size: 14px;">🙋‍♂️ Souhaitez-vous régler le solde à votre arrivée ?</p>
+                        <p style="margin-bottom: 15px; color: #475569;">Si vous préférez régler le solde restant (${soldeRestant.toFixed(2)} €) directement le jour de votre arrivée sur les lieux (chèque, espèces), merci de nous l'indiquer d'un simple clic ci-dessous pour enregistrer votre choix et stopper les relances e-mail :</p>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="text-align: center;">
+                          <tr>
+                            <td>
+                              <a href="${BACKEND_URL}/api/payment/pay-on-arrival/${tokenModification}" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 13px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">Je réglerai mon solde sur place à l'arrivée</a>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
                       ` : ''}
                       
                       ${(isAcompte && balancePaymentLink) ? `
@@ -1546,8 +1570,22 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
                     ${generateOptionsHTML(existingReservation.options, existingReservation.repas, existingReservation.salles)}
 
                     <p style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-size: 13px; color: #166534; margin: 25px 0;">
-                      📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes à cet e-mail l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Nous vous invitons à en vérifier l'exactitude dès votre arrivée. Tout écart doit nous être signalé dans les premières heures de votre entrée dans les lieux (conformément à l'Article 10 de nos CGV).
+                      📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes les <strong>CGV (PDF)</strong>, l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Le présent contrat est complété par l'état des lieux et l'inventaire en annexe. Il appartient aux occupants d'en vérifier l'exactitude dès leur arrivée. Tout écart doit impérativement nous être signalé dans les premières heures de l'entrée dans les lieux.
                     </p>
+
+                    ${(!isLastMinuteStay && montantSolde > 0) ? `
+                    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 8px; margin: 20px 0; font-size: 13px; border-left: 4px solid #10b981;">
+                      <p style="margin-top: 0; font-weight: bold; color: #10b981; font-size: 14px;">🙋‍♂️ Souhaitez-vous régler le solde à votre arrivée ?</p>
+                      <p style="margin-bottom: 15px; color: #475569;">Si vous préférez régler le solde restant (${montantSolde.toFixed(2)} €) directement le jour de votre arrivée sur les lieux (chèque, espèces), merci de nous l'indiquer d'un simple clic ci-dessous pour enregistrer votre choix et stopper les relances e-mail :</p>
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="text-align: center;">
+                        <tr>
+                          <td>
+                            <a href="${BACKEND_URL}/api/payment/pay-on-arrival/${tokenModification}" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 13px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">Je réglerai mon solde sur place à l'arrivée</a>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                    ` : ''}
 
                     ${paymentLink ? `
                       <div style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
@@ -4835,6 +4873,61 @@ app.post('/api/payment/virement/:token', async (req, res) => {
   }
 });
 
+// Choix paiement solde à l'arrivée par le client
+app.get('/api/payment/pay-on-arrival/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenModification: token },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).send("Réservation introuvable ou lien expiré.");
+    }
+    
+    // Mettre à jour souhaitePayerSoldeArrivee
+    await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: { 
+        souhaitePayerSoldeArrivee: true
+      }
+    });
+
+    // Envoyer une notification e-mail à l'admin pour l'avertir
+    try {
+      const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['dr.mucomnisports@gmail.com']);
+      const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr`;
+      await sendMail({
+        to: recipientEmails,
+        subject: `🔔 [SOLDE SUR PLACE] Résa #${reservation.id} - ${reservation.client.nom} paiera sur place`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #004B93; margin-top: 0;">Solde à l'arrivée choisi</h2>
+            <p>Bonjour,</p>
+            <p>Le client <strong>${reservation.client.nom}</strong> a indiqué qu'il souhaite <strong>régler le solde de son séjour le jour de son arrivée</strong> sur les lieux.</p>
+            <p><strong>Détails du séjour :</strong></p>
+            <ul>
+              <li><strong>Réservation :</strong> #${reservation.id}</li>
+              <li><strong>Dates :</strong> du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</li>
+              <li><strong>Montant du solde :</strong> ${(reservation.montantSolde || (reservation.prixTotal - (reservation.montantAcompte || 0))).toFixed(2)} €</li>
+            </ul>
+            <p>Le système a désactivé les relances automatiques de solde pour cette réservation. Le solde sera à collecter à son arrivée.</p>
+            <p><a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder au Tableau de Bord Admin</a></p>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      console.error("Erreur envoi notification admin choix paiement arrivée:", mailErr);
+    }
+
+    // Rediriger le client vers le frontend avec un paramètre type=arrivee
+    res.redirect(`${FRONTEND_URL}/payment-success?type=arrivee&token=${token}`);
+  } catch (error) {
+    console.error("Erreur lors du choix paiement sur place:", error);
+    res.status(500).send("Une erreur est survenue lors de l'enregistrement de votre choix.");
+  }
+});
+
 app.get('/api/payment/virement/validate-by-link', async (req, res) => {
   const { token, type } = req.query; // type: 'acompte', 'solde', 'totalite'
   
@@ -6839,114 +6932,15 @@ app.post('/api/promo-codes/validate', async (req, res) => {
 
 // ===== CAPTATION PARTIELLE DE LA CAUTION =====
 
-// Capturer un montant partiel de la caution (ex: 50€ pour ménage)
-app.post('/api/reservations/:id/capture-caution', checkAuth, async (req, res) => {
-  const { id } = req.params;
-  const { montant } = req.body;
-  
-  if (!montant || montant <= 0) {
-    return res.status(400).json({ error: 'Montant à  retenir requis et supérieur à  0' });
-  }
-  
-  try {
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: parseInt(id) }
-    });
-    
-    if (!reservation) return res.status(404).json({ error: 'Réservation non trouvée' });
-    if (!reservation.stripeCautionId) return res.status(400).json({ error: 'Aucune empreinte bancaire enregistrée' });
-    if (reservation.statutCaution !== 'DEPOSEE') return res.status(400).json({ error: 'La caution doit être au statut DEPOSEE pour pouvoir capturer un montant' });
-    
-    const montantCentimes = Math.round(parseFloat(montant) * 100);
-    
-    // Capturer le montant partiel via Stripe
-    const paymentIntent = await stripe.paymentIntents.capture(reservation.stripeCautionId, {
-      amount_to_capture: montantCentimes
-    });
-    
-    const updated = await prisma.reservation.update({
-      where: { id: parseInt(id) },
-      data: {
-        statutCaution: 'UTILISEE',
-        montantCautionRetenu: parseFloat(montant)
-      }
-    });
-    
-    res.json({
-      success: true,
-      message: `${parseFloat(montant).toFixed(2)} € ont été retenus sur la caution. Le reste a été libéré.`,
-      montantRetenu: parseFloat(montant)
-    });
-  } catch (error) {
-    console.error("Erreur captation caution:", error);
-    res.status(500).json({ error: "Erreur lors de la captation partielle de la caution" });
-  }
-});
-
-// ===== CRON JOB : RAPPEL DE SOLDE AUTOMATIQUE, RAPPELS J-10 ET J-7, ANNULATION J-6 =====
+// Capturer un montant p// ===== CRON JOB : RAPPEL DE SOLDE AUTOMATIQUE, RAPPELS J-10 ET J-7 =====
 // S'exécute tous les jours à 09:00
 cron.schedule('0 9 * * *', async () => {
-  console.log("Exécution du Cron Job : Rappels de soldes et annulations automatiques...");
+  console.log("Exécution du Cron Job : Rappels de soldes automatiques...");
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // --- 1. ANNULATIONS AUTOMATIQUES (J+6 avant l'arrivée) ---
-    // Si la date d'arrivée est dans 6 jours et que le séjour n'est pas réglé, on annule.
-    const cancelDateStart = new Date(today);
-    cancelDateStart.setDate(today.getDate() + 6);
-    const cancelDateEnd = new Date(cancelDateStart);
-    cancelDateEnd.setHours(23, 59, 59, 999);
-
-    const toCancel = await prisma.reservation.findMany({
-      where: {
-        statut: 'RESERVE',
-        statutPaiement: { not: 'PAYE' },
-        dateDebut: { gte: cancelDateStart, lte: cancelDateEnd }
-      },
-      include: { client: true }
-    });
-
-    for (const reser of toCancel) {
-      await prisma.reservation.update({
-        where: { id: reser.id },
-        data: { statut: 'REFUSEE', validePar: 'Système (Solde non payé)' }
-      });
-
-      await sendMail({
-        to: reser.client.email,
-        subject: "Annulation de votre réservation - Solde non réglé - Gîte de La Maladrerie",
-        html: `
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
-            <tr>
-              <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
-                  <tr>
-                    <td style="background-color: #dc3545; padding: 30px; text-align: center;">
-                      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Gîte de La Maladrerie</h1>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
-                      <h2 style="color: #dc3545; margin-top: 0;">Bonjour ${reser.client.nom},</h2>
-                      <p>Nous vous informons que votre réservation pour le séjour du <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(reser.dateFin).toLocaleDateString('fr-FR')}</strong> a été annulée.</p>
-                      <p>En effet, le règlement du solde restant de votre réservation n'a pas été reçu dans le délai requis (7 jours avant votre arrivée).</p>
-                      <p>Les dates de séjour correspondantes sont à nouveau disponibles à la location.</p>
-                      <p>Nous restons à votre disposition pour tout complément d'information.</p>
-                      <p style="margin-top: 30px;">Cordialement,<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
-                    </td>
-                  </tr>
-                  <tr><td style="background-color: #dc3545; height: 5px;"></td></tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        `
-      });
-      console.log(`Réservation ${reser.id} annulée automatiquement (non payée à J+6)`);
-    }
-
-    // --- 2. RAPPELS DERNIER AVERTISSEMENT (J+7 avant l'arrivée) ---
+    // --- 1. RAPPELS DERNIER AVERTISSEMENT (J+7 avant l'arrivée) ---
     const warningDateStart = new Date(today);
     warningDateStart.setDate(today.getDate() + 7);
     const warningDateEnd = new Date(warningDateStart);
@@ -6956,6 +6950,7 @@ cron.schedule('0 9 * * *', async () => {
       where: {
         statut: 'RESERVE',
         statutPaiement: { not: 'PAYE' },
+        souhaitePayerSoldeArrivee: false,
         dateDebut: { gte: warningDateStart, lte: warningDateEnd }
       },
       include: { client: true }
@@ -6974,6 +6969,7 @@ cron.schedule('0 9 * * *', async () => {
       }
 
       const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${paymentType}`;
+      const payOnArrivalLink = `${BACKEND_URL}/api/payment/pay-on-arrival/${tokenModification}`;
       
       const montant = paymentType === 'solde' 
         ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
@@ -6981,7 +6977,7 @@ cron.schedule('0 9 * * *', async () => {
 
       await sendMail({
         to: reser.client.email,
-        subject: "⚠️ DERNIER RAPPEL : Règlement de votre séjour - Gîte de La Maladrerie",
+        subject: "⚠️ Rappel important : Règlement de votre séjour - Gîte de La Maladrerie",
         html: `
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
             <tr>
@@ -6995,21 +6991,29 @@ cron.schedule('0 9 * * *', async () => {
                   <tr>
                     <td style="padding: 40px; color: #333333; line-height: 1.6;">
                       <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reser.client.nom},</h2>
-                      <p>Votre séjour commence le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong> (dans 7 jours).</p>
-                      <p style="color: #856404; font-weight: bold;">⚠️ Ceci est notre dernier rappel de paiement pour finaliser votre séjour.</p>
+                      <p>Votre séjour commence très prochainement le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong> (dans 7 jours).</p>
                       <p>Il vous reste à régler le montant de <strong>${montant.toFixed(2)} €</strong> correspondant au ${paymentType === 'solde' ? 'solde' : 'totalité'} de votre réservation.</p>
                       
-                      <div style="background-color: #fff3cd; border: 1px solid #ffe082; padding: 15px; border-radius: 8px; font-size: 14px; color: #856404; margin: 20px 0; font-weight: bold;">
-                        IMPORTANT : Si le paiement n'est pas effectué dans la journée (avant ce soir à 23h59), votre réservation sera automatiquement annulée et les dates libérées.
-                      </div>
-                      
-                      <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
+                      <p>Pour finaliser et confirmer le règlement, veuillez cliquer sur le bouton ci-dessous pour régler par carte bancaire ou virement bancaire :</p>
+                      <table width="100%" cellpadding="15" cellspacing="0" border="0" style="text-align: center; margin: 20px 0;">
                         <tr>
                           <td>
-                            <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le paiement de ${montant.toFixed(2)} €</a>
+                            <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(253, 185, 19, 0.2);">💳 Régler en ligne (${montant.toFixed(2)} €)</a>
                           </td>
                         </tr>
                       </table>
+                      
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin: 20px 0; font-size: 13px;">
+                        <p style="margin-top: 0; font-weight: bold; color: #475569;">Paiement à l'arrivée possible :</p>
+                        <p style="margin-bottom: 15px;">Si vous préférez régler ce solde directement le jour de votre arrivée (chèque, espèces ou virement préalable), merci de nous l'indiquer d'un simple clic ci-dessous afin de désactiver les relances :</p>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="text-align: center;">
+                          <tr>
+                            <td>
+                              <a href="${payOnArrivalLink}" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 13px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">🙋‍♂️ Je souhaite régler à mon arrivée</a>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
                       
                       <p>À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
                     </td>
@@ -7024,7 +7028,7 @@ cron.schedule('0 9 * * *', async () => {
       console.log(`Dernier rappel (J+7) envoyé pour la réservation ${reser.id}`);
     }
 
-    // --- 3. PREMIERS RAPPELS DE SOLDE (J+10 avant l'arrivée) ---
+    // --- 2. PREMIERS RAPPELS DE SOLDE (J+10 avant l'arrivée) ---
     const reminderDateStart = new Date(today);
     reminderDateStart.setDate(today.getDate() + 10);
     const reminderDateEnd = new Date(reminderDateStart);
@@ -7034,6 +7038,7 @@ cron.schedule('0 9 * * *', async () => {
       where: {
         statut: 'RESERVE',
         statutPaiement: { not: 'PAYE' },
+        souhaitePayerSoldeArrivee: false,
         dateDebut: { gte: reminderDateStart, lte: reminderDateEnd }
       },
       include: { client: true }
@@ -7052,6 +7057,7 @@ cron.schedule('0 9 * * *', async () => {
       }
 
       const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${paymentType}`;
+      const payOnArrivalLink = `${BACKEND_URL}/api/payment/pay-on-arrival/${tokenModification}`;
       
       const montant = paymentType === 'solde' 
         ? (reser.montantSolde || ((reser.prixTotal || 0) - (reser.montantAcompte || 0))) 
@@ -7075,15 +7081,27 @@ cron.schedule('0 9 * * *', async () => {
                       <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reser.client.nom},</h2>
                       <p>Votre séjour approche et débutera le <strong>${new Date(reser.dateDebut).toLocaleDateString('fr-FR')}</strong> (dans 10 jours).</p>
                       <p>Nous vous rappelons que votre réservation ne sera définitive que lorsque le solde restant de <strong>${montant.toFixed(2)} €</strong> aura été réglé.</p>
-                      <p>Merci de procéder au règlement en cliquant sur le lien ci-dessous :</p>
                       
-                      <table width="100%" cellpadding="25" cellspacing="0" border="0" style="background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; text-align: center; margin: 30px 0;">
+                      <p>Merci de procéder au règlement en cliquant sur le bouton ci-dessous :</p>
+                      <table width="100%" cellpadding="15" cellspacing="0" border="0" style="text-align: center; margin: 20px 0;">
                         <tr>
                           <td>
-                            <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Régler le solde de ${montant.toFixed(2)} €</a>
+                            <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2);">💳 Régler le solde en ligne (${montant.toFixed(2)} €)</a>
                           </td>
                         </tr>
                       </table>
+
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin: 20px 0; font-size: 13px;">
+                        <p style="margin-top: 0; font-weight: bold; color: #475569;">Paiement à l'arrivée possible :</p>
+                        <p style="margin-bottom: 15px;">Si vous préférez régler ce solde directement le jour de votre arrivée (chèque, espèces ou virement), merci de nous le signaler d'un simple clic ci-dessous pour désactiver les relances :</p>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="text-align: center;">
+                          <tr>
+                            <td>
+                              <a href="${payOnArrivalLink}" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 13px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">🙋‍♂️ Je souhaite régler à mon arrivée</a>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
                       
                       <p>Conformément à nos conditions, le solde doit être réglé au plus tard 7 jours avant votre séjour.</p>
                       <p>À très bientôt !<br><strong>L'équipe du Gîte de La Maladrerie - MUC</strong></p>
