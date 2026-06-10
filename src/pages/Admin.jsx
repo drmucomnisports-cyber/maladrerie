@@ -1596,6 +1596,15 @@ const Admin = () => {
                               <Coins size={18} />
                             </button>
                           )}
+                          {res.tokenDevis && (
+                            <button
+                              onClick={() => window.open(`${API_URL}/api/admin/devis/${res.id}/pdf?token=${token}`, '_blank')}
+                              className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+                              title="Télécharger le Devis PDF"
+                            >
+                              <FileText size={18} />
+                            </button>
+                          )}
                           <button onClick={() => setEditingReservation(res)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-500 hover:text-white transition-colors" title="Modifier la réservation">
                             <Edit3 size={18} />
                           </button>
