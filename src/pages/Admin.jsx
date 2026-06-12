@@ -866,6 +866,36 @@ const Admin = () => {
     }
   };
 
+  const [isSendingTaxReport, setIsSendingTaxReport] = useState(false);
+
+  const handleSendMonthlyTaxReport = async () => {
+    if (!window.confirm("Confirmer l'envoi immédiat du rapport de taxe de séjour du mois précédent par e-mail à Valérie et Johanna ?")) {
+      return;
+    }
+    setIsSendingTaxReport(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/finances/send-monthly-tax-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Rapport mensuel envoyé avec succès par e-mail à : ${data.to}\nMontant déclaré : ${data.totalTaxeSejour.toFixed(2)} € pour la période de ${data.month} ${data.year}.`);
+      } else {
+        const err = await res.json();
+        alert(`Erreur : ${err.error || "Une erreur est survenue lors de l'envoi."}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Une erreur réseau est survenue.");
+    } finally {
+      setIsSendingTaxReport(false);
+    }
+  };
+
   const updateStatut = async (id, newStatut) => {
     try {
       const res = await fetch(`${API_URL}/api/admin/reservations/${id}`, {
@@ -2437,12 +2467,17 @@ const Admin = () => {
         const taxesMensuelles = rList447.reduce((acc, item) => {
             const date = new Date(item.date);
             const monthYear = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-            if (!acc[monthYear]) acc[monthYear] = 0;
-            acc[monthYear] += item.montant;
+            if (!acc[monthYear]) acc[monthYear] = { total: 0, items: [] };
+            acc[monthYear].total += item.montant;
+            acc[monthYear].items.push(item);
             return acc;
         }, {});
         // Sort by date (descending)
-        const taxesMensuellesArray = Object.entries(taxesMensuelles).map(([label, total]) => ({ label, total }));
+        const taxesMensuellesArray = Object.entries(taxesMensuelles).map(([label, data]) => ({
+            label,
+            total: data.total,
+            items: data.items
+        }));
 
 
         const openModal = (code, title, total, items) => {
@@ -2519,17 +2554,39 @@ const Admin = () => {
 
                 {/* TAXE DE SEJOUR MENSUELLE */}
                 <div className="bg-amber-50 rounded-2xl shadow-xl border border-amber-100 overflow-hidden mt-8">
-                    <div className="p-6 border-b border-amber-200 flex justify-between items-center bg-amber-100/50">
+                    <div className="p-6 border-b border-amber-200 flex justify-between items-center bg-amber-100/50 flex-wrap gap-2">
                         <h3 className="font-black text-amber-900 uppercase tracking-widest flex items-center gap-2">
                             <span className="text-2xl">🏛️</span> Taxe de Séjour Mensuelle (À reverser)
                         </h3>
+                        <button
+                          type="button"
+                          disabled={isSendingTaxReport}
+                          onClick={handleSendMonthlyTaxReport}
+                          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isSendingTaxReport ? (
+                            <>
+                              <Loader2 className="animate-spin" size={14} />
+                              Envoi en cours...
+                            </>
+                          ) : (
+                            <>
+                              <Mail size={14} />
+                              Envoyer le rapport par e-mail
+                            </>
+                          )}
+                        </button>
                     </div>
                     <div className="p-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {taxesMensuellesArray.length > 0 ? taxesMensuellesArray.map((t, idx) => (
-                            <div key={idx} className="flex justify-between items-center p-4 border border-amber-200 rounded-xl bg-white shadow-sm">
-                            <span className="text-xs font-bold text-amber-900 capitalize">{t.label}</span>
-                            <span className="text-base font-black text-amber-600">{t.total.toFixed(2)} €</span>
+                            <div 
+                                key={idx} 
+                                onClick={() => openModal("447", `Taxe de Séjour - ${t.label}`, t.total, t.items)}
+                                className="flex justify-between items-center p-4 border border-amber-200 rounded-xl bg-white shadow-sm cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md hover:bg-amber-50"
+                            >
+                                <span className="text-xs font-bold text-amber-900 capitalize">{t.label}</span>
+                                <span className="text-base font-black text-amber-600">{t.total.toFixed(2)} €</span>
                             </div>
                         )) : <p className="text-sm text-amber-700 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
                         </div>
