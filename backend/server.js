@@ -4547,7 +4547,28 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         }
       }
 
-        return {
+      // Calcul du nombre de nuits
+      let nuits = 0;
+      if (r.dateDebut && r.dateFin) {
+        const start = new Date(r.dateDebut);
+        const end = new Date(r.dateFin);
+        nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+      }
+
+      // Calcul des adultes et mineurs
+      let nbAdultes = 0;
+      let nbMineurs = 0;
+      if (r.occupants && r.occupants.length > 0) {
+        nbAdultes = r.occupants.filter(o => o.estAdulte).length;
+        nbMineurs = r.occupants.filter(o => !o.estAdulte).length;
+      } else if (r.chambresDetails && typeof r.chambresDetails === 'object') {
+        Object.values(r.chambresDetails).forEach(room => {
+          nbAdultes += parseInt(room.adultes || 0);
+          nbMineurs += parseInt(room.mineurs || 0);
+        });
+      }
+
+      return {
         id: r.id,
         date: r.dateDebut,
         createdAt: r.createdAt,
@@ -4558,7 +4579,10 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         partRestauration: partRestaurationEncaissee,
         partSalles: partSallesEncaissee,
         partTaxeSejour: partTaxeEncaissee,
-        partHebergement: partHebergementEncaissee
+        partHebergement: partHebergementEncaissee,
+        nbAdultes,
+        nbMineurs,
+        nuits
       };
     });
 

@@ -2409,7 +2409,15 @@ const Admin = () => {
             }
             if (r.partTaxeSejour > 0) {
                 r447 += r.partTaxeSejour;
-                rList447.push({ date: r.date || r.createdAt, label: `Taxe Résa #${r.id} (${r.clientNom})`, montant: r.partTaxeSejour, statut: r.typePaiement });
+                rList447.push({ 
+                    date: r.date || r.createdAt, 
+                    label: `Taxe Résa #${r.id} (${r.clientNom})`, 
+                    montant: r.partTaxeSejour, 
+                    statut: r.typePaiement,
+                    nbAdultes: r.nbAdultes || 0,
+                    nbMineurs: r.nbMineurs || 0,
+                    nuits: r.nuits || 0
+                });
             }
         });
         
@@ -4255,49 +4263,161 @@ const Admin = () => {
         document.body
       )}
     
-      {showFinanceModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2rem] p-8 w-full max-w-4xl shadow-2xl transform transition-all relative max-h-[90vh] flex flex-col">
-            <button onClick={() => setShowFinanceModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-red-500 hover:rotate-90 transition-all p-2 bg-slate-100 hover:bg-red-50 rounded-full">
-              <X size={24} />
-            </button>
-            <div className="mb-8">
-                <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-xs font-black tracking-widest uppercase mr-3">Compte {financeModalData.code}</span>
-                <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter inline-block">{financeModalData.title}</h3>
-                <p className="text-xl font-bold text-muc-blue mt-2">Total : {financeModalData.total.toFixed(2)} €</p>
-            </div>
-            
-            <div className="flex-1 overflow-auto">
-                <table className="w-full text-left border-collapse text-sm min-w-[600px]">
-                    <thead className="sticky top-0 bg-white shadow-sm z-10">
-                        <tr className="border-b-2 border-slate-200">
-                            <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Date</th>
-                            <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Libellé</th>
-                            <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Statut / Type</th>
-                            <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Montant</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {financeModalData.items.length > 0 ? financeModalData.items.map((item, idx) => (
-                            <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                <td className="p-3 text-slate-600">{new Date(item.date).toLocaleDateString('fr-FR')}</td>
-                                <td className="p-3 font-medium text-slate-800">{item.label}</td>
-                                <td className="p-3 text-xs text-slate-500">
-                                    <span className="bg-slate-100 px-2 py-1 rounded-full">{item.statut || '-'}</span>
-                                </td>
-                                <td className="p-3 font-bold text-right text-slate-800">{item.montant.toFixed(2)} €</td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan="4" className="p-8 text-center text-slate-400 italic">Aucune transaction trouvée.</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+      {showFinanceModal && (() => {
+        let totalUnitesLouees = 0;
+        let totalNuiteesAssujetties = 0;
+        let totalNuiteesExonerees = 0;
+
+        if (financeModalData && financeModalData.code === "447") {
+          totalUnitesLouees = financeModalData.items.length;
+          financeModalData.items.forEach(item => {
+            totalNuiteesAssujetties += (item.nbAdultes || 0) * (item.nuits || 0);
+            totalNuiteesExonerees += (item.nbMineurs || 0) * (item.nuits || 0);
+          });
+        }
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[2rem] p-8 w-full max-w-4xl shadow-2xl transform transition-all relative max-h-[90vh] flex flex-col">
+              <button onClick={() => setShowFinanceModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-red-500 hover:rotate-90 transition-all p-2 bg-slate-100 hover:bg-red-50 rounded-full">
+                <X size={24} />
+              </button>
+              <div className="mb-6">
+                  <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-xs font-black tracking-widest uppercase mr-3">Compte {financeModalData.code}</span>
+                  <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter inline-block">{financeModalData.title}</h3>
+                  <p className="text-xl font-bold text-muc-blue mt-2">Total : {financeModalData.total.toFixed(2)} €</p>
+              </div>
+
+              {financeModalData.code === "447" && (
+                <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-5 mb-6">
+                    <div className="flex justify-between items-center mb-4 border-b border-amber-200 pb-3 flex-wrap gap-2">
+                        <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
+                            🏛️ Informations pour la Déclaration Extranet
+                        </span>
+                        <a 
+                            href="https://taxe.3douest.com/extranet/accueil.php" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all shadow-md inline-block"
+                        >
+                            Accéder au site de déclaration
+                        </a>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white p-3 border border-amber-200 rounded-xl flex flex-col items-center justify-between text-center relative group">
+                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest leading-tight">
+                                (2) Unités d'accueil louées
+                            </span>
+                            <span className="text-3xl font-black text-slate-800 my-1.5">{totalUnitesLouees}</span>
+                            <span className="text-[10px] text-slate-400 font-medium italic">
+                                Nbr de réservations
+                            </span>
+                            <button 
+                                onClick={() => { navigator.clipboard.writeText(totalUnitesLouees.toString()); alert("Copié !"); }}
+                                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-100 text-slate-600 hover:bg-muc-blue hover:text-white p-1 rounded text-[9px] font-bold"
+                            >
+                                Copier
+                            </button>
+                        </div>
+
+                        <div className="bg-white p-3 border border-amber-200 rounded-xl flex flex-col items-center justify-between text-center relative group">
+                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest leading-tight">
+                                (3) Nuitées Assujetties
+                            </span>
+                            <span className="text-3xl font-black text-slate-800 my-1.5">{totalNuiteesAssujetties}</span>
+                            <span className="text-[10px] text-slate-400 font-medium italic">
+                                Adultes x nuits
+                            </span>
+                            <button 
+                                onClick={() => { navigator.clipboard.writeText(totalNuiteesAssujetties.toString()); alert("Copié !"); }}
+                                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-100 text-slate-600 hover:bg-muc-blue hover:text-white p-1 rounded text-[9px] font-bold"
+                            >
+                                Copier
+                            </button>
+                        </div>
+
+                        <div className="bg-white p-3 border border-amber-200 rounded-xl flex flex-col items-center justify-between text-center relative group">
+                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest leading-tight">
+                                (4) Nuitées Exonérées
+                            </span>
+                            <span className="text-3xl font-black text-slate-800 my-1.5">{totalNuiteesExonerees}</span>
+                            <span className="text-[10px] text-slate-400 font-medium italic">
+                                Mineurs x nuits
+                            </span>
+                            <button 
+                                onClick={() => { navigator.clipboard.writeText(totalNuiteesExonerees.toString()); alert("Copié !"); }}
+                                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-100 text-slate-600 hover:bg-muc-blue hover:text-white p-1 rounded text-[9px] font-bold"
+                            >
+                                Copier
+                            </button>
+                        </div>
+
+                        <div className="bg-amber-100/50 p-3 border border-amber-300 rounded-xl flex flex-col items-center justify-between text-center relative group">
+                            <span className="text-[10px] text-amber-950 font-black uppercase tracking-widest leading-tight">
+                                (5) Montant Collecté
+                            </span>
+                            <span className="text-3xl font-black text-amber-800 my-1.5">{financeModalData.total.toFixed(2)} €</span>
+                            <span className="text-[10px] text-amber-600 font-medium italic">
+                                Montant total à déclarer
+                            </span>
+                            <button 
+                                onClick={() => { navigator.clipboard.writeText(financeModalData.total.toFixed(2)); alert("Copié !"); }}
+                                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-amber-200 text-amber-900 hover:bg-amber-600 hover:text-white p-1 rounded text-[9px] font-bold"
+                            >
+                                Copier
+                            </button>
+                        </div>
+                    </div>
+                </div>
+              )}
+              
+              <div className="flex-1 overflow-auto">
+                  <table className="w-full text-left border-collapse text-sm min-w-[600px]">
+                      <thead className="sticky top-0 bg-white shadow-sm z-10">
+                          <tr className="border-b-2 border-slate-200">
+                              <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Date</th>
+                              <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Libellé</th>
+                              {financeModalData.code === "447" && (
+                                <>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Nuits</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Adultes (3)</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Enfants (4)</th>
+                                </>
+                              )}
+                              <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Statut / Type</th>
+                              <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Montant</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {financeModalData.items.length > 0 ? financeModalData.items.map((item, idx) => (
+                              <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                  <td className="p-3 text-slate-600">{new Date(item.date).toLocaleDateString('fr-FR')}</td>
+                                  <td className="p-3 font-medium text-slate-800">{item.label}</td>
+                                  {financeModalData.code === "447" && (
+                                    <>
+                                      <td className="p-3 text-center text-slate-700 font-bold">{item.nuits}</td>
+                                      <td className="p-3 text-center text-slate-700 font-bold">{item.nbAdultes}</td>
+                                      <td className="p-3 text-center text-slate-700 font-bold">{item.nbMineurs}</td>
+                                    </>
+                                  )}
+                                  <td className="p-3 text-xs text-slate-500">
+                                      <span className="bg-slate-100 px-2 py-1 rounded-full">{item.statut || '-'}</span>
+                                  </td>
+                                  <td className="p-3 font-bold text-right text-slate-800">{item.montant.toFixed(2)} €</td>
+                              </tr>
+                          )) : (
+                              <tr>
+                                  <td colSpan={financeModalData.code === "447" ? "7" : "4"} className="p-8 text-center text-slate-400 italic">Aucune transaction trouvée.</td>
+                              </tr>
+                          )}
+                      </tbody>
+                  </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 </div>
   );
 };
