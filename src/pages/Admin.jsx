@@ -49,6 +49,21 @@ const formatAdminName = (validePar) => {
   return validePar.charAt(0).toUpperCase() + validePar.slice(1);
 };
 
+const formatMealsCount = (mealsObj) => {
+  if (!mealsObj || Object.keys(mealsObj).length === 0) return "Aucun";
+  let petitDej = 0, dej = 0, diner = 0;
+  Object.values(mealsObj).forEach(day => {
+    if (day.PETIT_DEJ) petitDej += (day.PETIT_DEJ.ADULTE || 0) + (day.PETIT_DEJ.ENFANT_MOINS_12 || 0) + (day.PETIT_DEJ.ENFANT_MOINS_5 || 0);
+    if (day.DEJEUNER) dej += (day.DEJEUNER.ADULTE || 0) + (day.DEJEUNER.ENFANT_MOINS_12 || 0) + (day.DEJEUNER.ENFANT_MOINS_5 || 0);
+    if (day.DINER) diner += (day.DINER.ADULTE || 0) + (day.DINER.ENFANT_MOINS_12 || 0) + (day.DINER.ENFANT_MOINS_5 || 0);
+  });
+  const parts = [];
+  if (petitDej) parts.push(`${petitDej} P-Dej`);
+  if (dej) parts.push(`${dej} Dej`);
+  if (diner) parts.push(`${diner} Din`);
+  return parts.join(', ') || "Aucun";
+};
+
 const PCG_CATEGORIES = [
   { code: '6063', name: 'Produits d\'entretien & petit équipement' },
   { code: '6068', name: 'Achats alimentaires & consommables' },
@@ -2313,6 +2328,10 @@ const Admin = () => {
                           <span>Chambres :</span>
                           <span>{(res.chambres || []).join(', ')}</span>
                         </div>
+                        <div className="flex justify-between">
+                          <span>Restauration :</span>
+                          <span className="font-semibold text-slate-700">{formatMealsCount(res.repas)}</span>
+                        </div>
                         {res.structure && (
                           <div className="flex justify-between">
                             <span>Structure :</span>
@@ -2760,7 +2779,7 @@ const Admin = () => {
                       const year = new Date().getFullYear();
                       const month = String(new Date().getMonth() + 1).padStart(2, '0');
                       const refFacture = res.numeroDevis 
-                        ? res.numeroDevis.replace('DEV', 'FAC') 
+                        ? res.numeroDevis.replace(/^D-/, 'F-') 
                         : `FA-${year}-${month}-${String(res.id).padStart(5, '0')}`;
 
                       return (
@@ -3634,20 +3653,7 @@ const Admin = () => {
           return list.join(', ') || "Aucune";
         };
 
-        const formatMealsCount = (mealsObj) => {
-          if (!mealsObj || Object.keys(mealsObj).length === 0) return "Aucun";
-          let petitDej = 0, dej = 0, diner = 0;
-          Object.values(mealsObj).forEach(day => {
-            if (day.PETIT_DEJ) petitDej += (day.PETIT_DEJ.ADULTE || 0) + (day.PETIT_DEJ.ENFANT_MOINS_12 || 0) + (day.PETIT_DEJ.ENFANT_MOINS_5 || 0);
-            if (day.DEJEUNER) dej += (day.DEJEUNER.ADULTE || 0) + (day.DEJEUNER.ENFANT_MOINS_12 || 0) + (day.DEJEUNER.ENFANT_MOINS_5 || 0);
-            if (day.DINER) diner += (day.DINER.ADULTE || 0) + (day.DINER.ENFANT_MOINS_12 || 0) + (day.DINER.ENFANT_MOINS_5 || 0);
-          });
-          const parts = [];
-          if (petitDej) parts.push(`${petitDej} P-Dej`);
-          if (dej) parts.push(`${dej} Dej`);
-          if (diner) parts.push(`${diner} Din`);
-          return parts.join(', ') || "Aucun";
-        };
+
 
         const formatChambresDetails = (chambresList, details) => {
           if (!chambresList || chambresList.length === 0) return "Aucune chambre";

@@ -11,7 +11,7 @@ async function generateFacturePDF(data) {
     return new Promise((resolve, reject) => {
         try {
             const doc = new PDFDocument({ 
-                margin: 50,
+                margins: { top: 50, bottom: 35, left: 50, right: 50 },
                 bufferPages: true,
                 info: {
                     Title: `Facture ${data.numeroFacture} - Gîte de la Maladrerie`,
@@ -247,13 +247,32 @@ async function generateFacturePDF(data) {
              let soldeRestant = data.prixTotal - montantPayeTotal;
              doc.text(`${soldeRestant.toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
 
-            // Mentions TVA et association
-            y = Math.max(680, y + 45);
+            // Désactiver la marge du bas pour l'écriture des mentions de bas de page absolues
+            doc.page.margins.bottom = 0;
+
+            // Mentions TVA et association (sur la dernière page)
+            y = Math.max(710, y + 25);
+            if (y > 745) {
+                // Si vraiment on dépasse, on ajoute une page propre
+                doc.addPage();
+                doc.page.margins.bottom = 0;
+                y = 710;
+            }
             doc.font('Helvetica-Oblique').fontSize(7.5).fillColor('#666666');
             doc.text("Exonération de TVA - Article 261-7-1° du Code Général des Impôts (Association loi 1901 à but non lucratif).", leftCol, y, { width: 512, align: 'center' });
             
-            // --- PIED DE PAGE ---
-            doc.fontSize(8).fillColor('#999999').text('Gîte de la Maladrerie - MUC OMNISPORTS | SIRET: 38820857100025 | Assurance MAIF n° 132 48 45 M', 0, 760, { align: 'center', width: 612 });
+            // --- PIED DE PAGE SUR TOUTES LES PAGES ---
+            const range = doc.bufferedPageRange();
+            for (let i = 0; i < range.count; i++) {
+                doc.switchToPage(i);
+                doc.page.margins.bottom = 0;
+                doc.fontSize(8).fillColor('#999999').text(
+                    'Gîte de la Maladrerie - MUC OMNISPORTS | SIRET: 38820857100025 | Assurance MAIF n° 132 48 45 M',
+                    0,
+                    755,
+                    { align: 'center', width: 612 }
+                );
+            }
 
             doc.end();
         } catch (err) {

@@ -8021,7 +8021,7 @@ app.get('/api/admin/reservations/:id/facture-pdf', checkAuth, async (req, res) =
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
     // Si la réservation provient d'un devis validé, on remplace DEV par FAC
     const numeroFacture = reservation.numeroDevis 
-      ? reservation.numeroDevis.replace('DEV', 'FAC') 
+      ? reservation.numeroDevis.replace(/^D-/, 'F-') 
       : `FA-${year}-${month}-${String(reservation.id).padStart(5, '0')}`;
 
     // Trouver l'administrateur
