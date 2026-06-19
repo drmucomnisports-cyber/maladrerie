@@ -64,6 +64,54 @@ const formatMealsCount = (mealsObj) => {
   return parts.join(', ') || "Aucun";
 };
 
+const formatMealsDetail = (mealsObj) => {
+  if (!mealsObj || Object.keys(mealsObj).length === 0) return <span className="text-slate-400 italic">Aucun repas commandé</span>;
+  
+  let mealsList = [];
+  Object.entries(mealsObj).forEach(([dateStr, meals]) => {
+    let dayMeals = [];
+    const addMeal = (type, label) => {
+      if (!meals[type]) return;
+      const a = parseInt(meals[type].ADULTE || 0);
+      const e12 = parseInt(meals[type].ENFANT_MOINS_12 || 0);
+      const e5 = parseInt(meals[type].ENFANT_MOINS_5 || 0);
+      if (a > 0 || e12 > 0 || e5 > 0) {
+        let parts = [];
+        if (a > 0) parts.push(`${a} Adulte${a > 1 ? 's' : ''}`);
+        if (e12 > 0) parts.push(`${e12} Enfant${e12 > 1 ? 's' : ''} (-12)`);
+        if (e5 > 0) parts.push(`${e5} Enfant${e5 > 1 ? 's' : ''} (-5)`);
+        dayMeals.push(`${label} (${parts.join(', ')})`);
+      }
+    };
+    addMeal('PETIT_DEJ', 'Petit-déjeuner');
+    addMeal('DEJEUNER', 'Déjeuner');
+    addMeal('DINER', 'Dîner');
+    
+    if (dayMeals.length > 0) {
+      const d = new Date(dateStr);
+      const dateLabel = isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' });
+      mealsList.push({ dateLabel, dayMeals });
+    }
+  });
+  
+  if (mealsList.length === 0) return <span className="text-slate-400 italic">Aucun repas commandé</span>;
+  
+  return (
+    <div className="mt-1 space-y-1.5 bg-slate-100/50 p-2.5 rounded-lg border border-slate-200/50 text-[11px] text-slate-600">
+      {mealsList.map((item, idx) => (
+        <div key={idx} className="flex flex-col border-b border-slate-200/40 pb-1.5 last:border-0 last:pb-0">
+          <span className="font-bold text-slate-700 capitalize">{item.dateLabel} :</span>
+          <ul className="list-disc list-inside pl-2 space-y-0.5 mt-0.5">
+            {item.dayMeals.map((m, mIdx) => (
+              <li key={mIdx} className="text-slate-600 list-none font-medium">• {m}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const PCG_CATEGORIES = [
   { code: '6063', name: 'Produits d\'entretien & petit équipement' },
   { code: '6068', name: 'Achats alimentaires & consommables' },
@@ -2328,9 +2376,9 @@ const Admin = () => {
                           <span>Chambres :</span>
                           <span>{(res.chambres || []).join(', ')}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span>Restauration :</span>
-                          <span className="font-semibold text-slate-700">{formatMealsCount(res.repas)}</span>
+                        <div className="flex flex-col space-y-0.5 mt-1 pb-1">
+                          <span className="font-semibold text-slate-500">Restauration :</span>
+                          {formatMealsDetail(res.repas)}
                         </div>
                         {res.structure && (
                           <div className="flex justify-between">
@@ -2382,6 +2430,93 @@ const Admin = () => {
                             </div>
                           ) : null;
                         })()}
+                      </div>
+
+                      {/* Suivi des Règlements Réels */}
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <p className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                          <CreditCard className="w-3.5 h-3.5 text-muc-blue" />
+                          Suivi des Règlements
+                        </p>
+                        <div className="bg-slate-100/60 p-2.5 rounded-lg border border-slate-200/50 space-y-1.5 text-[11px]">
+                          {/* Acompte */}
+                          <div className="flex justify-between items-center pb-1 border-b border-slate-200/40">
+                            <div>
+                              <span className="font-semibold text-slate-700">1. Acompte : </span>
+                              <span className="text-slate-500">
+                                {res.montantAcompte ? `${res.montantAcompte.toFixed(2)} €` : '30% à la validation'}
+                              </span>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              (res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE') 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {(res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE') ? 'PAYÉ' : 'EN ATTENTE'}
+                            </span>
+                          </div>
+                          
+                          {/* Solde */}
+                          <div className="flex justify-between items-center pb-1 border-b border-slate-200/40">
+                            <div>
+                              <span className="font-semibold text-slate-700">2. Solde : </span>
+                              <span className="text-slate-500">
+                                {res.montantSolde ? `${res.montantSolde.toFixed(2)} €` : 'Solde restant'}
+                              </span>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              res.statutPaiement === 'PAYE' 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {res.statutPaiement === 'PAYE' ? 'PAYÉ' : 'EN ATTENTE'}
+                            </span>
+                          </div>
+                          
+                          {/* Caution */}
+                          {res.statutCaution && res.statutCaution !== 'NON_DEMANDEE' && (
+                            <div className="flex justify-between items-center pb-1 border-b border-slate-200/40 last:border-0 last:pb-0">
+                              <div>
+                                <span className="font-semibold text-slate-700">🛡️ Caution (Garantie) : </span>
+                                <span className="text-slate-500">Pre-auth Stripe</span>
+                              </div>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                res.statutCaution === 'DEPOSEE' ? 'bg-indigo-100 text-indigo-700' :
+                                res.statutCaution === 'RESTITUEE' ? 'bg-green-100 text-green-700' :
+                                res.statutCaution === 'UTILISEE' ? 'bg-red-100 text-red-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {res.statutCaution === 'DEPOSEE' ? 'DÉPOSÉE' : 
+                                 res.statutCaution === 'RESTITUEE' ? 'RESTITUÉE' : 
+                                 res.statutCaution === 'UTILISEE' ? 'RETENUE' : res.statutCaution}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Total Payé Effectif */}
+                          <div className="flex justify-between font-bold text-emerald-700 pt-1 text-xs">
+                            <span>Total Encaissé Réel :</span>
+                            <span>
+                              {(() => {
+                                let paye = 0;
+                                if (res.statutPaiement === 'PAYE') {
+                                  paye = res.prixTotal || 0;
+                                } else if (res.statutPaiement === 'ACOMPTE_PAYE') {
+                                  paye = res.montantAcompte || 0;
+                                }
+                                return `${paye.toFixed(2)} €`;
+                              })()}
+                            </span>
+                          </div>
+                          
+                          {/* Moyen & Date */}
+                          {(res.payeLe || res.modePaiement) && (
+                            <div className="text-[10px] text-slate-400 mt-1 italic">
+                              Enregistré par <strong className="uppercase">{res.modePaiement || 'Stripe'}</strong>
+                              {res.payeLe && ` le ${new Date(res.payeLe).toLocaleDateString('fr-FR')}`}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Occupants list */}
