@@ -4331,6 +4331,10 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
 
     const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5 };
     
+    // Trier temporairement par ordre chronologique de création (croissant) 
+    // pour garantir une attribution cohérente lors des mises à niveau
+    reservations.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    
     // Assurer l'existence d'un numéro de facture pour toutes les réservations confirmées/payées
     const processedReservations = [];
     for (let r of reservations) {
@@ -4341,6 +4345,9 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
       }
       processedReservations.push(r);
     }
+
+    // Remettre dans l'ordre chronologique décroissant pour le tableau de bord admin
+    processedReservations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const reservationsWithTaxe = processedReservations.map(r => {
       let taxe = 0;
