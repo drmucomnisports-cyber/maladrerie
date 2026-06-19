@@ -111,6 +111,18 @@ const Admin = () => {
   const [missionIntervenantId, setMissionIntervenantId] = useState('');
   const [isAssigningMissions, setIsAssigningMissions] = useState(false);
 
+  // Facturation
+  const [reservationsFactures, setReservationsFactures] = useState([]);
+  const [isLoadingFactures, setIsLoadingFactures] = useState(false);
+  const [dateDebutFacture, setDateDebutFacture] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [dateFinFacture, setDateFinFacture] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  });
+
   const [activeTab, setActiveTab] = useState('reservations');
   const [clients, setClients] = useState([]);
   const [intervenants, setIntervenants] = useState([]);
@@ -241,6 +253,12 @@ const Admin = () => {
       fetchPlanningEvents();
     }
   }, [token, activeTab]);
+
+  useEffect(() => {
+    if (token && activeTab === 'factures') {
+      fetchReservationsFactures();
+    }
+  }, [token, activeTab, dateDebutFacture, dateFinFacture]);
 
   useEffect(() => {
     const clientMap = new Map();
@@ -711,6 +729,26 @@ const Admin = () => {
       }
     } catch (err) {
       console.error("Erreur finances:", err);
+    }
+  };
+
+  const fetchReservationsFactures = async () => {
+    setIsLoadingFactures(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/factures/period?dateDebut=${dateDebutFacture}&dateFin=${dateFinFacture}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReservationsFactures(data);
+      } else {
+        setReservationsFactures([]);
+      }
+    } catch (err) {
+      console.error("Erreur chargement factures:", err);
+      setReservationsFactures([]);
+    } finally {
+      setIsLoadingFactures(false);
     }
   };
 
@@ -1192,6 +1230,7 @@ const Admin = () => {
               <button onClick={() => setActiveTab('intervenants')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'intervenants' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Intervenants</button>
               <button onClick={() => setActiveTab('planning')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'planning' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Planning</button>
               <button onClick={() => setActiveTab('finances')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'finances' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Finances</button>
+              <button onClick={() => setActiveTab('factures')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'factures' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Factures</button>
               <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'promos' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Promos</button>
               {adminUser?.isSuperAdmin && (
                 <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${activeTab === 'accounts' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'}`}>Comptes</button>
@@ -1633,6 +1672,15 @@ const Admin = () => {
                               title="Télécharger le Devis PDF"
                             >
                               <FileText size={18} />
+                            </button>
+                          )}
+                          {(res.statut === 'RESERVE' || res.statut === 'TERMINE') && (
+                            <button
+                              onClick={() => window.open(`${API_URL}/api/admin/reservations/${res.id}/facture-pdf?token=${token}`, '_blank')}
+                              className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white rounded-lg transition-colors"
+                              title="Télécharger la Facture PDF"
+                            >
+                              <Banknote size={18} />
                             </button>
                           )}
                           <button onClick={() => setEditingReservation(res)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-500 hover:text-white transition-colors" title="Modifier la réservation">
@@ -2119,7 +2167,27 @@ const Admin = () => {
                   {selectedClient.reservations.map(res => (
                     <div key={res.id} className="border border-slate-100 p-4 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-bold text-muc-blue">Réf: {res.numeroDevis || `Résa #${res.id}`}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-muc-blue">Réf: {res.numeroDevis || `Résa #${res.id}`}</span>
+                          {res.numeroDevis && (
+                            <button
+                              onClick={() => window.open(`${API_URL}/api/admin/devis/${res.id}/pdf?token=${token}`, '_blank')}
+                              className="p-1 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded text-[10px] font-bold"
+                              title="Télécharger le Devis PDF"
+                            >
+                              Devis PDF
+                            </button>
+                          )}
+                          {(res.statut === 'RESERVE' || res.statut === 'TERMINE') && (
+                            <button
+                              onClick={() => window.open(`${API_URL}/api/admin/reservations/${res.id}/facture-pdf?token=${token}`, '_blank')}
+                              className="p-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-[10px] font-bold"
+                              title="Télécharger la Facture PDF"
+                            >
+                              Facture PDF
+                            </button>
+                          )}
+                        </div>
                         <span className={`text-xs px-2 py-1 rounded-md uppercase font-bold ${
                           res.statut === 'RESERVE' ? 'bg-green-100 text-green-700' :
                           res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700' :
@@ -2603,6 +2671,151 @@ const Admin = () => {
             </div>
         );
       })()}
+      {activeTab === 'factures' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest mb-6">Gestion & Édition des Factures</h2>
+            
+            <div className="flex flex-wrap items-end gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Séjour débutant après le :</label>
+                <input 
+                  type="date" 
+                  value={dateDebutFacture} 
+                  onChange={(e) => setDateDebutFacture(e.target.value)}
+                  className="w-full bg-white p-3 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-muc-blue focus:outline-none"
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Séjour débutant avant le :</label>
+                <input 
+                  type="date" 
+                  value={dateFinFacture} 
+                  onChange={(e) => setDateFinFacture(e.target.value)}
+                  className="w-full bg-white p-3 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-muc-blue focus:outline-none"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    const now = new Date();
+                    setDateDebutFacture(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]);
+                    setDateFinFacture(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-3 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-600 bg-white transition-all"
+                >
+                  Mois en cours
+                </button>
+                <button 
+                  onClick={() => {
+                    const now = new Date();
+                    setDateDebutFacture(new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]);
+                    setDateFinFacture(new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-3 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-600 bg-white transition-all"
+                >
+                  Année en cours
+                </button>
+                <button 
+                  onClick={fetchReservationsFactures}
+                  disabled={isLoadingFactures}
+                  className="bg-muc-blue text-white px-6 py-3 rounded-xl font-black uppercase tracking-wider hover:bg-blue-800 transition-all shadow-md flex items-center gap-2"
+                >
+                  {isLoadingFactures ? 'Chargement...' : '🔍 Filtrer'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            {isLoadingFactures ? (
+              <div className="p-12 text-center">
+                <div className="animate-spin inline-block w-8 h-8 border-4 border-muc-blue border-t-transparent rounded-full mb-4"></div>
+                <p className="text-slate-500 font-medium">Chargement des factures de la période...</p>
+              </div>
+            ) : reservationsFactures.length === 0 ? (
+              <div className="p-12 text-center bg-slate-50/50">
+                <div className="text-4xl mb-3">📄</div>
+                <p className="text-slate-500 font-bold mb-1">Aucune réservation trouvée pour cette période.</p>
+                <p className="text-xs text-slate-400">Modifiez les dates de filtre ci-dessus pour élargir votre recherche.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <th className="p-4">Réf / Devis</th>
+                      <th className="p-4">Client / Structure</th>
+                      <th className="p-4">Séjour</th>
+                      <th className="p-4 text-right">Total TTC</th>
+                      <th className="p-4 text-center">Règlements</th>
+                      <th className="p-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {reservationsFactures.map((res) => {
+                      const start = new Date(res.dateDebut);
+                      const end = new Date(res.dateFin);
+                      const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                      const year = new Date().getFullYear();
+                      const month = String(new Date().getMonth() + 1).padStart(2, '0');
+                      const refFacture = res.numeroDevis 
+                        ? res.numeroDevis.replace('DEV', 'FAC') 
+                        : `FA-${year}-${month}-${String(res.id).padStart(5, '0')}`;
+
+                      return (
+                        <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-4">
+                            <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200">
+                              {refFacture}
+                            </span>
+                            <div className="text-[10px] text-slate-400 mt-1 font-semibold">Résa #{res.id}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-800">{res.client.nom}</div>
+                            {res.structure && (
+                              <div className="text-xs font-semibold text-slate-500 flex items-center gap-1 mt-0.5">
+                                🏢 {res.structure}
+                              </div>
+                            )}
+                            <div className="text-xs text-slate-400 font-medium mt-0.5">{res.client.email}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-semibold text-slate-700">
+                              du {start.toLocaleDateString('fr-FR')} au {end.toLocaleDateString('fr-FR')}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-0.5 font-medium">{nuits} nuits | {(res.chambres || []).length} chambre(s)</div>
+                          </td>
+                          <td className="p-4 text-right font-black text-slate-800">
+                            {res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : '0.00 €'}
+                          </td>
+                          <td className="p-4 text-center">
+                            {res.statutPaiement === 'PAYE' ? (
+                              <span className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 text-xs font-black uppercase tracking-wider rounded-lg">Payé</span>
+                            ) : res.statutPaiement === 'ACOMPTE_PAYE' ? (
+                              <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-black uppercase tracking-wider rounded-lg">Acompte</span>
+                            ) : (
+                              <span className="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 text-xs font-black uppercase tracking-wider rounded-lg">Attente</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-center">
+                            <button
+                              onClick={() => window.open(`${API_URL}/api/admin/reservations/${res.id}/facture-pdf?token=${token}`, '_blank')}
+                              className="inline-flex items-center gap-2 bg-muc-blue hover:bg-blue-800 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-sm"
+                            >
+                              📄 Facture PDF
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {activeTab === 'promos' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -4146,6 +4359,44 @@ const Admin = () => {
                 {isSavingProfile ? 'Enregistrement...' : 'Enregistrer les modifications'}
               </button>
             </form>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8 mt-6">
+            <h3 className="text-lg font-black text-muc-blue uppercase tracking-tight mb-4 pb-4 border-b border-slate-100 flex items-center gap-2">
+              <span>📅</span> Synchronisation Agenda (Outlook, Google, Mac...)
+            </h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Vous pouvez afficher en temps réel toutes les réservations validées du gîte directement sur votre agenda personnel (Outlook, Google Agenda ou Apple Calendrier) en vous abonnant à ce flux.
+            </p>
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-2">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Lien d'abonnement iCal :</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={`${API_URL}/api/calendar/ical?token=MUC_MALADRERIE_SYNC`}
+                  className="flex-1 bg-white p-2.5 border border-slate-200 rounded-lg text-xs font-mono select-all outline-none"
+                />
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${API_URL}/api/calendar/ical?token=MUC_MALADRERIE_SYNC`);
+                    alert("Lien d'abonnement copié !");
+                  }}
+                  className="bg-muc-blue text-white px-4 py-2 text-xs font-bold rounded-lg hover:bg-blue-800 transition-all shadow-sm"
+                >
+                  Copier
+                </button>
+              </div>
+              <div className="mt-3 pt-3 border-t border-slate-200">
+                <p className="text-xs font-bold text-slate-700 mb-1">Comment l'ajouter dans Outlook ?</p>
+                <ol className="text-[11px] text-slate-500 list-decimal list-inside space-y-1">
+                  <li>Copiez le lien ci-dessus.</li>
+                  <li>Dans Outlook, ouvrez votre calendrier et cliquez sur <strong>Ajouter un calendrier</strong>.</li>
+                  <li>Sélectionnez <strong>S'abonner à partir du web</strong>.</li>
+                  <li>Collez le lien et donnez-lui un nom (ex: "Gîte La Maladrerie").</li>
+                </ol>
+              </div>
+            </div>
           </div>
         </div>
       )}
