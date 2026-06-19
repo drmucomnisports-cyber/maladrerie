@@ -2857,7 +2857,19 @@ const Admin = () => {
       {activeTab === 'factures' && (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
-            <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest mb-6">Gestion & Édition des Factures</h2>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">Gestion & Édition des Factures</h2>
+              {reservationsFactures.length > 0 && (
+                <button
+                  onClick={() => {
+                    window.open(`${API_URL}/api/admin/factures/period/zip?dateDebut=${dateDebutFacture}&dateFin=${dateFinFacture}&token=${token}`, '_blank');
+                  }}
+                  className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md"
+                >
+                  📦 Télécharger les {reservationsFactures.length} factures (ZIP)
+                </button>
+              )}
+            </div>
             
             <div className="flex flex-wrap items-end gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <div className="flex-1 min-w-[200px]">
