@@ -4331,9 +4331,9 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
 
     const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5 };
     
-    // Trier temporairement par ordre chronologique de création (croissant) 
+    // Trier temporairement par ordre chronologique de début de séjour (croissant) 
     // pour garantir une attribution cohérente lors des mises à niveau
-    reservations.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    reservations.sort((a, b) => new Date(a.dateDebut) - new Date(b.dateDebut));
     
     // Assurer l'existence d'un numéro de facture pour toutes les réservations confirmées/payées
     const processedReservations = [];
