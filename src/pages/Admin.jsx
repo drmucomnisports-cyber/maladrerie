@@ -112,6 +112,29 @@ const formatMealsDetail = (mealsObj) => {
   );
 };
 
+const calculerTotalRepasFrontend = (repas) => {
+  if (!repas) return 0;
+  let total = 0;
+  Object.values(repas).forEach(day => {
+    if (day.PETIT_DEJ) {
+      total += (parseInt(day.PETIT_DEJ.ADULTE || 0) * 6);
+      total += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_12 || 0) * 5);
+      total += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_5 || 0) * 4);
+    }
+    if (day.DEJEUNER) {
+      total += (parseInt(day.DEJEUNER.ADULTE || 0) * 11.5);
+      total += (parseInt(day.DEJEUNER.ENFANT_MOINS_12 || 0) * 9.5);
+      total += (parseInt(day.DEJEUNER.ENFANT_MOINS_5 || 0) * 8);
+    }
+    if (day.DINER) {
+      total += (parseInt(day.DINER.ADULTE || 0) * 14);
+      total += (parseInt(day.DINER.ENFANT_MOINS_12 || 0) * 12);
+      total += (parseInt(day.DINER.ENFANT_MOINS_5 || 0) * 10);
+    }
+  });
+  return total;
+};
+
 const PCG_CATEGORIES = [
   { code: '6063', name: 'Produits d\'entretien & petit équipement' },
   { code: '6068', name: 'Achats alimentaires & consommables' },
@@ -2391,6 +2414,12 @@ const Admin = () => {
                           <span>Estimation Prix Total :</span>
                           <span>{res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : 'N/A'}</span>
                         </div>
+                        {res.repas && Object.keys(res.repas).length > 0 && (
+                          <div className="flex justify-between text-slate-500 font-semibold pl-2 border-l-2 border-amber-300">
+                            <span>Dont Restauration :</span>
+                            <span className="text-amber-700">{calculerTotalRepasFrontend(res.repas).toFixed(2)} €</span>
+                          </div>
+                        )}
                         {res.montantAcompte && (
                           <div className="flex justify-between text-slate-500">
                             <span>Acompte estimé :</span>
@@ -2913,9 +2942,9 @@ const Admin = () => {
                       const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
                       const year = new Date().getFullYear();
                       const month = String(new Date().getMonth() + 1).padStart(2, '0');
-                      const refFacture = res.numeroDevis 
+                      const refFacture = res.numeroFacture || (res.numeroDevis 
                         ? res.numeroDevis.replace(/^D-/, 'F-') 
-                        : `FA-${year}-${month}-${String(res.id).padStart(5, '0')}`;
+                        : `FA-${year}-${month}-${String(res.id).padStart(5, '0')}`);
 
                       return (
                         <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">

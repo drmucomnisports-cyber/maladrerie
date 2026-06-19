@@ -980,6 +980,37 @@ async function createStripeSessionForReservation(reservation, paymentType) {
   return session;
 }
 
+// --- HELPER : Obtenir ou assigner un numéro de facture unique ---
+async function getOrAssignNumeroFacture(reservationId) {
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: reservationId }
+  });
+  if (!reservation) return null;
+  if (reservation.numeroFacture) return reservation.numeroFacture;
+
+  const estConfirmee = ['RESERVE', 'TERMINE'].includes(reservation.statut) || 
+                       ['ACOMPTE_PAYE', 'PAYE'].includes(reservation.statutPaiement);
+
+  if (estConfirmee) {
+    const year = new Date(reservation.dateDebut || new Date()).getFullYear();
+    // Compter les factures existantes pour cette-année-là
+    const count = await prisma.reservation.count({
+      where: {
+        numeroFacture: { startsWith: `FA-${year}-` }
+      }
+    });
+    const numeroFacture = `FA-${year}-${String(count + 1).padStart(4, '0')}`;
+    
+    // Mettre à jour en base de données
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { numeroFacture }
+    });
+    return numeroFacture;
+  }
+  return null;
+}
+
 // --- HELPER : Calculer le total des repas ---
 function calculerTotalRepasServeur(repas) {
   if (!repas) return 0;
@@ -3091,6 +3122,256 @@ app.get('/api/devis/pdf/:token', async (req, res) => {
   }
 });
 
+// Télécharger la facture PDF par son token (Client - Public)
+app.get('/api/reservation/facture-pdf/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findFirst({
+      where: {
+        OR: [
+          { tokenDevis: token },
+          { tokenModification: token }
+        ]
+      },
+      include: { client: true, occupants: true }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable" });
+    }
+
+    const estConfirmee = ['RESERVE', 'TERMINE'].includes(reservation.statut) || 
+                         ['ACOMPTE_PAYE', 'PAYE'].includes(reservation.statutPaiement);
+    if (!estConfirmee) {
+      return res.status(400).json({ error: "La facture n'est pas encore disponible." });
+    }
+
+    const { generateFacturePDF } = require('./utils/generateFacturePDF');
+
+    const start = new Date(reservation.dateDebut);
+    const end = new Date(reservation.dateFin);
+    const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    
+    let numeroFacture = reservation.numeroFacture;
+    if (!numeroFacture) {
+      numeroFacture = await getOrAssignNumeroFacture(reservation.id);
+    }
+    if (!numeroFacture) {
+      const year = new Date().getFullYear();
+      const month = String(new Date().getMonth() + 1).padStart(2, '0');
+      numeroFacture = `FA-${year}-${month}-${String(reservation.id).padStart(5, '0')}`;
+    }
+
+    // Trouver l'administrateur
+    const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
+    const admin = await prisma.adminAccount.findUnique({
+      where: { email: adminEmail }
+    });
+    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
+    const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
+    const resolvedAdminEmail = admin ? admin.email : adminEmail;
+    const resolvedAdminTel = admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81';
+
+    let totalAdultes = 0;
+    let totalMineurs = 0;
+    let totalPrixBase = 0;
+    let taxeSejourCalculee = 0;
+    
+    const chambresDetails = reservation.chambresDetails || {};
+    reservation.chambres.forEach(chId => {
+      const details = chambresDetails[chId] || { adultes: 0, enfants: 0 };
+      const nbAdultes = parseInt(details.adultes || 0);
+      const nbMineurs = parseInt(details.enfants || 0);
+      const occupantsCount = nbAdultes + nbMineurs;
+      const capacite = CHAMBRES_CAPACITE[chId] || 5;
+      const tarifPers = occupantsCount >= capacite ? 22 : 25;
+      
+      totalAdultes += nbAdultes;
+      totalMineurs += nbMineurs;
+      totalPrixBase += occupantsCount * tarifPers * nuits;
+      taxeSejourCalculee += nbAdultes * tarifPers * nuits * 0.044;
+    });
+
+    const totalPersonnes = totalAdultes + totalMineurs;
+    const tarifMoyen = totalAdultes > 0 ? (taxeSejourCalculee / (totalAdultes * nuits * 0.044)) : 25;
+
+    const detailsLignes = reservation.chambres.map(chId => {
+      const details = chambresDetails[chId] || { adultes: 0, enfants: 0 };
+      const nbAdultes = parseInt(details.adultes || 0);
+      const nbMineurs = parseInt(details.enfants || 0);
+      const occupantsCount = nbAdultes + nbMineurs;
+      const capacite = CHAMBRES_CAPACITE[chId] || 5;
+      const tarifPers = occupantsCount >= capacite ? 22 : 25;
+      return {
+        designation: `${CHAMBRES_NAMES[chId] || `Chambre ${chId}`} (${nbAdultes} ad. + ${nbMineurs} enf.)`,
+        nbPersonnes: occupantsCount,
+        tarifParPersonne: tarifPers,
+        nuits: nuits,
+        total: occupantsCount * tarifPers * nuits
+      };
+    });
+
+    // Salles
+    if (reservation.salles) {
+      let nuitsSalles = nuits;
+      let datesSuffix = "";
+      if (reservation.salles.dateDebut && reservation.salles.dateFin) {
+        const startS = new Date(reservation.salles.dateDebut);
+        const endS = new Date(reservation.salles.dateFin);
+        nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
+        const strD = startS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        const strF = endS.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        datesSuffix = ` (du ${strD} au ${strF})`;
+      }
+      const prixSalle = reservation.chambres.length > 0 ? 100 : 150;
+      if (reservation.salles.salle15) {
+        detailsLignes.push({
+          designation: `Location Salle 15 personnes${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: prixSalle,
+          nuits: nuitsSalles,
+          total: prixSalle * nuitsSalles
+        });
+      }
+      if (reservation.salles.salle12) {
+        detailsLignes.push({
+          designation: `Location Salle 12 personnes${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: prixSalle,
+          nuits: nuitsSalles,
+          total: prixSalle * nuitsSalles
+        });
+      }
+    }
+
+    // Repas
+    if (reservation.repas) {
+      let totalPDJ = { adulte: 0, enfant12: 0, enfant5: 0 };
+      let totalDEJ = { adulte: 0, enfant12: 0, enfant5: 0 };
+      let totalDIN = { adulte: 0, enfant12: 0, enfant5: 0 };
+
+      Object.values(reservation.repas).forEach(dayRepas => {
+        if (dayRepas.PETIT_DEJ) {
+          totalPDJ.adulte += parseInt(dayRepas.PETIT_DEJ.ADULTE || 0);
+          totalPDJ.enfant12 += parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_12 || 0);
+          totalPDJ.enfant5 += parseInt(dayRepas.PETIT_DEJ.ENFANT_MOINS_5 || 0);
+        }
+        if (dayRepas.DEJEUNER) {
+          totalDEJ.adulte += parseInt(dayRepas.DEJEUNER.ADULTE || 0);
+          totalDEJ.enfant12 += parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_12 || 0);
+          totalDEJ.enfant5 += parseInt(dayRepas.DEJEUNER.ENFANT_MOINS_5 || 0);
+        }
+        if (dayRepas.DINER) {
+          totalDIN.adulte += parseInt(dayRepas.DINER.ADULTE || 0);
+          totalDIN.enfant12 += parseInt(dayRepas.DINER.ENFANT_MOINS_12 || 0);
+          totalDIN.enfant5 += parseInt(dayRepas.DINER.ENFANT_MOINS_5 || 0);
+        }
+      });
+
+      if (totalPDJ.adulte > 0) detailsLignes.push({ designation: 'Petits-déjeuners (Adulte)', nbPersonnes: totalPDJ.adulte, tarifParPersonne: 6, nuits: 1, total: totalPDJ.adulte * 6 });
+      if (totalPDJ.enfant12 > 0) detailsLignes.push({ designation: 'Petits-déjeuners (Enfant -12 ans)', nbPersonnes: totalPDJ.enfant12, tarifParPersonne: 5, nuits: 1, total: totalPDJ.enfant12 * 5 });
+      if (totalPDJ.enfant5 > 0) detailsLignes.push({ designation: 'Petits-déjeuners (Enfant -5 ans)', nbPersonnes: totalPDJ.enfant5, tarifParPersonne: 4, nuits: 1, total: totalPDJ.enfant5 * 4 });
+
+      if (totalDEJ.adulte > 0) detailsLignes.push({ designation: 'Déjeuners (Adulte)', nbPersonnes: totalDEJ.adulte, tarifParPersonne: 11.5, nuits: 1, total: totalDEJ.adulte * 11.5 });
+      if (totalDEJ.enfant12 > 0) detailsLignes.push({ designation: 'Déjeuners (Enfant -12 ans)', nbPersonnes: totalDEJ.enfant12, tarifParPersonne: 9.5, nuits: 1, total: totalDEJ.enfant12 * 9.5 });
+      if (totalDEJ.enfant5 > 0) detailsLignes.push({ designation: 'Déjeuners (Enfant -5 ans)', nbPersonnes: totalDEJ.enfant5, tarifParPersonne: 8, nuits: 1, total: totalDEJ.enfant5 * 8 });
+
+      if (totalDIN.adulte > 0) detailsLignes.push({ designation: 'Dîners (Adulte)', nbPersonnes: totalDIN.adulte, tarifParPersonne: 14, nuits: 1, total: totalDIN.adulte * 14 });
+      if (totalDIN.enfant12 > 0) detailsLignes.push({ designation: 'Dîners (Enfant -12 ans)', nbPersonnes: totalDIN.enfant12, tarifParPersonne: 12, nuits: 1, total: totalDIN.enfant12 * 12 });
+      if (totalDIN.enfant5 > 0) detailsLignes.push({ designation: 'Dîners (Enfant -5 ans)', nbPersonnes: totalDIN.enfant5, tarifParPersonne: 10, nuits: 1, total: totalDIN.enfant5 * 10 });
+    }
+
+    // Options
+    const detailsOptions = reservation.options ? Object.entries(reservation.options).filter(([k,v]) => v).map(([k,v]) => {
+      let optPrix = 0;
+      let optNom = '';
+      let qte = 1;
+      if (k === 'menage') {
+        optNom = 'Ménage fin de séjour';
+        optPrix = 50;
+        qte = reservation.chambres.length;
+      } else if (k === 'litsFaits') {
+        optNom = 'Lits faits à l\'arrivée';
+        optPrix = 5;
+        qte = totalPersonnes || 1;
+      } else if (k === 'lingeFourni') {
+        optNom = 'Linge de toilette fourni';
+        optPrix = 5;
+        qte = totalPersonnes || 1;
+      }
+      return { nom: optNom, pu: optPrix, qte: qte, total: optPrix * qte };
+    }) : [];
+
+    const taxeSejourDetails = {
+      adultes: totalAdultes,
+      taux: 0.044,
+      nuits: nuits,
+      base: tarifMoyen,
+      total: taxeSejourCalculee
+    };
+
+    let promoMontant = 0;
+    if (reservation.codePromo) {
+      const promo = await prisma.promoCode.findUnique({ where: { code: reservation.codePromo.toUpperCase() } });
+      if (promo && promo.actif) {
+        if (promo.type === 'pourcentage') {
+          const ratio = 1 - (promo.valeur / 100);
+          if (ratio > 0) {
+            const prixSansPromo = reservation.prixTotal / ratio;
+            promoMontant = prixSansPromo - reservation.prixTotal;
+          }
+        } else {
+          promoMontant = promo.valeur;
+        }
+      }
+    }
+
+    const acompteVal = reservation.montantAcompte || (Math.round((Math.max(0, reservation.prixTotal - calculerTotalRepasServeur(reservation.repas)) * 0.3 + calculerTotalRepasServeur(reservation.repas)) * 100) / 100);
+    const soldeVal = reservation.prixTotal - acompteVal;
+
+    const pdfData = {
+      numeroFacture,
+      reservationId: reservation.id,
+      dateEmission: new Date(),
+      dateDebut: reservation.dateDebut,
+      dateFin: reservation.dateFin,
+      clientNom: reservation.client.nom,
+      clientEmail: reservation.client.email,
+      clientTel: reservation.client.telephone,
+      clientAdresse: reservation.client.adressePostale,
+      structure: reservation.structure,
+      adminNom: resolvedAdminNom,
+      adminEmail: resolvedAdminEmail,
+      adminTel: resolvedAdminTel,
+      chambres: reservation.chambres.map(id => CHAMBRES_NAMES[id] || `Chambre ${id}`),
+      nuits,
+      detailsLignes,
+      options: detailsOptions,
+      taxeSejourDetails,
+      prixTotal: reservation.prixTotal,
+      montantAcompte: acompteVal,
+      montantSolde: soldeVal,
+      statutPaiement: reservation.statutPaiement,
+      modePaiement: reservation.modePaiement,
+      payeLe: reservation.payeLe,
+      promoMontant,
+      codePromo: reservation.codePromo
+    };
+
+    const pdfBuffer = await generateFacturePDF(pdfData);
+    
+    const safeNomClient = reservation.client.nom.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const pdfFileName = `Facture_${numeroFacture}_${safeNomClient}.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${pdfFileName}"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Erreur téléchargement PDF facture:", error);
+    res.status(500).json({ error: 'Erreur lors du téléchargement du PDF' });
+  }
+});
+
 // Récupérer les informations d'un devis par son token (Client)
 app.get('/api/devis/info/:token', async (req, res) => {
   const { token } = req.params;
@@ -4049,7 +4330,19 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
     });
 
     const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5 };
-    const reservationsWithTaxe = reservations.map(r => {
+    
+    // Assurer l'existence d'un numéro de facture pour toutes les réservations confirmées/payées
+    const processedReservations = [];
+    for (let r of reservations) {
+      const estConfirmee = ['RESERVE', 'TERMINE'].includes(r.statut) || 
+                           ['ACOMPTE_PAYE', 'PAYE'].includes(r.statutPaiement);
+      if (estConfirmee && !r.numeroFacture) {
+        r.numeroFacture = await getOrAssignNumeroFacture(r.id);
+      }
+      processedReservations.push(r);
+    }
+
+    const reservationsWithTaxe = processedReservations.map(r => {
       let taxe = 0;
       if (r.dateDebut && r.dateFin && r.chambres && r.chambres.length > 0) {
         const start = new Date(r.dateDebut);
@@ -8017,12 +8310,15 @@ app.get('/api/admin/reservations/:id/facture-pdf', checkAuth, async (req, res) =
     const end = new Date(reservation.dateFin);
     const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
-    // Si la réservation provient d'un devis validé, on remplace DEV par FAC
-    const numeroFacture = reservation.numeroDevis 
-      ? reservation.numeroDevis.replace(/^D-/, 'F-') 
-      : `FA-${year}-${month}-${String(reservation.id).padStart(5, '0')}`;
+    let numeroFacture = reservation.numeroFacture;
+    if (!numeroFacture) {
+      numeroFacture = await getOrAssignNumeroFacture(reservation.id);
+    }
+    if (!numeroFacture) {
+      const year = new Date().getFullYear();
+      const month = String(new Date().getMonth() + 1).padStart(2, '0');
+      numeroFacture = `FA-${year}-${month}-${String(reservation.id).padStart(5, '0')}`;
+    }
 
     // Trouver l'administrateur
     const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';

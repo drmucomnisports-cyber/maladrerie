@@ -45,6 +45,7 @@ model Reservation {
   modificationProposed Json?
   expireLe        DateTime?    // Pour les devis (48h)
   numeroDevis     String?      @unique
+  numeroFacture   String?      @unique
   isGroupe        Boolean      @default(false)
   lienPaiementEnvoye Boolean   @default(false)
   cuisineEmailEnvoye Boolean   @default(false)

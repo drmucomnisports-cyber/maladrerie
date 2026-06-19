@@ -164,8 +164,8 @@ const OccupantsCollect = () => {
 
         {status === 'form' && reservation && (
           <div className="space-y-6">
-            {/* Tabs (only for reservations originating from a devis) */}
-            {reservation.numeroDevis && (
+            {/* Tabs */}
+            {(reservation.numeroDevis || ['RESERVE', 'TERMINE'].includes(reservation.statut) || ['ACOMPTE_PAYE', 'PAYE'].includes(reservation.statutPaiement)) && (
               <div className="flex border-b border-slate-200 mb-6 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
                 <button
                   type="button"
@@ -177,16 +177,16 @@ const OccupantsCollect = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveSubTab('devis')}
-                  className={`flex-1 py-3 px-6 font-black uppercase text-xs tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${activeSubTab === 'devis' ? 'bg-[#004B93] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                  onClick={() => setActiveSubTab('documents')}
+                  className={`flex-1 py-3 px-6 font-black uppercase text-xs tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${activeSubTab === 'documents' ? 'bg-[#004B93] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                 >
                   <FileText size={16} />
-                  Mon Devis Validé
+                  Mes Documents
                 </button>
               </div>
             )}
 
-            {(!reservation.numeroDevis || activeSubTab === 'voyageurs') ? (
+            {(activeSubTab === 'voyageurs') ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Recap Card */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
@@ -342,21 +342,50 @@ const OccupantsCollect = () => {
             ) : (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-                    <div>
-                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Détails de votre Devis</h3>
-                      <p className="text-slate-500 text-xs mt-1">
-                        Devis validé réf : <span className="font-bold text-[#004B93]">{reservation.numeroDevis || `DV-${reservation.id}`}</span>
-                      </p>
-                    </div>
-                    <a 
-                      href={`${API_URL}/api/devis/pdf/${encodeURIComponent(token)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#004B93] text-white font-black text-xs px-4 py-2.5 rounded-xl hover:bg-blue-800 transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider self-start sm:self-center"
-                    >
-                      <Download size={14} /> Télécharger le PDF
-                    </a>
+                  {/* Documents Section Header */}
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Vos Documents Téléchargeables</h3>
+                    <p className="text-slate-500 text-xs mt-1">Retrouvez ci-dessous les documents officiels liés à votre séjour.</p>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    {/* Bloc Devis si présent */}
+                    {reservation.numeroDevis && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm">Devis de Réservation</div>
+                          <div className="text-xs text-slate-400 font-semibold mt-0.5">Réf : {reservation.numeroDevis}</div>
+                        </div>
+                        <a 
+                          href={`${API_URL}/api/devis/pdf/${encodeURIComponent(token)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-[#004B93] text-white font-black text-xs px-4 py-2.5 rounded-xl hover:bg-blue-800 transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider self-start sm:self-center"
+                        >
+                          <Download size={14} /> Télécharger le Devis (PDF)
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Bloc Facture si confirmée ou payée */}
+                    {(['RESERVE', 'TERMINE'].includes(reservation.statut) || ['ACOMPTE_PAYE', 'PAYE'].includes(reservation.statutPaiement)) && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-amber-50/50 border border-amber-100">
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm">Facture de Séjour</div>
+                          <div className="text-xs text-slate-400 font-semibold mt-0.5">
+                            Réf : {reservation.numeroFacture || `FA-${reservation.id}`}
+                          </div>
+                        </div>
+                        <a 
+                          href={`${API_URL}/api/reservation/facture-pdf/${encodeURIComponent(token)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-[#FFD700] hover:bg-[#FCD34D] text-[#004B93] font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider self-start sm:self-center"
+                        >
+                          <Download size={14} /> Télécharger la Facture (PDF)
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-6">
