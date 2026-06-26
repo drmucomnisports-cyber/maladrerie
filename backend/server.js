@@ -312,34 +312,48 @@ const getMissionDetail = (m, dateDebut, dateFin) => {
   veille.setDate(veille.getDate() - 1);
 
   const formatDate = (date) => date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const formatDateShort = (date) => date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+
+  const formatPetitDejDates = (s, e) => {
+    const dates = [];
+    const curr = new Date(s);
+    curr.setDate(curr.getDate() + 1);
+    while (curr <= e) {
+      dates.push(formatDateShort(curr));
+      curr.setDate(curr.getDate() + 1);
+    }
+    return dates.length > 0 ? dates.join(', ') : 'à définir';
+  };
 
   let details = '';
-  switch (m.typeMission) {
-    case 'Prestation draps et ménage':
-    case 'Draps et ménage':
-      details = `<strong>Prestation Draps et Ménage :</strong> à  réaliser avant le premier jour de réservation (le <strong>${formatDate(veille)}</strong>).`;
-      break;
-    case 'Remise et récupération des clés':
-    case 'Remise des clés':
-      details = `<strong>Remise et récupération des clés :</strong>
-        <ul style="margin: 5px 0; padding-left: 20px;">
-          <li>Remise des clés à  <strong>17h</strong> le premier jour de réservation (le <strong>${formatDate(start)}</strong>) ;</li>
-          <li>Récupération des clés à  <strong>11h</strong> le dernier jour de réservation (le <strong>${formatDate(end)}</strong>).</li>
-        </ul>`;
-      break;
-    case 'Astreinte de nuit sur place':
-      details = `<strong>Astreinte de nuit sur place :</strong> surveillance du site du premier au dernier jour du séjour (du <strong>${formatDate(start)}</strong> au <strong>${formatDate(end)}</strong>).`;
-      break;
-    case 'Astreinte de nuit à  domicile':
-      details = `<strong>Astreinte de nuit à  domicile :</strong> disponibilité du premier au dernier jour du séjour (du <strong>${formatDate(start)}</strong> au <strong>${formatDate(end)}</strong>).`;
-      break;
-    case 'Déplacement astreinte':
-    case 'Déplacement sur site en astreinte':
-      details = `<strong>Déplacement sur site en astreinte :</strong> intervention ponctuelle sur site (complément de +100 €).`;
-      break;
-    default:
-      details = `<strong>${m.typeMission} :</strong> prévue le ${m.date ? formatDate(new Date(m.date)) : 'à  définir'}.`;
+  const typeLower = (m.typeMission || '').toLowerCase().trim();
+
+  if (typeLower === 'prestation draps et ménage' || typeLower === 'draps et ménage') {
+    details = `<strong>Prestation Draps et Ménage :</strong> effectuer le ménage de préparation du gîte et déposer les draps pliés sur chaque lit (l'intervenant ne fait pas les lits). S'assurer que toutes les chambres disposent d'un drap et que tous les lits de chaque chambre réservée disposent de draps, afin d'accueillir les personnes selon la répartition prévue. À réaliser la veille du séjour (le <strong>${formatDate(veille)}</strong>).`;
+  } else if (typeLower === 'remise et récupération des clés' || typeLower === 'remise des clés') {
+    details = `<strong>Remise et récupération des clés :</strong>
+      <ul style="margin: 5px 0; padding-left: 20px;">
+        <li><strong>Entrée (le ${formatDate(start)} à 17h00) :</strong> remise des clés aux clients, accompagnement à l'installation, vérification de la présence des draps et de la bonne installation des voyageurs pour s'assurer que tout se passe au mieux.</li>
+        <li><strong>Sortie (le ${formatDate(end)} à 11h00) :</strong> récupération des clés et réalisation de l'état des lieux contradictoire de sortie.</li>
+      </ul>`;
+  } else if (typeLower === 'astreinte de nuit sur place') {
+    details = `<strong>Astreinte de nuit sur place :</strong> surveillance nocturne continue du site du premier au dernier jour du séjour (du <strong>${formatDate(start)}</strong> au <strong>${formatDate(end)}</strong>). Comprend également la gestion de l'arrivée tardive des personnes, de leur départ, ainsi que les tâches d'entretien/ménage nécessaires et, le cas échéant, la préparation/service du petit-déjeuner le lendemain matin.`;
+  } else if (typeLower === 'astreinte de nuit à domicile') {
+    details = `<strong>Astreinte de nuit à domicile :</strong> disponibilité téléphonique et physique pour intervenir en urgence sur le site du premier au dernier jour du séjour (du <strong>${formatDate(start)}</strong> au <strong>${formatDate(end)}</strong>).`;
+  } else if (typeLower === 'déplacement astreinte' || typeLower === 'déplacement sur site en astreinte') {
+    details = `<strong>Déplacement sur site en astreinte :</strong> intervention ponctuelle d'urgence sur site (complément de +100 €).`;
+  } else if (typeLower === 'lits faits') {
+    details = `<strong>Lits faits :</strong> faire activement les lits pour préparer les chambres avant l'arrivée des voyageurs. À réaliser la veille du séjour (le <strong>${formatDate(veille)}</strong>) ou au plus tard le jour de l'arrivée avant 17h00 (le <strong>${formatDate(start)}</strong>).`;
+  } else if (typeLower === 'linge de toilette') {
+    details = `<strong>Linge de toilette :</strong> approvisionner et disposer le linge de toilette propre dans chaque chambre. À réaliser avant l'arrivée le <strong>${formatDate(start)}</strong>.`;
+  } else if (typeLower === 'ménage' || typeLower === 'ménage de chambre') {
+    details = `<strong>Ménage :</strong> nettoyage et remise au propre complète du gîte/des chambres. À réaliser le jour du départ à partir de 11h00 (le <strong>${formatDate(end)}</strong>).`;
+  } else if (typeLower === 'préparation petit-déjeuner') {
+    details = `<strong>Préparation petit-déjeuner :</strong> préparer et dresser le petit-déjeuner chaque matin du séjour. À réaliser les matins du <strong>${formatPetitDejDates(start, end)}</strong>.`;
+  } else {
+    details = `<strong>${m.typeMission} :</strong> prévue le ${m.date ? formatDate(new Date(m.date)) : 'à définir'}.`;
   }
+
   return `${details} <br/><span style="color: #666; font-size: 13px;">(Rémunération : ${m.montant.toFixed(2)} €)</span>`;
 };
 
@@ -5608,19 +5622,41 @@ app.get('/api/payment/pay-on-arrival/:token', async (req, res) => {
         to: recipientEmails,
         subject: `🔔 [SOLDE SUR PLACE] Résa #${reservation.id} - ${reservation.client.nom} paiera sur place`,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #004B93; margin-top: 0;">Solde à l'arrivée choisi</h2>
-            <p>Bonjour,</p>
-            <p>Le client <strong>${reservation.client.nom}</strong> a indiqué qu'il souhaite <strong>régler le solde de son séjour le jour de son arrivée</strong> sur les lieux.</p>
-            <p><strong>Détails du séjour :</strong></p>
-            <ul>
-              <li><strong>Réservation :</strong> #${reservation.id}</li>
-              <li><strong>Dates :</strong> du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</li>
-              <li><strong>Montant du solde :</strong> ${(reservation.montantSolde || (reservation.prixTotal - (reservation.montantAcompte || 0))).toFixed(2)} €</li>
-            </ul>
-            <p>Le système a désactivé les relances automatiques de solde pour cette réservation. Le solde sera à collecter à son arrivée.</p>
-            <p><a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder au Tableau de Bord Admin</a></p>
-          </div>
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                  <tr>
+                    <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                      <h2 style="color: #004B93; margin-top: 0; font-size: 22px;">Solde à l'arrivée choisi</h2>
+                      <p style="font-size: 16px;">Bonjour,</p>
+                      <p style="font-size: 16px;">Le client <strong>${reservation.client.nom}</strong> a indiqué qu'il souhaite <strong>régler le solde de son séjour le jour de son arrivée</strong> sur les lieux.</p>
+                      
+                      <div style="background-color: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 4px solid #004B93; margin: 25px 0;">
+                        <p style="margin-top: 0; font-weight: bold; color: #004B93;">Détails du séjour :</p>
+                        <ul style="margin-bottom: 0; padding-left: 20px; font-size: 15px;">
+                          <li><strong>Réservation :</strong> #${reservation.id}</li>
+                          <li><strong>Dates :</strong> du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</li>
+                          <li><strong>Montant du solde à collecter :</strong> ${(reservation.montantSolde || (reservation.prixTotal - (reservation.montantAcompte || 0))).toFixed(2)} €</li>
+                        </ul>
+                      </div>
+
+                      <p style="font-size: 15px; color: #555555; font-style: italic;">Le système a désactivé les relances automatiques de solde pour cette réservation. Le solde sera à collecter le jour de l'arrivée.</p>
+                      
+                      <div style="text-align: center; margin-top: 40px;">
+                        <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">Accéder au Tableau de Bord Admin</a>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         `
       });
     } catch (mailErr) {
