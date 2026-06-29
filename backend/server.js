@@ -3923,20 +3923,40 @@ app.get('/api/devis/validate/:token', async (req, res) => {
   }
 });
 
-// Cron job pour expirer les devis
+// Cron job pour expirer les devis (réutilisable pour Vercel Crons)
+const executeHourlyDevisCheck = async () => {
+  const now = new Date();
+  const expired = await prisma.reservation.updateMany({
+    where: {
+      statut: 'DEVIS_EN_ATTENTE',
+      expireLe: { lte: now }
+    },
+    data: { statut: 'DEVIS_EXPIRE' }
+  });
+  if (expired.count > 0) console.log(`${expired.count} devis expirés.`);
+  return expired.count;
+};
+
 cron.schedule('0 * * * *', async () => {
   try {
-    const now = new Date();
-    const expired = await prisma.reservation.updateMany({
-      where: {
-        statut: 'DEVIS_EN_ATTENTE',
-        expireLe: { lte: now }
-      },
-      data: { statut: 'DEVIS_EXPIRE' }
-    });
-    if (expired.count > 0) console.log(`${expired.count} devis expirés.`);
+    await executeHourlyDevisCheck();
   } catch (err) {
     console.error("Erreur cron devis:", err);
+  }
+});
+
+app.get('/api/cron/devis', async (req, res) => {
+  const isVercelCron = req.headers['x-vercel-cron'] === '1';
+  const isValidToken = req.query.token === process.env.CRON_SECRET;
+  if (!isVercelCron && !isValidToken && process.env.NODE_ENV === 'production') {
+    return res.status(401).send('Non autorisé');
+  }
+  try {
+    const count = await executeHourlyDevisCheck();
+    res.json({ success: true, expired: count });
+  } catch (err) {
+    console.error("Erreur HTTP cron devis:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -7839,7 +7859,7 @@ app.post('/api/promo-codes/validate', async (req, res) => {
 
 // Capturer un montant p// ===== CRON JOB : RAPPEL DE SOLDE AUTOMATIQUE, RAPPELS J-10 ET J-7 =====
 // S'exécute tous les jours à 09:00
-cron.schedule('0 9 * * *', async () => {
+const executeDailyReminders = async () => {
   console.log("Exécution du Cron Job : Rappels de soldes automatiques...");
   try {
     const today = new Date();
@@ -8025,11 +8045,34 @@ cron.schedule('0 9 * * *', async () => {
   } catch (error) {
     console.error("Erreur lors de l'exécution du Cron Job de rappels/annulations :", error);
   }
+};
+
+cron.schedule('0 9 * * *', async () => {
+  try {
+    await executeDailyReminders();
+  } catch (err) {
+    console.error("Erreur cron reminders:", err);
+  }
+});
+
+app.get('/api/cron/reminders', async (req, res) => {
+  const isVercelCron = req.headers['x-vercel-cron'] === '1';
+  const isValidToken = req.query.token === process.env.CRON_SECRET;
+  if (!isVercelCron && !isValidToken && process.env.NODE_ENV === 'production') {
+    return res.status(401).send('Non autorisé');
+  }
+  try {
+    await executeDailyReminders();
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Erreur HTTP cron reminders:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ===== CRON JOB : DÉCLARATION MENSUELLE DE TAXE DE SÉJOUR =====
 // S'exécute le 1er de chaque mois à 09:00
-cron.schedule('0 9 1 * *', async () => {
+const executeMonthlyTaxReport = async () => {
   console.log("Exécution du Cron Job : Rapport mensuel de Taxe de Séjour...");
   try {
     const today = new Date();
@@ -8153,6 +8196,29 @@ cron.schedule('0 9 1 * *', async () => {
     console.log(`Cron mensuel taxe de séjour exécuté avec succès. E-mail envoyé à : ${toEmails}`);
   } catch (error) {
     console.error("Erreur dans le cron mensuel taxe de séjour :", error);
+  }
+};
+
+cron.schedule('0 9 1 * *', async () => {
+  try {
+    await executeMonthlyTaxReport();
+  } catch (error) {
+    console.error("Erreur dans le cron mensuel taxe de séjour :", error);
+  }
+});
+
+app.get('/api/cron/tax-report', async (req, res) => {
+  const isVercelCron = req.headers['x-vercel-cron'] === '1';
+  const isValidToken = req.query.token === process.env.CRON_SECRET;
+  if (!isVercelCron && !isValidToken && process.env.NODE_ENV === 'production') {
+    return res.status(401).send('Non autorisé');
+  }
+  try {
+    await executeMonthlyTaxReport();
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Erreur HTTP cron tax-report:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -8627,6 +8693,10 @@ app.get('/api/admin/factures/period', checkAuth, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Serveur démarré sur le port ${PORT}`);
+  });
+}
+
+module.exports = app;

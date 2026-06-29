@@ -964,7 +964,7 @@ const Admin = () => {
               </div>
               <div class="field">
                 <div class="label">Adresse</div>
-                <div class="value">La Maladrerie, 24220 Saint-Cyprien, France</div>
+                <div class="value">Av. Louis Balsan, 12100 Millau, France</div>
               </div>
             </div>
           </div>
