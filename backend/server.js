@@ -4340,17 +4340,21 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
 // Authentification simple
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ success: false, error: 'Email et mot de passe requis' });
+  }
+  const cleanEmail = email.trim().toLowerCase();
 
   try {
     // 1. Check SuperAdmin (Env Var) - Toujours prioritaire pour le dépannage
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      let dbAdmin = await prisma.adminAccount.findUnique({ where: { email } });
+    if (cleanEmail === ADMIN_EMAIL.trim().toLowerCase() && password === ADMIN_PASSWORD) {
+      let dbAdmin = await prisma.adminAccount.findUnique({ where: { email: cleanEmail } });
       if (!dbAdmin) {
         try {
           const hashedPassword = await bcrypt.hash(password, 10);
           dbAdmin = await prisma.adminAccount.create({
             data: {
-              email,
+              email: cleanEmail,
               password: hashedPassword,
               nom: 'David ROUJET',
               telephone: '',
@@ -4366,12 +4370,12 @@ app.post('/api/auth/login', async (req, res) => {
           console.error("Erreur creation auto SuperAdmin dans DB:", dbErr);
         }
       }
-      const token = jwt.sign({ id: dbAdmin ? dbAdmin.id : 0, email, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+      const token = jwt.sign({ id: dbAdmin ? dbAdmin.id : 0, email: cleanEmail, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
       return res.json({ success: true, token, role: 'admin' });
     }
 
     // 2. Check Database Admin
-    const dbAdmin = await prisma.adminAccount.findUnique({ where: { email } });
+    const dbAdmin = await prisma.adminAccount.findUnique({ where: { email: cleanEmail } });
     if (dbAdmin) {
       const isMatch = await bcrypt.compare(password, dbAdmin.password);
       if (isMatch) {
@@ -4382,7 +4386,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // 3. Check Intervenant
     const intervenant = await prisma.intervenant.findUnique({
-      where: { email }
+      where: { email: cleanEmail }
     });
 
     if (intervenant) {
