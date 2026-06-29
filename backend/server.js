@@ -3395,6 +3395,8 @@ app.post('/api/admin/reservations/:id/send-facture', checkAuth, async (req, res)
 
     const { pdfBuffer, pdfFileName } = await getInvoicePdfBuffer(parseInt(id), includeOccupants);
 
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://maladrerie-millau.com';
+    
     await sendMail({
       to: reservation.client.email,
       subject: `Votre facture - Réservation #${reservation.id} - Gîte de la Maladrerie`,
@@ -3405,6 +3407,7 @@ app.post('/api/admin/reservations/:id/send-facture', checkAuth, async (req, res)
               <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
                 <tr>
                   <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <img src="${FRONTEND_URL}/logo-muc.png" alt="MUC Omnisports" style="max-height: 60px; margin-bottom: 15px;" />
                     <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Gîte de La Maladrerie</h1>
                   </td>
                 </tr>
@@ -3415,9 +3418,9 @@ app.post('/api/admin/reservations/:id/send-facture', checkAuth, async (req, res)
                     <p style="font-size: 16px;">Veuillez trouver ci-joint la facture correspondant à votre séjour au Gîte de la Maladrerie.</p>
                     
                     <div style="background-color: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 4px solid #004B93; margin: 25px 0;">
-                      <ul style="margin-bottom: 0; padding-left: 20px; font-size: 15px;">
-                        <li><strong>Réservation :</strong> #${reservation.id}</li>
-                        <li><strong>Montant Total :</strong> ${reservation.prixTotal.toFixed(2)} €</li>
+                      <ul style="margin-bottom: 0; padding-left: 0; font-size: 15px; list-style-type: none;">
+                        <li style="margin-bottom: 8px;"><strong>Réservation :</strong> #${reservation.id}</li>
+                        <li><strong>Montant Total :</strong> <span style="color: #004B93; font-weight: bold;">${reservation.prixTotal.toFixed(2)} €</span></li>
                       </ul>
                     </div>
                     
@@ -3430,9 +3433,8 @@ app.post('/api/admin/reservations/:id/send-facture', checkAuth, async (req, res)
         </table>
       `,
       attachments: [{
-        filename: pdfFileName,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
+        name: pdfFileName,
+        content: pdfBuffer.toString('base64')
       }]
     });
 
