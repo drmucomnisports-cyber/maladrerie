@@ -312,6 +312,12 @@ const Admin = () => {
   const [manualPaymentRes, setManualPaymentRes] = useState(null);
   const [manualPaymentForm, setManualPaymentForm] = useState({ montant: '', mode: 'ESPECES', typePaiement: 'ACOMPTE' });
 
+  // Factures
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [currentInvoiceRes, setCurrentInvoiceRes] = useState(null);
+  const [invoiceIncludeOccupants, setInvoiceIncludeOccupants] = useState(false);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+
   // Remboursement
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundRes, setRefundRes] = useState(null);
@@ -769,6 +775,39 @@ const Admin = () => {
       }
     } catch (err) {
       showFeedback('Erreur réseau', 'error');
+    }
+  };
+
+  const openInvoiceModal = (res) => {
+    setCurrentInvoiceRes(res);
+    setInvoiceIncludeOccupants(false);
+    setShowInvoiceModal(true);
+  };
+
+  const handleDownloadInvoice = () => {
+    window.open(`${API_URL}/api/admin/reservations/${currentInvoiceRes.id}/facture-pdf?token=${token}&includeOccupants=${invoiceIncludeOccupants}`, '_blank');
+    setShowInvoiceModal(false);
+  };
+
+  const handleSendInvoice = async () => {
+    setIsSendingInvoice(true);
+    try {
+      const response = await fetch(`${API_URL}/api/admin/reservations/${currentInvoiceRes.id}/send-facture`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ includeOccupants: invoiceIncludeOccupants })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur lors de l\'envoi');
+      showFeedback('Facture envoyée avec succès par e-mail.', 'success');
+      setShowInvoiceModal(false);
+    } catch (err) {
+      showFeedback(err.message, 'error');
+    } finally {
+      setIsSendingInvoice(false);
     }
   };
 
@@ -1762,9 +1801,9 @@ const Admin = () => {
                           )}
                           {(res.statut === 'RESERVE' || res.statut === 'TERMINE') && (
                             <button
-                              onClick={() => window.open(`${API_URL}/api/admin/reservations/${res.id}/facture-pdf?token=${token}`, '_blank')}
+                              onClick={() => openInvoiceModal(res)}
                               className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white rounded-lg transition-colors"
-                              title="Télécharger la Facture PDF"
+                              title="Gérer la facture"
                             >
                               <Banknote size={18} />
                             </button>
@@ -2266,9 +2305,9 @@ const Admin = () => {
                           )}
                           {(res.statut === 'RESERVE' || res.statut === 'TERMINE') && (
                             <button
-                              onClick={() => window.open(`${API_URL}/api/admin/reservations/${res.id}/facture-pdf?token=${token}`, '_blank')}
+                              onClick={() => openInvoiceModal(res)}
                               className="p-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-[10px] font-bold"
-                              title="Télécharger la Facture PDF"
+                              title="Gérer la facture"
                             >
                               Facture PDF
                             </button>
@@ -2995,10 +3034,10 @@ const Admin = () => {
                           </td>
                           <td className="p-4 text-center">
                             <button
-                              onClick={() => window.open(`${API_URL}/api/admin/reservations/${res.id}/facture-pdf?token=${token}`, '_blank')}
+                              onClick={() => openInvoiceModal(res)}
                               className="inline-flex items-center gap-2 bg-muc-blue hover:bg-blue-800 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-sm"
                             >
-                              📄 Facture PDF
+                              📄 Gérer la facture
                             </button>
                           </td>
                         </tr>
@@ -3512,6 +3551,61 @@ const Admin = () => {
                 existingReservation={editingReservation}
                 onCreated={() => { setEditingReservation(null); fetchReservations(); }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInvoiceModal && currentInvoiceRes && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setShowInvoiceModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+              <X className="w-6 h-6" />
+            </button>
+            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+              <FileText className="w-6 h-6 text-muc-blue" />
+              Gérer la facture
+            </h3>
+            
+            <p className="text-slate-600 mb-6 text-sm">
+              Sélectionnez les options pour la facture de la réservation <strong>#{currentInvoiceRes.id}</strong> ({currentInvoiceRes.client?.nom}).
+            </p>
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="w-5 h-5 text-muc-blue rounded focus:ring-muc-blue border-slate-300"
+                  checked={invoiceIncludeOccupants}
+                  onChange={(e) => setInvoiceIncludeOccupants(e.target.checked)}
+                />
+                <span className="text-slate-700 font-medium text-sm">
+                  Inclure le nom des occupants (page Annexe)
+                </span>
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleDownloadInvoice}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-5 h-5" />
+                Télécharger le PDF
+              </button>
+              
+              <button
+                onClick={handleSendInvoice}
+                disabled={isSendingInvoice}
+                className="w-full bg-muc-blue hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSendingInvoice ? (
+                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                ) : (
+                  <Mail className="w-5 h-5" />
+                )}
+                {isSendingInvoice ? 'Envoi en cours...' : 'Envoyer par e-mail au client'}
+              </button>
             </div>
           </div>
         </div>

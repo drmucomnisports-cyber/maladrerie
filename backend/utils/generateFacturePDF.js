@@ -261,6 +261,38 @@ async function generateFacturePDF(data) {
             doc.font('Helvetica-Oblique').fontSize(7.5).fillColor('#666666');
             doc.text("Exonération de TVA - Article 261-7-1° du Code Général des Impôts (Association loi 1901 à but non lucratif).", leftCol, y, { width: 512, align: 'center' });
             
+            // --- ANNEXE : LISTE DES OCCUPANTS ---
+            if (data.occupants && data.occupants.length > 0) {
+                doc.addPage();
+                doc.page.margins.bottom = 35;
+                
+                doc.rect(50, 50, 512, 20).fill('#004B93');
+                doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12);
+                doc.text('ANNEXE : LISTE DES OCCUPANTS', 50, 55, { width: 512, align: 'center' });
+                
+                let yOcc = 90;
+                doc.fillColor('#000000').font('Helvetica').fontSize(10);
+                
+                doc.font('Helvetica-Bold');
+                doc.text('NOM', 50, yOcc);
+                doc.text('PRÉNOM', 250, yOcc);
+                doc.text('CATÉGORIE', 450, yOcc);
+                doc.moveTo(50, yOcc + 12).lineTo(562, yOcc + 12).stroke('#DDDDDD');
+                yOcc += 25;
+                
+                doc.font('Helvetica');
+                data.occupants.forEach(occ => {
+                    if (yOcc > 700) {
+                        doc.addPage();
+                        yOcc = 50;
+                    }
+                    doc.text((occ.nom || '').toUpperCase(), 50, yOcc);
+                    doc.text(occ.prenom || '', 250, yOcc);
+                    doc.text(occ.estAdulte ? 'Adulte' : (occ.age ? `Enfant (${occ.age} ans)` : 'Enfant'), 450, yOcc);
+                    yOcc += 15;
+                });
+            }
+
             // --- PIED DE PAGE SUR TOUTES LES PAGES ---
             const range = doc.bufferedPageRange();
             for (let i = 0; i < range.count; i++) {

@@ -3137,7 +3137,7 @@ app.get('/api/devis/pdf/:token', async (req, res) => {
 });
 
 // --- HELPER : Générer le PDF de facture en mémoire (Buffer) ---
-async function getInvoicePdfBuffer(reservationId) {
+async function getInvoicePdfBuffer(reservationId, includeOccupants = false) {
   const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
     include: { client: true, occupants: true }
@@ -3356,7 +3356,8 @@ async function getInvoicePdfBuffer(reservationId) {
     modePaiement: reservation.modePaiement,
     payeLe: reservation.payeLe,
     promoMontant,
-    codePromo: reservation.codePromo
+    codePromo: reservation.codePromo,
+    occupants: includeOccupants ? reservation.occupants : undefined
   };
 
   const pdfBuffer = await generateFacturePDF(pdfData);
@@ -3367,14 +3368,78 @@ async function getInvoicePdfBuffer(reservationId) {
 // --- ENDPOINT POUR TÉLÉCHARGER LA FACTURE PDF D'UNE RÉSERVATION ---
 app.get('/api/admin/reservations/:id/facture-pdf', checkAuth, async (req, res) => {
   const { id } = req.params;
+  const includeOccupants = req.query.includeOccupants === 'true';
   try {
-    const { pdfBuffer, pdfFileName } = await getInvoicePdfBuffer(parseInt(id));
+    const { pdfBuffer, pdfFileName } = await getInvoicePdfBuffer(parseInt(id), includeOccupants);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${pdfFileName}"`);
     res.send(pdfBuffer);
   } catch (error) {
     console.error("Erreur génération facture PDF:", error);
     res.status(500).json({ error: error.message || 'Erreur lors de la génération de la facture.' });
+  }
+});
+
+// --- ENDPOINT POUR ENVOYER LA FACTURE PAR EMAIL ---
+app.post('/api/admin/reservations/:id/send-facture', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const { includeOccupants } = req.body;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+
+    const { pdfBuffer, pdfFileName } = await getInvoicePdfBuffer(parseInt(id), includeOccupants);
+
+    await sendMail({
+      to: reservation.client.email,
+      subject: `Votre facture - Réservation #${reservation.id} - Gîte de la Maladrerie`,
+      html: `
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                <tr>
+                  <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                    <h2 style="color: #004B93; margin-top: 0; font-size: 22px;">Votre facture est disponible</h2>
+                    <p style="font-size: 16px;">Bonjour <strong>${reservation.client.nom}</strong>,</p>
+                    <p style="font-size: 16px;">Veuillez trouver ci-joint la facture correspondant à votre séjour au Gîte de la Maladrerie.</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 4px solid #004B93; margin: 25px 0;">
+                      <ul style="margin-bottom: 0; padding-left: 20px; font-size: 15px;">
+                        <li><strong>Réservation :</strong> #${reservation.id}</li>
+                        <li><strong>Montant Total :</strong> ${reservation.prixTotal.toFixed(2)} €</li>
+                      </ul>
+                    </div>
+                    
+                    <p style="font-size: 16px;">Nous vous remercions pour votre confiance et restons à votre entière disposition.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `,
+      attachments: [{
+        filename: pdfFileName,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }]
+    });
+
+    res.json({ message: "Facture envoyée avec succès." });
+  } catch (error) {
+    console.error("Erreur envoi facture email:", error);
+    res.status(500).json({ error: "Erreur lors de l'envoi de la facture." });
   }
 });
 
@@ -8363,8 +8428,9 @@ app.get('/api/calendar/ical', async (req, res) => {
 // --- ENDPOINT POUR TÉLÉCHARGER LA FACTURE PDF D'UNE RÉSERVATION (DUPLICATA SIMPLIFIÉ) ---
 app.get('/api/admin/reservations/:id/facture-pdf', checkAuth, async (req, res) => {
   const { id } = req.params;
+  const includeOccupants = req.query.includeOccupants === 'true';
   try {
-    const { pdfBuffer, pdfFileName } = await getInvoicePdfBuffer(parseInt(id));
+    const { pdfBuffer, pdfFileName } = await getInvoicePdfBuffer(parseInt(id), includeOccupants);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${pdfFileName}"`);
     res.send(pdfBuffer);
