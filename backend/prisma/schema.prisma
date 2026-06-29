@@ -59,6 +59,7 @@ model Reservation {
   valideLe        DateTime?
   payeLe          DateTime?
   souhaitePayerSoldeArrivee Boolean @default(false)
+  fichesPolice    Json?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }

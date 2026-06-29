@@ -4851,14 +4851,22 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
       include: { intervenant: true, reservation: { include: { client: true } } }
     });
     
-    const remunerationTotale = missions.reduce((sum, m) => sum + m.montant, 0);
+    const ADMIN_EMAILS = ['philippe.morereau@mucomnisports.fr', 'david.roujet@mucomnisports.fr', 'mireille.chelly@mucomnisports.fr'];
+    const getMissionCoutReel = (m) => {
+      if (m.intervenant && ADMIN_EMAILS.includes(m.intervenant.email)) {
+        return 0;
+      }
+      return m.montant;
+    };
+
+    const remunerationTotale = missions.reduce((sum, m) => sum + getMissionCoutReel(m), 0);
 
     // Groupement par intervenant
     const remunerationParIntervenant = {};
     missions.forEach(m => {
       const nom = `${m.intervenant.prenom} ${m.intervenant.nom}`;
       if (!remunerationParIntervenant[nom]) remunerationParIntervenant[nom] = 0;
-      remunerationParIntervenant[nom] += m.montant;
+      remunerationParIntervenant[nom] += getMissionCoutReel(m);
     });
 
     const missionsDetails = missions.map(m => ({
@@ -4866,7 +4874,7 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         date: m.date || (m.reservation ? m.reservation.dateDebut : new Date()),
         intervenant: `${m.intervenant.prenom} ${m.intervenant.nom}`,
         typeMission: m.typeMission,
-        montant: m.montant,
+        montant: getMissionCoutReel(m),
         clientNom: m.reservation?.client?.nom || 'Inconnu',
         reservationId: m.reservationId,
         statut: m.statut
