@@ -16,8 +16,16 @@
       "dest": "api/index.js"
     },
     {
+      "src": "/photos/(.*)",
+      "dest": "/photos/$1"
+    },
+    {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
+    },
+    {
+      "src": "/logo-muc.(png|jpg)",
+      "dest": "/logo-muc.$1"
     },
     {
       "src": "/favicon.svg",
