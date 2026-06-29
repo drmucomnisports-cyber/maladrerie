@@ -5122,6 +5122,93 @@ app.put('/api/admin/reservations/:id', checkAuth, async (req, res) => {
   }
 });
 
+// Enregistrer une fiche de police signée pour un occupant
+app.post('/api/admin/reservations/:id/fiche-police', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  const {
+    occupantId,
+    nom,
+    prenom,
+    dateNaissance,
+    lieuNaissance,
+    nationalite,
+    domicile,
+    telephone,
+    email,
+    signature, // base64 image
+    dateArrivee,
+    dateDepart
+  } = req.body;
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+
+    let fiches = [];
+    if (reservation.fichesPolice) {
+      fiches = Array.isArray(reservation.fichesPolice) 
+        ? reservation.fichesPolice 
+        : JSON.parse(JSON.stringify(reservation.fichesPolice));
+    }
+
+    const newFiche = {
+      occupantId: occupantId ? parseInt(occupantId) : null,
+      nom,
+      prenom,
+      dateNaissance,
+      lieuNaissance,
+      nationalite,
+      domicile,
+      telephone,
+      email,
+      signature,
+      dateArrivee,
+      dateDepart,
+      signedAt: new Date().toISOString()
+    };
+
+    // Rechercher si une fiche existe déjà pour cet occupant
+    let updated = false;
+    if (occupantId) {
+      const idx = fiches.findIndex(f => f.occupantId === parseInt(occupantId));
+      if (idx > -1) {
+        fiches[idx] = newFiche;
+        updated = true;
+      }
+    }
+    
+    // Si non trouvé ou pas d'id occupant, chercher par nom/prénom
+    if (!updated) {
+      const idx = fiches.findIndex(f => f.nom.toLowerCase() === nom.toLowerCase() && f.prenom.toLowerCase() === prenom.toLowerCase());
+      if (idx > -1) {
+        fiches[idx] = newFiche;
+      } else {
+        fiches.push(newFiche);
+      }
+    }
+
+    const updatedRes = await prisma.reservation.update({
+      where: { id: parseInt(id) },
+      data: { fichesPolice: fiches },
+      include: { 
+        client: true,
+        occupants: true,
+        missions: { include: { intervenant: true } }
+      }
+    });
+
+    res.json(updatedRes);
+  } catch (error) {
+    console.error("Erreur enregistrement fiche police:", error);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement de la fiche de police." });
+  }
+});
+
 // Rembourser une réservation (Stripe ou manuel)
 app.post('/api/admin/reservations/:id/refund', checkAuth, async (req, res) => {
   const { id } = req.params;
@@ -8344,8 +8431,8 @@ app.get('/api/documents/:filename', (req, res) => {
 });
 
 // --- ENDPOINT ICS/ICAL POUR SYNCHRONISATION AGENDA OUTLOOK ---
-app.get('/api/calendar/ical', async (req, res) => {
-  const { token } = req.query;
+app.get(['/api/calendar/ical', '/api/calendar/ical/:tokenParam'], async (req, res) => {
+  const token = req.params.tokenParam || req.query.token;
   const expectedToken = process.env.CALENDAR_TOKEN || 'MUC_MALADRERIE_SYNC';
   if (token !== expectedToken) {
     return res.status(403).send("Token de synchronisation invalide");

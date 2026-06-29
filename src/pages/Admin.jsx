@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText, Users, Mail } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
+import SignaturePad from '../components/SignaturePad';
 
 import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
@@ -328,6 +329,25 @@ const Admin = () => {
   const [showModificationModal, setShowModificationModal] = useState(false);
   const [selectedProposedModification, setSelectedProposedModification] = useState(null);
   const [isValidatingProposed, setIsValidatingProposed] = useState(false);
+
+  // Fiches de Police
+  const [selectedFicheReservation, setSelectedFicheReservation] = useState(null);
+  const [showFicheModal, setShowFicheModal] = useState(false);
+  const [activeFicheOccupant, setActiveFicheOccupant] = useState(null);
+  const [isSavingFiche, setIsSavingFiche] = useState(false);
+  const [ficheForm, setFicheForm] = useState({
+    nom: '',
+    prenom: '',
+    dateNaissance: '',
+    lieuNaissance: '',
+    nationalite: '',
+    domicile: '',
+    telephone: '',
+    email: '',
+    dateArrivee: '',
+    dateDepart: '',
+    signature: null
+  });
 
   useEffect(() => {
     if (token) {
@@ -808,6 +828,271 @@ const Admin = () => {
       showFeedback(err.message, 'error');
     } finally {
       setIsSendingInvoice(false);
+    }
+  };
+
+  const printFichePolice = (reservation, fiche) => {
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) {
+      alert("Veuillez autoriser les fenêtres contextuelles (popups) pour imprimer.");
+      return;
+    }
+    const dateArriveeStr = new Date(fiche.dateArrivee).toLocaleDateString('fr-FR');
+    const dateDepartStr = new Date(fiche.dateDepart).toLocaleDateString('fr-FR');
+    const signedAtStr = new Date(fiche.signedAt).toLocaleString('fr-FR');
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Fiche Individuelle de Police - ${fiche.nom} ${fiche.prenom}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+              color: #333;
+              line-height: 1.5;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #000;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              font-size: 20px;
+              margin: 0;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .header p {
+              margin: 5px 0 0 0;
+              font-size: 12px;
+              color: #666;
+            }
+            .legal-ref {
+              font-style: italic;
+              font-size: 11px;
+              text-align: center;
+              margin-bottom: 35px;
+              color: #555;
+            }
+            .section {
+              margin-bottom: 25px;
+            }
+            .section-title {
+              font-weight: bold;
+              font-size: 14px;
+              text-transform: uppercase;
+              background: #f1f5f9;
+              padding: 5px 10px;
+              margin-bottom: 15px;
+              border-left: 4px solid #0f172a;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+            }
+            .field {
+              margin-bottom: 10px;
+            }
+            .label {
+              font-size: 11px;
+              text-transform: uppercase;
+              color: #666;
+              font-weight: bold;
+            }
+            .value {
+              font-size: 14px;
+              border-bottom: 1px dotted #999;
+              padding-bottom: 3px;
+              min-height: 20px;
+            }
+            .full-width {
+              grid-column: span 2;
+            }
+            .signature-area {
+              margin-top: 40px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 40px;
+            }
+            .signature-box {
+              border: 1px solid #ccc;
+              height: 150px;
+              position: relative;
+              padding: 10px;
+            }
+            .signature-box .title {
+              font-size: 11px;
+              font-weight: bold;
+              text-transform: uppercase;
+              color: #666;
+              margin-bottom: 10px;
+            }
+            .signature-img {
+              max-height: 110px;
+              max-width: 100%;
+              display: block;
+              margin: 0 auto;
+            }
+            @media print {
+              body { margin: 20px; }
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Fiche Individuelle de Police</h1>
+            <p>Pour la transmission aux autorités sur demande • Articles R. 611-35 à R. 611-42 du CESEDA</p>
+          </div>
+          
+          <div class="legal-ref">
+            Régie par l'article R. 611-35 du Code de l'entrée et du séjour des étrangers et du droit d'asile.<br/>
+            Obligatoire pour les clients étrangers séjournant en hôtel, gîte, meublé ou camping. À conserver pendant 6 mois.
+          </div>
+
+          <div class="section">
+            <div class="section-title">Établissement d'accueil</div>
+            <div class="grid">
+              <div class="field">
+                <div class="label">Nom du Gîte</div>
+                <div class="value">Gîte de la Maladrerie</div>
+              </div>
+              <div class="field">
+                <div class="label">Adresse</div>
+                <div class="value">La Maladrerie, 24220 Saint-Cyprien, France</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Informations du Voyageur</div>
+            <div class="grid">
+              <div class="field">
+                <div class="label">Nom de famille</div>
+                <div class="value">${fiche.nom.toUpperCase()}</div>
+              </div>
+              <div class="field">
+                <div class="label">Prénom(s)</div>
+                <div class="value">${fiche.prenom}</div>
+              </div>
+              <div class="field">
+                <div class="label">Date de naissance</div>
+                <div class="value">${new Date(fiche.dateNaissance).toLocaleDateString('fr-FR')}</div>
+              </div>
+              <div class="field">
+                <div class="label">Lieu de naissance</div>
+                <div class="value">${fiche.lieuNaissance}</div>
+              </div>
+              <div class="field">
+                <div class="label">Nationalité</div>
+                <div class="value">${fiche.nationalite}</div>
+              </div>
+              <div class="field">
+                <div class="label">Téléphone Mobile</div>
+                <div class="value">${fiche.telephone || '-'}</div>
+              </div>
+              <div class="field full-width">
+                <div class="label">Adresse email</div>
+                <div class="value">${fiche.email || '-'}</div>
+              </div>
+              <div class="field full-width">
+                <div class="label">Domicile habituel</div>
+                <div class="value">${fiche.domicile}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Détails du Séjour</div>
+            <div class="grid">
+              <div class="field">
+                <div class="label">Date d'arrivée</div>
+                <div class="value">${dateArriveeStr}</div>
+              </div>
+              <div class="field">
+                <div class="label">Date de départ prévue</div>
+                <div class="value">${dateDepartStr}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="signature-area">
+            <div class="field">
+              <div class="label">Fait à</div>
+              <div class="value">Saint-Cyprien</div>
+              <div class="label" style="margin-top: 15px;">Le</div>
+              <div class="value">${signedAtStr}</div>
+            </div>
+            <div class="signature-box">
+              <div class="title">Signature du Voyageur</div>
+              ${fiche.signature ? `<img class="signature-img" src="${fiche.signature}" alt="Signature" />` : '<div style="height:100px; display:flex; align-items:center; justify-content:center; color:#999; font-style:italic;">Aucune signature</div>'}
+            </div>
+          </div>
+
+          <div style="margin-top: 50px; text-align: center;">
+            <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold; background: #0f172a; color: white; border: none; border-radius: 5px; cursor: pointer;">Imprimer la fiche</button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleSaveFiche = async (e) => {
+    e.preventDefault();
+    if (!ficheForm.signature) {
+      showFeedback("La signature manuscrite est obligatoire pour valider la fiche.", "error");
+      return;
+    }
+    
+    setIsSavingFiche(true);
+    try {
+      const isDummy = activeFicheOccupant.id === 'client-dummy';
+      const occupantIdVal = isDummy ? null : (typeof activeFicheOccupant.id === 'string' && activeFicheOccupant.id.startsWith('extra-') ? null : activeFicheOccupant.id);
+      
+      const payload = {
+        occupantId: occupantIdVal,
+        nom: ficheForm.nom,
+        prenom: ficheForm.prenom,
+        dateNaissance: ficheForm.dateNaissance,
+        lieuNaissance: ficheForm.lieuNaissance,
+        nationalite: ficheForm.nationalite,
+        domicile: ficheForm.domicile,
+        telephone: ficheForm.telephone,
+        email: ficheForm.email,
+        signature: ficheForm.signature,
+        dateArrivee: ficheForm.dateArrivee,
+        dateDepart: ficheForm.dateDepart
+      };
+
+      const response = await fetch(`${API_URL}/api/admin/reservations/${selectedFicheReservation.id}/fiche-police`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erreur lors de la sauvegarde.");
+      
+      showFeedback("Fiche de police enregistrée avec succès !", "success");
+      
+      // Mettre à jour la réservation sélectionnée
+      setSelectedFicheReservation(data);
+      
+      // Mettre à jour la liste principale
+      setReservations(prev => prev.map(r => r.id === data.id ? data : r));
+      
+      setActiveFicheOccupant(null);
+    } catch (err) {
+      showFeedback(err.message, "error");
+    } finally {
+      setIsSavingFiche(false);
     }
   };
 
@@ -1540,6 +1825,25 @@ const Admin = () => {
                             </div>
                           );
                         })()}
+                        {(res.statut === 'RESERVE' || res.statut === 'TERMINE') && (
+                          <button
+                            onClick={() => {
+                              setSelectedFicheReservation(res);
+                              setShowFicheModal(true);
+                            }}
+                            className="mt-2 text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 rounded-lg outline-none border border-slate-200 bg-white text-slate-600 hover:border-muc-blue hover:text-muc-blue hover:bg-slate-50 transition-colors flex items-center gap-1.5 w-full justify-between shadow-sm"
+                            title="Gérer les fiches de police voyageurs"
+                          >
+                            <span className="flex items-center gap-1">📝 Fiches Police</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                              (res.fichesPolice || []).length > 0 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {(res.fichesPolice || []).length} / {res.occupants ? res.occupants.length : 0}
+                            </span>
+                          </button>
+                        )}
                         <div className="text-[10px] text-slate-500 mt-1.5 flex gap-1 flex-wrap font-bold">
                           {res.options?.litsFaits && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🛏️ Lits</span>}
                           {res.options?.lingeFourni && <span className="border border-slate-200 px-1 py-0.5 rounded bg-slate-50 uppercase tracking-wider">🧴 Linge</span>}
@@ -4299,6 +4603,289 @@ const Admin = () => {
         );
       })()}
 
+      {/* Modal Fiches de Police */}
+      {showFicheModal && selectedFicheReservation && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 transition-all">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="bg-muc-blue text-white p-6 flex justify-between items-center sticky top-0 z-10">
+              <h3 className="font-black text-lg uppercase tracking-tight flex items-center gap-2">
+                📋 Fiches de Police - Réf: {selectedFicheReservation.numeroDevis || `Resa #${selectedFicheReservation.id}`}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowFicheModal(false);
+                  setSelectedFicheReservation(null);
+                  setActiveFicheOccupant(null);
+                }}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {/* Occupant Detail/Signing form */}
+              {activeFicheOccupant ? (
+                <form onSubmit={handleSaveFiche} className="space-y-4">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Voyageur en cours d'émargement</h4>
+                    <div className="text-sm font-bold text-slate-800">
+                      {activeFicheOccupant.nom} {activeFicheOccupant.prenom}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      Séjour du {new Date(selectedFicheReservation.dateDebut).toLocaleDateString('fr-FR')} au {new Date(selectedFicheReservation.dateFin).toLocaleDateString('fr-FR')}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Nom</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.nom} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, nom: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Prénom</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.prenom} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, prenom: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Date de naissance</label>
+                      <input 
+                        type="date" 
+                        value={ficheForm.dateNaissance} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, dateNaissance: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Lieu de naissance</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.lieuNaissance} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, lieuNaissance: e.target.value })}
+                        placeholder="Ville, Pays"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Nationalité</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.nationalite} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, nationalite: e.target.value })}
+                        placeholder="Ex: Espagnole"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Téléphone mobile</label>
+                      <input 
+                        type="tel" 
+                        value={ficheForm.telephone} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, telephone: e.target.value })}
+                        placeholder="+33 6..."
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Adresse e-mail</label>
+                      <input 
+                        type="email" 
+                        value={ficheForm.email} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, email: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Domicile habituel</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.domicile} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, domicile: e.target.value })}
+                        placeholder="Adresse complète (N°, rue, code postal, ville, pays)"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-4">
+                    <SignaturePad onSave={(sig) => setFicheForm(prev => ({ ...prev, signature: sig }))} />
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setActiveFicheOccupant(null)}
+                      className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    >
+                      Retour
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingFiche || !ficheForm.signature}
+                      className="flex-1 py-3 text-sm font-bold text-white bg-muc-blue hover:bg-blue-800 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-xl transition-colors flex justify-center items-center gap-2"
+                    >
+                      {isSavingFiche ? 'Enregistrement...' : 'Enregistrer la fiche'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Occupants List */
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-slate-600">
+                    Sélectionnez un occupant pour remplir sa fiche de police et la faire signer :
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Map existing reservation occupants */}
+                    {((selectedFicheReservation.occupants || []).length > 0 ? selectedFicheReservation.occupants : [
+                      { id: 'client-dummy', nom: selectedFicheReservation.client?.nom?.split(' ')[0] || 'Client', prenom: selectedFicheReservation.client?.nom?.split(' ')[1] || 'Réservataire', estAdulte: true }
+                    ]).map((occ) => {
+                      const existingFiche = (selectedFicheReservation.fichesPolice || []).find(
+                        f => f.occupantId === occ.id || (occ.id === 'client-dummy' && f.occupantId === null)
+                      );
+
+                      return (
+                        <div 
+                          key={occ.id} 
+                          className="border border-slate-150 rounded-xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-50 hover:bg-slate-100/50 transition-colors"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-800 flex items-center gap-2">
+                              <span>{occ.nom} {occ.prenom}</span>
+                              <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-black uppercase">
+                                {occ.estAdulte ? 'Adulte' : 'Enfant'}
+                              </span>
+                              {occ.nationalite && (
+                                <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">
+                                  {occ.nationalite}
+                                </span>
+                              )}
+                            </div>
+                            {existingFiche ? (
+                              <div className="text-xs text-emerald-655 font-bold flex items-center gap-1 mt-1">
+                                <CheckCircle size={14} className="text-emerald-500" /> Fiche signée le {new Date(existingFiche.signedAt).toLocaleDateString('fr-FR')}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-amber-655 font-semibold flex items-center gap-1 mt-1">
+                                <Clock size={14} className="text-amber-500" /> En attente de signature
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            {existingFiche ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => printFichePolice(selectedFicheReservation, existingFiche)}
+                                  className="px-3 py-1.5 bg-blue-50 text-muc-blue hover:bg-muc-blue hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                >
+                                  <FileText size={14} /> Imprimer
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFicheForm({
+                                      nom: existingFiche.nom,
+                                      prenom: existingFiche.prenom,
+                                      dateNaissance: existingFiche.dateNaissance,
+                                      lieuNaissance: existingFiche.lieuNaissance,
+                                      nationalite: existingFiche.nationalite,
+                                      domicile: existingFiche.domicile,
+                                      telephone: existingFiche.telephone || '',
+                                      email: existingFiche.email || '',
+                                      dateArrivee: existingFiche.dateArrivee ? existingFiche.dateArrivee.split('T')[0] : selectedFicheReservation.dateDebut.split('T')[0],
+                                      dateDepart: existingFiche.dateDepart ? existingFiche.dateDepart.split('T')[0] : selectedFicheReservation.dateFin.split('T')[0],
+                                      signature: existingFiche.signature
+                                    });
+                                    setActiveFicheOccupant(occ);
+                                  }}
+                                  className="px-3 py-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg text-xs font-bold transition-all"
+                                >
+                                  Modifier
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFicheForm({
+                                    nom: occ.nom || '',
+                                    prenom: occ.prenom || '',
+                                    dateNaissance: '',
+                                    lieuNaissance: '',
+                                    nationalite: occ.nationalite || '',
+                                    domicile: selectedFicheReservation.client?.adressePostale || '',
+                                    telephone: selectedFicheReservation.client?.telephone || '',
+                                    email: selectedFicheReservation.client?.email || '',
+                                    dateArrivee: selectedFicheReservation.dateDebut.split('T')[0],
+                                    dateDepart: selectedFicheReservation.dateFin.split('T')[0],
+                                    signature: null
+                                  });
+                                  setActiveFicheOccupant(occ);
+                                }}
+                                className="px-3 py-1.5 bg-muc-blue text-white hover:bg-blue-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                              >
+                                <Check size={14} /> Émarger / Signer
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-4 flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newId = `extra-${Date.now()}`;
+                        setFicheForm({
+                          nom: '',
+                          prenom: '',
+                          dateNaissance: '',
+                          lieuNaissance: '',
+                          nationalite: '',
+                          domicile: selectedFicheReservation.client?.adressePostale || '',
+                          telephone: '',
+                          email: '',
+                          dateArrivee: selectedFicheReservation.dateDebut.split('T')[0],
+                          dateDepart: selectedFicheReservation.dateFin.split('T')[0],
+                          signature: null
+                        });
+                        setActiveFicheOccupant({ id: newId, nom: 'Nouveau', prenom: 'Voyageur', estAdulte: true });
+                      }}
+                      className="px-4 py-2 text-xs font-bold text-muc-blue border border-dashed border-muc-blue hover:bg-blue-50 rounded-xl transition-all flex items-center gap-1.5"
+                    >
+                      <PlusCircle size={14} /> Ajouter un voyageur non listé
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'planning' && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100">
@@ -4650,12 +5237,12 @@ const Admin = () => {
                 <input 
                   type="text" 
                   readOnly 
-                  value={`${API_URL}/api/calendar/ical?token=MUC_MALADRERIE_SYNC`}
+                  value={`${API_URL}/api/calendar/ical/MUC_MALADRERIE_SYNC`}
                   className="flex-1 bg-white p-2.5 border border-slate-200 rounded-lg text-xs font-mono select-all outline-none"
                 />
                 <button 
                   onClick={() => {
-                    navigator.clipboard.writeText(`${API_URL}/api/calendar/ical?token=MUC_MALADRERIE_SYNC`);
+                    navigator.clipboard.writeText(`${API_URL}/api/calendar/ical/MUC_MALADRERIE_SYNC`);
                     alert("Lien d'abonnement copié !");
                   }}
                   className="bg-muc-blue text-white px-4 py-2 text-xs font-bold rounded-lg hover:bg-blue-800 transition-all shadow-sm"
@@ -4945,6 +5532,289 @@ const Admin = () => {
           </div>
         );
       })()}
+
+      {/* Modal Fiches de Police */}
+      {showFicheModal && selectedFicheReservation && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 transition-all">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="bg-muc-blue text-white p-6 flex justify-between items-center sticky top-0 z-10">
+              <h3 className="font-black text-lg uppercase tracking-tight flex items-center gap-2">
+                📋 Fiches de Police - Réf: {selectedFicheReservation.numeroDevis || `Resa #${selectedFicheReservation.id}`}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowFicheModal(false);
+                  setSelectedFicheReservation(null);
+                  setActiveFicheOccupant(null);
+                }}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {/* Occupant Detail/Signing form */}
+              {activeFicheOccupant ? (
+                <form onSubmit={handleSaveFiche} className="space-y-4">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Voyageur en cours d'émargement</h4>
+                    <div className="text-sm font-bold text-slate-800">
+                      {activeFicheOccupant.nom} {activeFicheOccupant.prenom}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      Séjour du {new Date(selectedFicheReservation.dateDebut).toLocaleDateString('fr-FR')} au {new Date(selectedFicheReservation.dateFin).toLocaleDateString('fr-FR')}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Nom</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.nom} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, nom: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Prénom</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.prenom} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, prenom: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Date de naissance</label>
+                      <input 
+                        type="date" 
+                        value={ficheForm.dateNaissance} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, dateNaissance: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Lieu de naissance</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.lieuNaissance} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, lieuNaissance: e.target.value })}
+                        placeholder="Ville, Pays"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Nationalité</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.nationalite} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, nationalite: e.target.value })}
+                        placeholder="Ex: Espagnole"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Téléphone mobile</label>
+                      <input 
+                        type="tel" 
+                        value={ficheForm.telephone} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, telephone: e.target.value })}
+                        placeholder="+33 6..."
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Adresse e-mail</label>
+                      <input 
+                        type="email" 
+                        value={ficheForm.email} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, email: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Domicile habituel</label>
+                      <input 
+                        type="text" 
+                        value={ficheForm.domicile} 
+                        onChange={(e) => setFicheForm({ ...ficheForm, domicile: e.target.value })}
+                        placeholder="Adresse complète (N°, rue, code postal, ville, pays)"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:border-muc-blue focus:ring-1 focus:ring-muc-blue outline-none text-sm font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-4">
+                    <SignaturePad onSave={(sig) => setFicheForm(prev => ({ ...prev, signature: sig }))} />
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setActiveFicheOccupant(null)}
+                      className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    >
+                      Retour
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingFiche || !ficheForm.signature}
+                      className="flex-1 py-3 text-sm font-bold text-white bg-muc-blue hover:bg-blue-800 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-xl transition-colors flex justify-center items-center gap-2"
+                    >
+                      {isSavingFiche ? 'Enregistrement...' : 'Enregistrer la fiche'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Occupants List */
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-slate-600">
+                    Sélectionnez un occupant pour remplir sa fiche de police et la faire signer :
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Map existing reservation occupants */}
+                    {((selectedFicheReservation.occupants || []).length > 0 ? selectedFicheReservation.occupants : [
+                      { id: 'client-dummy', nom: selectedFicheReservation.client?.nom?.split(' ')[0] || 'Client', prenom: selectedFicheReservation.client?.nom?.split(' ')[1] || 'Réservataire', estAdulte: true }
+                    ]).map((occ) => {
+                      const existingFiche = (selectedFicheReservation.fichesPolice || []).find(
+                        f => f.occupantId === occ.id || (occ.id === 'client-dummy' && f.occupantId === null)
+                      );
+
+                      return (
+                        <div 
+                          key={occ.id} 
+                          className="border border-slate-150 rounded-xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-50 hover:bg-slate-100/50 transition-colors"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-800 flex items-center gap-2">
+                              <span>{occ.nom} {occ.prenom}</span>
+                              <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-black uppercase">
+                                {occ.estAdulte ? 'Adulte' : 'Enfant'}
+                              </span>
+                              {occ.nationalite && (
+                                <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">
+                                  {occ.nationalite}
+                                </span>
+                              )}
+                            </div>
+                            {existingFiche ? (
+                              <div className="text-xs text-emerald-655 font-bold flex items-center gap-1 mt-1">
+                                <CheckCircle size={14} className="text-emerald-500" /> Fiche signée le {new Date(existingFiche.signedAt).toLocaleDateString('fr-FR')}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-amber-655 font-semibold flex items-center gap-1 mt-1">
+                                <Clock size={14} className="text-amber-500" /> En attente de signature
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            {existingFiche ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => printFichePolice(selectedFicheReservation, existingFiche)}
+                                  className="px-3 py-1.5 bg-blue-50 text-muc-blue hover:bg-muc-blue hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                >
+                                  <FileText size={14} /> Imprimer
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFicheForm({
+                                      nom: existingFiche.nom,
+                                      prenom: existingFiche.prenom,
+                                      dateNaissance: existingFiche.dateNaissance,
+                                      lieuNaissance: existingFiche.lieuNaissance,
+                                      nationalite: existingFiche.nationalite,
+                                      domicile: existingFiche.domicile,
+                                      telephone: existingFiche.telephone || '',
+                                      email: existingFiche.email || '',
+                                      dateArrivee: existingFiche.dateArrivee ? existingFiche.dateArrivee.split('T')[0] : selectedFicheReservation.dateDebut.split('T')[0],
+                                      dateDepart: existingFiche.dateDepart ? existingFiche.dateDepart.split('T')[0] : selectedFicheReservation.dateFin.split('T')[0],
+                                      signature: existingFiche.signature
+                                    });
+                                    setActiveFicheOccupant(occ);
+                                  }}
+                                  className="px-3 py-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg text-xs font-bold transition-all"
+                                >
+                                  Modifier
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFicheForm({
+                                    nom: occ.nom || '',
+                                    prenom: occ.prenom || '',
+                                    dateNaissance: '',
+                                    lieuNaissance: '',
+                                    nationalite: occ.nationalite || '',
+                                    domicile: selectedFicheReservation.client?.adressePostale || '',
+                                    telephone: selectedFicheReservation.client?.telephone || '',
+                                    email: selectedFicheReservation.client?.email || '',
+                                    dateArrivee: selectedFicheReservation.dateDebut.split('T')[0],
+                                    dateDepart: selectedFicheReservation.dateFin.split('T')[0],
+                                    signature: null
+                                  });
+                                  setActiveFicheOccupant(occ);
+                                }}
+                                className="px-3 py-1.5 bg-muc-blue text-white hover:bg-blue-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                              >
+                                <Check size={14} /> Émarger / Signer
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-4 flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newId = `extra-${Date.now()}`;
+                        setFicheForm({
+                          nom: '',
+                          prenom: '',
+                          dateNaissance: '',
+                          lieuNaissance: '',
+                          nationalite: '',
+                          domicile: selectedFicheReservation.client?.adressePostale || '',
+                          telephone: '',
+                          email: '',
+                          dateArrivee: selectedFicheReservation.dateDebut.split('T')[0],
+                          dateDepart: selectedFicheReservation.dateFin.split('T')[0],
+                          signature: null
+                        });
+                        setActiveFicheOccupant({ id: newId, nom: 'Nouveau', prenom: 'Voyageur', estAdulte: true });
+                      }}
+                      className="px-4 py-2 text-xs font-bold text-muc-blue border border-dashed border-muc-blue hover:bg-blue-50 rounded-xl transition-all flex items-center gap-1.5"
+                    >
+                      <PlusCircle size={14} /> Ajouter un voyageur non listé
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 </div>
   );
 };
