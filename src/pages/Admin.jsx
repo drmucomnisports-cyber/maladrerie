@@ -209,6 +209,8 @@ const Admin = () => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
   });
+  const [factureSearch, setFactureSearch] = useState('');
+  const [factureSortConfig, setFactureSortConfig] = useState({ key: 'dateDebut', direction: 'desc' });
 
   const [activeTab, setActiveTab] = useState('reservations');
   const [clients, setClients] = useState([]);
@@ -1160,6 +1162,66 @@ const Admin = () => {
     } finally {
       setIsLoadingFactures(false);
     }
+  };
+
+  const requestFactureSort = (key) => {
+    let direction = 'desc';
+    if (factureSortConfig.key === key && factureSortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setFactureSortConfig({ key, direction });
+  };
+
+  const getFilteredAndSortedFactures = () => {
+    let result = [...reservationsFactures];
+    if (factureSearch.trim()) {
+      const searchLower = factureSearch.toLowerCase();
+      result = result.filter(res => {
+        const nom = res.client?.nom || '';
+        const email = res.client?.email || '';
+        const structure = res.structure || '';
+        const refFacture = res.numeroFacture || '';
+        const refDevis = res.numeroDevis || '';
+        const resId = String(res.id);
+        
+        return nom.toLowerCase().includes(searchLower) ||
+               email.toLowerCase().includes(searchLower) ||
+               structure.toLowerCase().includes(searchLower) ||
+               refFacture.toLowerCase().includes(searchLower) ||
+               refDevis.toLowerCase().includes(searchLower) ||
+               resId.includes(searchLower);
+      });
+    }
+    
+    if (factureSortConfig.key) {
+      result.sort((a, b) => {
+        let valA, valB;
+        if (factureSortConfig.key === 'ref') {
+          valA = a.numeroFacture || a.numeroDevis || `FA-${a.id}`;
+          valB = b.numeroFacture || b.numeroDevis || `FA-${b.id}`;
+        } else if (factureSortConfig.key === 'client') {
+          valA = a.client?.nom || '';
+          valB = b.client?.nom || '';
+        } else if (factureSortConfig.key === 'dateDebut') {
+          valA = new Date(a.dateDebut);
+          valB = new Date(b.dateDebut);
+        } else if (factureSortConfig.key === 'prixTotal') {
+          valA = a.prixTotal || 0;
+          valB = b.prixTotal || 0;
+        } else if (factureSortConfig.key === 'statutPaiement') {
+          valA = a.statutPaiement || '';
+          valB = b.statutPaiement || '';
+        } else {
+          return 0;
+        }
+        
+        if (valA < valB) return factureSortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return factureSortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return result;
   };
 
   const handleDeleteExpense = async (id) => {
@@ -3214,6 +3276,19 @@ const Admin = () => {
               )}
             </div>
             
+            <div className="mb-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Rechercher une facture (nom du client, structure, e-mail, référence...)"
+                  value={factureSearch}
+                  onChange={(e) => setFactureSearch(e.target.value)}
+                  className="w-full bg-slate-50 pl-11 pr-4 py-3.5 border border-slate-200 rounded-2xl font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-muc-blue focus:outline-none transition-all text-sm"
+                />
+                <Search className="absolute left-4 top-4 text-slate-400" size={18} />
+              </div>
+            </div>
+            
             <div className="flex flex-wrap items-end gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <div className="flex-1 min-w-[200px]">
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Séjour débutant après le :</label>
@@ -3281,17 +3356,27 @@ const Admin = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100 text-xs font-black text-slate-400 uppercase tracking-widest">
-                      <th className="p-4">Réf / Devis</th>
-                      <th className="p-4">Client / Structure</th>
-                      <th className="p-4">Séjour</th>
-                      <th className="p-4 text-right">Total TTC</th>
-                      <th className="p-4 text-center">Règlements</th>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-xs font-black text-slate-400 uppercase tracking-widest select-none">
+                      <th className="p-4 cursor-pointer hover:text-slate-600 transition-colors" onClick={() => requestFactureSort('ref')}>
+                        Réf / Devis {factureSortConfig.key === 'ref' && (factureSortConfig.direction === 'asc' ? ' ▲' : ' ▼')}
+                      </th>
+                      <th className="p-4 cursor-pointer hover:text-slate-600 transition-colors" onClick={() => requestFactureSort('client')}>
+                        Client / Structure {factureSortConfig.key === 'client' && (factureSortConfig.direction === 'asc' ? ' ▲' : ' ▼')}
+                      </th>
+                      <th className="p-4 cursor-pointer hover:text-slate-600 transition-colors" onClick={() => requestFactureSort('dateDebut')}>
+                        Séjour {factureSortConfig.key === 'dateDebut' && (factureSortConfig.direction === 'asc' ? ' ▲' : ' ▼')}
+                      </th>
+                      <th className="p-4 text-right cursor-pointer hover:text-slate-600 transition-colors" onClick={() => requestFactureSort('prixTotal')}>
+                        Total TTC {factureSortConfig.key === 'prixTotal' && (factureSortConfig.direction === 'asc' ? ' ▲' : ' ▼')}
+                      </th>
+                      <th className="p-4 text-center cursor-pointer hover:text-slate-600 transition-colors" onClick={() => requestFactureSort('statutPaiement')}>
+                        Règlements {factureSortConfig.key === 'statutPaiement' && (factureSortConfig.direction === 'asc' ? ' ▲' : ' ▼')}
+                      </th>
                       <th className="p-4 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
-                    {reservationsFactures.map((res) => {
+                    {getFilteredAndSortedFactures().map((res) => {
                       const start = new Date(res.dateDebut);
                       const end = new Date(res.dateFin);
                       const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
