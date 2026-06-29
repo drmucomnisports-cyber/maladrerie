@@ -26,7 +26,7 @@ async function generateDevisPDF(data) {
             doc.rect(0, 0, 612, 100).fill('#004B93');
             
             try {
-                const logoPath = path.join(__dirname, '../../public/logo-muc.png');
+                const logoPath = path.join(__dirname, '../assets/logo-muc.jpg');
                 if (fs.existsSync(logoPath)) {
                     // Positionné en haut à droite pour ne pas casser la mise en forme (x: 500, y: 20)
                     doc.image(logoPath, 500, 20, { width: 60 });

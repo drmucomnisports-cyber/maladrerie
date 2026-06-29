@@ -26,7 +26,7 @@ async function generateFacturePDF(data) {
             doc.rect(0, 0, 612, 100).fill('#004B93');
             
             try {
-                const logoPath = path.join(__dirname, '../../public/logo-muc.png');
+                const logoPath = path.join(__dirname, '../assets/logo-muc.jpg');
                 if (fs.existsSync(logoPath)) {
                     doc.image(logoPath, 500, 20, { width: 60 });
                 }
