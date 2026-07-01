@@ -3999,6 +3999,9 @@ const Admin = () => {
                   >
                     <option value="">Sélectionner un intervenant</option>
                     {intervenants.filter(i => {
+                      const ADMIN_EMAILS = ['philippe.morereau@mucomnisports.fr', 'david.roujet@mucomnisports.fr', 'mireille.chelly@mucomnisports.fr'];
+                      if (ADMIN_EMAILS.includes(i.email?.toLowerCase())) return true;
+
                       if (!currentReservationForMission) return true;
                       const rDebut = new Date(currentReservationForMission.dateDebut);
                       const rFin = new Date(currentReservationForMission.dateFin);

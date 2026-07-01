@@ -4888,9 +4888,6 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     
     const ADMIN_EMAILS = ['philippe.morereau@mucomnisports.fr', 'david.roujet@mucomnisports.fr', 'mireille.chelly@mucomnisports.fr'];
     const getMissionCoutReel = (m) => {
-      if (m.intervenant && ADMIN_EMAILS.includes(m.intervenant.email)) {
-        return 0;
-      }
       return m.montant;
     };
 
