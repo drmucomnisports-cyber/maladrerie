@@ -242,7 +242,7 @@ const Admin = () => {
 
   // Facturation intervenants
   const [showBillingModal, setShowBillingModal] = useState(false);
-  const [billingIntervenant, setBillingIntervenant] = useState(null);
+  const [billingIntervenantId, setBillingIntervenantId] = useState(null);
   const [billingMonth, setBillingMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -840,6 +840,39 @@ const Admin = () => {
       showFeedback(err.message, 'error');
     } finally {
       setIsSendingInvoice(false);
+    }
+  };
+
+  const handleAddBillingToExpenses = async (interv, total, monthLabel) => {
+    const label = `Facture ${interv.prenom} ${interv.nom} - ${monthLabel}`;
+    const [year, month] = billingMonth.split('-').map(Number);
+    const dateFacture = new Date(year, month, 0).toISOString().substring(0, 10);
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/expenses`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          label,
+          montant: parseFloat(total),
+          categorie: "Sous-traitance & Prestations externes",
+          comptePcg: "611",
+          description: `Facturation automatique générée depuis l'espace intervenant pour le mois de ${monthLabel}`,
+          date: dateFacture
+        })
+      });
+      if (response.ok) {
+        showFeedback('Facture enregistrée comme dépense avec succès !');
+        fetchFinances();
+      } else {
+        const data = await response.json();
+        showFeedback(data.error || 'Erreur lors de l\'enregistrement', 'error');
+      }
+    } catch (err) {
+      showFeedback('Erreur réseau', 'error');
     }
   };
 
@@ -2556,9 +2589,10 @@ const Admin = () => {
                     <div className="flex gap-1.5 shrink-0 ml-4">
                       {interv.statut === 'INDEPENDANT' && (
                         <button
-                          onClick={() => {
-                            setBillingIntervenant(interv);
+                          onClick={async () => {
+                            setBillingIntervenantId(interv.id);
                             setShowBillingModal(true);
+                            await fetchIntervenants();
                           }}
                           className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors"
                           title="Voir la facturation"
@@ -2590,20 +2624,46 @@ const Admin = () => {
         })()}
       </div>
 
-      {showBillingModal && billingIntervenant && (() => {
+      {showBillingModal && billingIntervenantId && (() => {
+        const currentInterv = intervenants.find(i => i.id === billingIntervenantId);
+        if (!currentInterv) return null;
+
         const [year, month] = billingMonth.split('-').map(Number);
         const monthStart = new Date(year, month - 1, 1);
         const monthEnd = new Date(year, month, 0, 23, 59, 59);
         
-        const missions = (billingIntervenant.missions || []).filter(m => {
+        const missions = (currentInterv.missions || []).filter(m => {
           const mDate = m.date ? new Date(m.date) : (m.reservation?.dateDebut ? new Date(m.reservation.dateDebut) : null);
           if (!mDate) return false;
           return mDate >= monthStart && mDate <= monthEnd;
         });
         
         const totalMois = missions.reduce((sum, m) => sum + (m.montant || 0), 0);
+        const monthStartLoc = new Date(year, month - 1, 1);
+        const monthName = monthStartLoc.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
         
-        const monthName = monthStart.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        const monthsOptions = [
+          { value: 1, label: 'Janvier' },
+          { value: 2, label: 'Février' },
+          { value: 3, label: 'Mars' },
+          { value: 4, label: 'Avril' },
+          { value: 5, label: 'Mai' },
+          { value: 6, label: 'Juin' },
+          { value: 7, label: 'Juillet' },
+          { value: 8, label: 'Août' },
+          { value: 9, label: 'Septembre' },
+          { value: 10, label: 'Octobre' },
+          { value: 11, label: 'Novembre' },
+          { value: 12, label: 'Décembre' }
+        ];
+        
+        const currentYear = new Date().getFullYear();
+        const yearsOptions = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+
+        const labelDepenseAttendu = `Facture ${currentInterv.prenom} ${currentInterv.nom} - ${monthName}`;
+        const depenseExiste = (finances?.expenses || []).some(e => 
+          e.label === labelDepenseAttendu && e.comptePcg === '611'
+        );
         
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -2615,16 +2675,30 @@ const Admin = () => {
                 <Banknote className="w-6 h-6 text-amber-500" />
                 Facturation
               </h3>
-              <p className="text-slate-500 text-sm mb-5">{billingIntervenant.prenom} {billingIntervenant.nom} <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold ml-1">Indépendant</span></p>
+              <p className="text-slate-500 text-sm mb-5">{currentInterv.prenom} {currentInterv.nom} • <span className="text-xs font-bold text-muc-blue">Indépendant / Prestataire</span></p>
               
               <div className="mb-5">
-                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Période</label>
-                <input
-                  type="month"
-                  value={billingMonth}
-                  onChange={(e) => setBillingMonth(e.target.value)}
-                  className="w-full bg-slate-50 p-3 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:outline-none"
-                />
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Choisir la période</label>
+                <div className="flex gap-2">
+                  <select
+                    value={month}
+                    onChange={(e) => {
+                      setBillingMonth(`${year}-${String(e.target.value).padStart(2, '0')}`);
+                    }}
+                    className="flex-1 bg-slate-50 p-3 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:outline-none bg-white"
+                  >
+                    {monthsOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                  <select
+                    value={year}
+                    onChange={(e) => {
+                      setBillingMonth(`${e.target.value}-${String(month).padStart(2, '0')}`);
+                    }}
+                    className="w-32 bg-slate-50 p-3 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:outline-none bg-white"
+                  >
+                    {yearsOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
               </div>
               
               {missions.length === 0 ? (
@@ -2652,10 +2726,27 @@ const Admin = () => {
                     })}
                   </div>
                   
-                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 flex justify-between items-center">
+                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 flex justify-between items-center mb-4">
                     <span className="font-bold text-amber-800 uppercase text-sm tracking-wide">Total à facturer</span>
                     <span className="font-black text-amber-900 text-xl">{totalMois.toFixed(2)} €</span>
                   </div>
+
+                  {totalMois > 0 && (
+                    <div className="mt-4">
+                      {depenseExiste ? (
+                        <div className="bg-emerald-50 text-emerald-800 p-3.5 rounded-xl border border-emerald-200 text-center font-bold text-sm flex items-center justify-center gap-2">
+                          <Check className="w-5 h-5" /> Enregistré en dépense (PCG 611)
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleAddBillingToExpenses(currentInterv, totalMois, monthName)}
+                          className="w-full bg-muc-blue hover:bg-blue-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm"
+                        >
+                          💰 Enregistrer comme dépense dans la Finance
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
