@@ -110,6 +110,14 @@ function IntervenantPortal() {
   const [disponibilites, setDisponibilites] = useState([]);
   const [newDispo, setNewDispo] = useState({ dateDebut: '', dateFin: '' });
 
+  // Facturation intervenants connectés
+  const [missions, setMissions] = useState([]);
+  const [loadingMissions, setLoadingMissions] = useState(false);
+  const [billingMonth, setBillingMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
   // Redirection si token absent
   useEffect(() => {
     if (!token) {
@@ -131,6 +139,8 @@ function IntervenantPortal() {
         fetchReservations();
       } else if (activeTab === 'planning') {
         fetchPlanningEvents();
+      } else if (activeTab === 'facturation') {
+        fetchMissions();
       }
     }
   }, [token, intervenant, activeTab]);
@@ -186,6 +196,24 @@ function IntervenantPortal() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMissions = async () => {
+    if (!intervenant) return;
+    setLoadingMissions(true);
+    try {
+      const res = await fetch(`${API_URL}/api/intervenant/${intervenant.id}/missions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMissions(data);
+      }
+    } catch (err) {
+      console.error("Erreur de récupération des missions :", err);
+    } finally {
+      setLoadingMissions(false);
     }
   };
 
@@ -489,6 +517,16 @@ function IntervenantPortal() {
               >
                 Mon Profil
               </button>
+              {intervenant?.statut === 'INDEPENDANT' && (
+                <button 
+                  onClick={() => setActiveTab('facturation')} 
+                  className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-all ${
+                    activeTab === 'facturation' ? 'text-muc-blue border-b-4 border-muc-blue' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Ma Facturation
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1253,6 +1291,141 @@ function IntervenantPortal() {
           </div>
         </div>
       )}
+
+      {activeTab === 'facturation' && intervenant?.statut === 'INDEPENDANT' && (() => {
+        const [year, month] = billingMonth.split('-').map(Number);
+        const monthStart = new Date(year, month - 1, 1);
+        const monthEnd = new Date(year, month, 0, 23, 59, 59);
+        
+        const filteredMissions = missions.filter(m => {
+          const mDate = m.date ? new Date(m.date) : (m.reservation?.dateDebut ? new Date(m.reservation.dateDebut) : null);
+          if (!mDate) return false;
+          return mDate >= monthStart && mDate <= monthEnd;
+        });
+        
+        const totalMois = filteredMissions.reduce((sum, m) => sum + (m.montant || 0), 0);
+        const monthStartLoc = new Date(year, month - 1, 1);
+        const monthName = monthStartLoc.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        
+        const monthsOptions = [
+          { value: 1, label: 'Janvier' },
+          { value: 2, label: 'Février' },
+          { value: 3, label: 'Mars' },
+          { value: 4, label: 'Avril' },
+          { value: 5, label: 'Mai' },
+          { value: 6, label: 'Juin' },
+          { value: 7, label: 'Juillet' },
+          { value: 8, label: 'Août' },
+          { value: 9, label: 'Septembre' },
+          { value: 10, label: 'Octobre' },
+          { value: 11, label: 'Novembre' },
+          { value: 12, label: 'Décembre' }
+        ];
+        
+        const currentYear = new Date().getFullYear();
+        const yearsOptions = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+
+        return (
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 space-y-6">
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-xl font-black text-muc-blue uppercase tracking-tight">Suivi de ma Facturation</h2>
+                <p className="text-slate-400 text-xs mt-1">Consultez et calculez vos honoraires pour chaque mois de prestation.</p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <select
+                  value={month}
+                  onChange={(e) => {
+                    setBillingMonth(`${year}-${String(e.target.value).padStart(2, '0')}`);
+                  }}
+                  className="flex-1 sm:w-40 bg-slate-50 p-2.5 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-muc-blue text-sm bg-white"
+                >
+                  {monthsOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                <select
+                  value={year}
+                  onChange={(e) => {
+                    setBillingMonth(`${e.target.value}-${String(month).padStart(2, '0')}`);
+                  }}
+                  className="w-24 bg-slate-50 p-2.5 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-muc-blue text-sm bg-white"
+                >
+                  {yearsOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {loadingMissions ? (
+              <div className="p-12 text-center">
+                <div className="animate-spin inline-block w-8 h-8 border-4 border-muc-blue border-t-transparent rounded-full mb-4"></div>
+                <p className="text-slate-500 font-medium text-sm">Chargement de votre facturation...</p>
+              </div>
+            ) : filteredMissions.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="text-4xl mb-3">📭</div>
+                <p className="text-slate-500 font-bold text-sm">Aucune prestation enregistrée pour {monthName}.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-xs font-black text-slate-400 uppercase tracking-widest">
+                          <th className="p-4">Date</th>
+                          <th className="p-4">Prestation effectuée</th>
+                          <th className="p-4">Référence Séjour</th>
+                          <th className="p-4 text-center">Statut Mission</th>
+                          <th className="p-4 text-right">Rémunération</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredMissions.map((m, idx) => {
+                          const mDate = m.date ? new Date(m.date) : (m.reservation?.dateDebut ? new Date(m.reservation.dateDebut) : null);
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="p-4 text-slate-600 font-medium">
+                                {mDate ? mDate.toLocaleDateString('fr-FR') : '—'}
+                              </td>
+                              <td className="p-4 font-bold text-slate-800">
+                                {m.typeMission}
+                              </td>
+                              <td className="p-4 text-slate-500 font-medium">
+                                {m.reservation?.numeroDevis || `Résa #${m.reservationId}`}
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold uppercase ${
+                                  m.statut === 'ACCEPTEE' 
+                                    ? 'bg-emerald-100 text-emerald-800' 
+                                    : m.statut === 'REFUSEE' 
+                                      ? 'bg-rose-100 text-rose-800' 
+                                      : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {m.statut === 'ACCEPTEE' ? 'Validé' : m.statut === 'REFUSEE' ? 'Refusé' : 'En attente'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-right font-black text-slate-800">
+                                {(m.montant || 0).toFixed(2)} €
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200 flex justify-between items-center">
+                  <div>
+                    <span className="font-bold text-amber-800 uppercase text-xs tracking-wider block">Total de mes honoraires</span>
+                    <span className="text-slate-400 text-[10px] mt-0.5 block">Sur la base des prestations validées ou en attente pour {monthName}.</span>
+                  </div>
+                  <span className="font-black text-amber-900 text-2xl whitespace-nowrap">{totalMois.toFixed(2)} €</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {paymentLinkData && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
