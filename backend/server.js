@@ -197,7 +197,8 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
           include: { client: true, intervenant: true }
         });
         console.log(`Acompte payé (statut final: ${targetStatus}) pour la réservation ${reservationId}`);
-        await sendCuisineEmailIfNeeded(reservationId);
+        // Désactivé : remplacé par l'envoi hebdomadaire groupé (cron cuisine du jeudi)
+        // await sendCuisineEmailIfNeeded(reservationId);
         await sendPaymentConfirmationEmails(reservation, 'acompte', session.amount_total / 100, balancePaymentLink);
         
         if (reservation.codePromo) {
@@ -229,7 +230,8 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
           include: { client: true, intervenant: true }
         });
         console.log(`Solde/Totalité payé (statut final: ${targetStatus}) pour la réservation ${reservationId}`);
-        await sendCuisineEmailIfNeeded(reservationId);
+        // Désactivé : remplacé par l'envoi hebdomadaire groupé (cron cuisine du jeudi)
+        // await sendCuisineEmailIfNeeded(reservationId);
         await sendPaymentConfirmationEmails(reservation, paymentType, session.amount_total / 100);
       } else if (paymentType === 'caution') {
         const reservation = await prisma.reservation.update({
@@ -482,7 +484,7 @@ const sendMail = async (options) => {
   try {
     const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
     
-    await brevo.transactionalEmails.sendTransacEmail({
+    const emailPayload = {
       subject: options.subject,
       htmlContent: options.html,
       sender: { 
@@ -498,9 +500,16 @@ const sendMail = async (options) => {
         content: att.content,
         name: att.name
       })) : undefined
-    });
+    };
+
+    // Support CC (copie carbone)
+    if (options.cc) {
+      emailPayload.cc = options.cc.split(',').map(email => ({ email: email.trim() }));
+    }
+
+    await brevo.transactionalEmails.sendTransacEmail(emailPayload);
     
-    console.log(`Email envoyé via API Brevo avec succès à : ${options.to}`);
+    console.log(`Email envoyé via API Brevo avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
   } catch (error) {
     console.error("Erreur lors de l'envoi de l'email via API:", error.message || error);
   }
@@ -5150,7 +5159,8 @@ app.put('/api/admin/reservations/:id', checkAuth, async (req, res) => {
       data: dataToUpdate,
       include: { client: true }
     });
-    await sendCuisineEmailIfNeeded(updated.id);
+    // Désactivé : remplacé par l'envoi hebdomadaire groupé (cron cuisine du jeudi)
+    // await sendCuisineEmailIfNeeded(updated.id);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la mise à  jour' });
@@ -5998,7 +6008,8 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
     });
 
     console.log(`Validation Virement par lien : Réservation #${reservation.id} mise à jour à ${targetStatus}`);
-    await sendCuisineEmailIfNeeded(reservation.id);
+    // Désactivé : remplacé par l'envoi hebdomadaire groupé (cron cuisine du jeudi)
+    // await sendCuisineEmailIfNeeded(reservation.id);
     await sendPaymentConfirmationEmails(updatedReservation, nextPaymentType, amount, balancePaymentLink);
 
     if (updatedReservation.codePromo) {
@@ -8223,6 +8234,171 @@ app.get('/api/cron/tax-report', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error("Erreur HTTP cron tax-report:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// CRON HEBDOMADAIRE - COMMANDES REPAS CUISINE CENTRALE
+// Envoi chaque jeudi à 11h (Paris) du récapitulatif des repas pour la semaine suivante
+// ==========================================
+
+const executeWeeklyCuisineEmail = async () => {
+  try {
+    // Calculer lundi et dimanche de la semaine PROCHAINE
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=dim, 1=lun, ..., 4=jeu
+    // Jours jusqu'au lundi prochain
+    const daysUntilNextMonday = ((8 - dayOfWeek) % 7) || 7;
+    
+    const nextMonday = new Date(now);
+    nextMonday.setDate(now.getDate() + daysUntilNextMonday);
+    nextMonday.setHours(0, 0, 0, 0);
+    
+    const nextSunday = new Date(nextMonday);
+    nextSunday.setDate(nextMonday.getDate() + 6);
+    nextSunday.setHours(23, 59, 59, 999);
+
+    console.log(`[Cron Cuisine] Recherche des repas du ${nextMonday.toISOString().slice(0,10)} au ${nextSunday.toISOString().slice(0,10)}`);
+
+    // Récupérer toutes les réservations confirmées chevauchant la période
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        dateDebut: { lte: nextSunday },
+        dateFin: { gte: nextMonday },
+        OR: [
+          { statut: { in: ['ACCEPTEE', 'RESERVE', 'CONFIRMEE'] } },
+          { statutPaiement: { in: ['ACOMPTE_PAYE', 'PAYE'] } }
+        ]
+      },
+      include: { client: true }
+    });
+
+    if (!reservations || reservations.length === 0) {
+      console.log('[Cron Cuisine] Aucune réservation avec repas pour la semaine prochaine.');
+      return { sent: false, reason: 'Aucune réservation pour la période' };
+    }
+
+    // Construire le détail par client pour la semaine
+    const clientBlocks = [];
+    const joursSemaine = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+    for (const resa of reservations) {
+      if (!resa.repas || Object.keys(resa.repas).length === 0) continue;
+
+      const clientNom = resa.client ? `${resa.client.prenom || ''} ${resa.client.nom || ''}`.trim() : 'Client inconnu';
+      const dateDebut = new Date(resa.dateDebut).toLocaleDateString('fr-FR');
+      const dateFin = new Date(resa.dateFin).toLocaleDateString('fr-FR');
+
+      let tableRows = '';
+      let hasAnyMeal = false;
+
+      // Parcourir chaque jour de la semaine prochaine
+      for (let d = new Date(nextMonday); d <= nextSunday; d.setDate(d.getDate() + 1)) {
+        const dateKey = d.toISOString().slice(0, 10);
+        const dayRepas = resa.repas[dateKey];
+        if (!dayRepas) continue;
+
+        const dj = dayRepas.DEJEUNER || {};
+        const dn = dayRepas.DINER || {};
+
+        const djAdulte = dj.ADULTE || 0;
+        const djEnfant = (dj.ENFANT_MOINS_12 || 0) + (dj.ENFANT_MOINS_5 || 0);
+        const dnAdulte = dn.ADULTE || 0;
+        const dnEnfant = (dn.ENFANT_MOINS_12 || 0) + (dn.ENFANT_MOINS_5 || 0);
+
+        if (djAdulte + djEnfant + dnAdulte + dnEnfant === 0) continue;
+        hasAnyMeal = true;
+
+        const jourIndex = (d.getDay() + 6) % 7; // 0=lundi
+        const jourNom = joursSemaine[jourIndex];
+        const dateFormatted = d.toLocaleDateString('fr-FR');
+
+        tableRows += `<tr>
+          <td style="padding:6px 12px;border:1px solid #ddd;">${jourNom} ${dateFormatted}</td>
+          <td style="padding:6px 12px;border:1px solid #ddd;text-align:center;">${djAdulte}</td>
+          <td style="padding:6px 12px;border:1px solid #ddd;text-align:center;">${djEnfant}</td>
+          <td style="padding:6px 12px;border:1px solid #ddd;text-align:center;">${dnAdulte}</td>
+          <td style="padding:6px 12px;border:1px solid #ddd;text-align:center;">${dnEnfant}</td>
+        </tr>`;
+      }
+
+      if (!hasAnyMeal) continue;
+
+      clientBlocks.push(`
+        <div style="margin-bottom:24px;border:1px solid #ccc;border-radius:8px;padding:16px;background:#fafafa;">
+          <h3 style="margin:0 0 8px 0;color:#333;">👤 ${clientNom}</h3>
+          <p style="margin:0 0 12px 0;color:#666;">Séjour du ${dateDebut} au ${dateFin}</p>
+          <table style="border-collapse:collapse;width:100%;">
+            <thead>
+              <tr style="background:#2c3e50;color:white;">
+                <th style="padding:8px 12px;border:1px solid #ddd;">Jour</th>
+                <th style="padding:8px 12px;border:1px solid #ddd;">Déjeuner Adulte</th>
+                <th style="padding:8px 12px;border:1px solid #ddd;">Déjeuner Enfant</th>
+                <th style="padding:8px 12px;border:1px solid #ddd;">Dîner Adulte</th>
+                <th style="padding:8px 12px;border:1px solid #ddd;">Dîner Enfant</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>
+      `);
+    }
+
+    if (clientBlocks.length === 0) {
+      console.log('[Cron Cuisine] Aucun repas (déjeuner/dîner) commandé pour la semaine prochaine.');
+      return { sent: false, reason: 'Aucun déjeuner ou dîner commandé' };
+    }
+
+    const periodeLabel = `${nextMonday.toLocaleDateString('fr-FR')} au ${nextSunday.toLocaleDateString('fr-FR')}`;
+
+    const htmlContent = `
+      <div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;">
+        <div style="background:linear-gradient(135deg,#2c3e50,#3498db);color:white;padding:24px;border-radius:8px 8px 0 0;">
+          <h1 style="margin:0;font-size:22px;">🍽️ Commandes de repas - Semaine du ${periodeLabel}</h1>
+          <p style="margin:8px 0 0 0;opacity:0.9;">Gîte de la Maladrerie - MUC Omnisports</p>
+        </div>
+        <div style="padding:24px;background:white;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;">
+          <p style="color:#555;margin-bottom:20px;">Bonjour,<br><br>Veuillez trouver ci-dessous le récapitulatif des commandes de repas pour la semaine du <strong>${periodeLabel}</strong>.<br>Chaque groupe dispose de son propre détail (livraison en bac inox par groupe).</p>
+          ${clientBlocks.join('')}
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+          <p style="color:#888;font-size:13px;">Ce récapitulatif a été généré automatiquement. Pour toute question, contactez-nous à l'adresse <a href="mailto:dr.mucomnisports@gmail.com">dr.mucomnisports@gmail.com</a>.</p>
+        </div>
+      </div>
+    `;
+
+    const cuisineEmail = process.env.CUISINE_EMAIL || process.env.ADMIN_EMAIL || 'cuisine@millau.fr';
+    const ccEmails = 'david.roujet@mucomnisports.fr,philippe.morereau@mucomnisports.fr';
+
+    await sendMail({
+      to: cuisineEmail,
+      cc: ccEmails,
+      subject: `Commandes de repas - Semaine du ${periodeLabel} - Gîte de la Maladrerie`,
+      html: htmlContent
+    });
+
+    console.log(`[Cron Cuisine] Récapitulatif envoyé avec succès pour la semaine du ${periodeLabel} (${clientBlocks.length} groupe(s)).`);
+    return { sent: true, groups: clientBlocks.length, period: periodeLabel };
+
+  } catch (error) {
+    console.error('[Cron Cuisine] Erreur:', error);
+    throw error;
+  }
+};
+
+app.get('/api/cron/cuisine', async (req, res) => {
+  const isVercelCron = req.headers['x-vercel-cron'] === '1';
+  const isValidToken = req.query.token === process.env.CRON_SECRET;
+  if (!isVercelCron && !isValidToken && process.env.NODE_ENV === 'production') {
+    return res.status(401).send('Non autorisé');
+  }
+  try {
+    const result = await executeWeeklyCuisineEmail();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Erreur HTTP cron cuisine:', error);
     res.status(500).json({ error: error.message });
   }
 });

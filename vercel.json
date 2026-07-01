@@ -56,6 +56,10 @@
     {
       "path": "/api/cron/tax-report",
       "schedule": "0 9 1 * *"
+    },
+    {
+      "path": "/api/cron/cuisine",
+      "schedule": "0 9 * * 4"
     }
   ]
 }
