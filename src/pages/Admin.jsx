@@ -346,6 +346,7 @@ const Admin = () => {
   const [showFicheModal, setShowFicheModal] = useState(false);
   const [activeFicheOccupant, setActiveFicheOccupant] = useState(null);
   const [isSavingFiche, setIsSavingFiche] = useState(false);
+  const [isSendingPoliceEmail, setIsSendingPoliceEmail] = useState(false);
   const [ficheForm, setFicheForm] = useState({
     nom: '',
     prenom: '',
@@ -1138,6 +1139,27 @@ const Admin = () => {
       showFeedback(err.message, "error");
     } finally {
       setIsSavingFiche(false);
+    }
+  };
+
+  const handleSendPoliceEmail = async () => {
+    if (!selectedFicheReservation) return;
+    setIsSendingPoliceEmail(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations/${selectedFicheReservation.id}/send-police-email`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de l'envoi.");
+      showFeedback("E-mail de signature envoyé au client avec succès !", "success");
+    } catch (err) {
+      showFeedback(err.message, "error");
+    } finally {
+      setIsSendingPoliceEmail(false);
     }
   };
 
@@ -5050,6 +5072,20 @@ const Admin = () => {
               ) : (
                 /* Occupants List */
                 <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50 mb-2">
+                    <div>
+                      <div className="text-xs font-black text-muc-blue uppercase tracking-wider">Signature en ligne</div>
+                      <div className="text-[11px] text-slate-500 font-medium">Envoyer un lien unique par mail au client pour signer les fiches en ligne.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSendPoliceEmail}
+                      disabled={isSendingPoliceEmail}
+                      className="px-3.5 py-2 bg-muc-blue hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-md shrink-0"
+                    >
+                      {isSendingPoliceEmail ? 'Envoi...' : '✉️ Envoyer demande par mail'}
+                    </button>
+                  </div>
                   <div className="text-sm font-medium text-slate-600">
                     Sélectionnez un occupant pour remplir sa fiche de police et la faire signer :
                   </div>
@@ -5980,6 +6016,20 @@ const Admin = () => {
               ) : (
                 /* Occupants List */
                 <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50 mb-2">
+                    <div>
+                      <div className="text-xs font-black text-muc-blue uppercase tracking-wider">Signature en ligne</div>
+                      <div className="text-[11px] text-slate-500 font-medium">Envoyer un lien unique par mail au client pour signer les fiches en ligne.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSendPoliceEmail}
+                      disabled={isSendingPoliceEmail}
+                      className="px-3.5 py-2 bg-muc-blue hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-md shrink-0"
+                    >
+                      {isSendingPoliceEmail ? 'Envoi...' : '✉️ Envoyer demande par mail'}
+                    </button>
+                  </div>
                   <div className="text-sm font-medium text-slate-600">
                     Sélectionnez un occupant pour remplir sa fiche de police et la faire signer :
                   </div>

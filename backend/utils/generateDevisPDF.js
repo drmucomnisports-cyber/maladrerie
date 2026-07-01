@@ -229,10 +229,26 @@ async function generateDevisPDF(data) {
             y += 40;
             doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(11).text('Bon pour accord', leftCol, y);
             doc.fillColor('#000000').font('Helvetica').fontSize(10);
-            doc.text('Date :', leftCol, y + 20);
+            
+            let dateAccord = 'Date :';
+            if (data.valideLe) {
+              const formattedDate = new Date(data.valideLe).toLocaleDateString('fr-FR');
+              dateAccord = `Date : ${formattedDate}`;
+            }
+            doc.text(dateAccord, leftCol, y + 20);
             doc.text('Signature (précédée de la mention "Lu et approuvé") :', leftCol, y + 40);
             
             doc.rect(leftCol, y + 60, 250, 70).stroke('#CCCCCC');
+
+            if (data.devisSignature) {
+              try {
+                const base64Data = data.devisSignature.replace(/^data:image\/\w+;base64,/, "");
+                const imgBuffer = Buffer.from(base64Data, 'base64');
+                doc.image(imgBuffer, leftCol + 10, y + 65, { width: 230, height: 60 });
+              } catch (err) {
+                console.error("Erreur lors de l'insertion de la signature du devis:", err);
+              }
+            }
 
             // --- PIED DE PAGE ---
             doc.fontSize(8).fillColor('#999999').text('Gîte de la Maladrerie - MUC OMNISPORTS | SIRET: 38820857100025 | Assurance MAIF n° 132 48 45 M', 0, 760, { align: 'center', width: 612 });

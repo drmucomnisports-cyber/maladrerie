@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, AlertTriangle, Loader2, Calendar, Users, CreditCard, Info, ShieldCheck, Mail, Phone, Home, Landmark, Copy, Check } from 'lucide-react';
 import { API_URL } from '../config';
+import SignaturePad from '../components/SignaturePad';
 
 const CHAMBRES_INFO = {
   1: { num: 1, name: 'Chambre PMR', lits: 5, etage: 'RDC' },
@@ -28,6 +29,7 @@ const DevisValidate = () => {
   const [paymentMethod, setPaymentMethod] = useState('stripe');
   const [virementResult, setVirementResult] = useState(null);
   const [copiedField, setCopiedField] = useState(null);
+  const [devisSignature, setDevisSignature] = useState(null);
 
   const copyToClipboard = (text, field) => {
     navigator.clipboard.writeText(text);
@@ -126,6 +128,12 @@ const DevisValidate = () => {
       }
     }
 
+    // Valider la signature
+    if (!devisSignature) {
+      setErrorMsg("La signature manuscrite du devis est obligatoire pour valider la réservation.");
+      return;
+    }
+
     setIsSubmitting(true);
     const validateUrl = `${API_URL}/api/devis/validate/${encodeURIComponent(token)}`;
     console.log('[DevisValidate] Validating devis:', { validateUrl, occupantsCount: occupants.length });
@@ -134,7 +142,7 @@ const DevisValidate = () => {
       const res = await fetch(validateUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ occupants, paymentMethod })
+        body: JSON.stringify({ occupants, paymentMethod, signature: devisSignature })
       });
 
       if (res.ok) {
@@ -487,10 +495,14 @@ const DevisValidate = () => {
                     </div>
                   </div>
 
+                  <div className="border-t border-slate-100 pt-4 mb-4">
+                    <SignaturePad onSave={setDevisSignature} />
+                  </div>
+
                   <button 
-                    disabled={isSubmitting} 
+                    disabled={isSubmitting || !devisSignature} 
                     type="submit" 
-                    className={`w-full py-4 bg-[#FFD700] hover:bg-[#FCD34D] text-[#004B93] font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl hover:scale-[1.01] ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    className={`w-full py-4 bg-[#FFD700] hover:bg-[#FCD34D] text-[#004B93] font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl hover:scale-[1.01] ${isSubmitting || !devisSignature ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
                     {isSubmitting ? (
                       <>

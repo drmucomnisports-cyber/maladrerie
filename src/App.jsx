@@ -14,6 +14,7 @@ import PaymentSuccess from './pages/PaymentSuccess';
 import OccupantsCollect from './pages/OccupantsCollect';
 import ReservationModify from './pages/ReservationModify';
 import ReservationPay from './pages/ReservationPay';
+import FichePoliceSign from './pages/FichePoliceSign';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="/payment" element={<ReservationPay />} />
         <Route path="/reservation/occupants" element={<OccupantsCollect />} />
         <Route path="/reservation/modify" element={<ReservationModify />} />
+        <Route path="/sign-police" element={<FichePoliceSign />} />
       </Routes>
     </Router>
   );

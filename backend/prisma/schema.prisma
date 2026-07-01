@@ -41,6 +41,8 @@ model Reservation {
   statut          String       @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE, RESERVE, DEVIS_EN_ATTENTE, DEVIS_EXPIRE
   validePar       String?      // Nom de l'admin ayant validé
   tokenDevis      String?      @unique
+  tokenPolice     String?      @unique
+  devisSignature  String?
   tokenModification String?    @unique
   modificationProposed Json?
   expireLe        DateTime?    // Pour les devis (48h)
@@ -83,6 +85,7 @@ model Intervenant {
   email          String          @unique
   password       String?
   statut         String          @default("SALARIE") // "SALARIE" ou "INDEPENDANT"
+  recevoirRappels Boolean         @default(true)
   disponibilites Disponibilite[]
   reservations   Reservation[]
   missions       Mission[]

@@ -2905,7 +2905,9 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
       prixTotal: devis.prixTotal,
       montantAcompte: devis.montantAcompte || (Math.round((Math.max(0, devis.prixTotal - calculerTotalRepasServeur(devis.repas)) * 0.3 + calculerTotalRepasServeur(devis.repas)) * 100) / 100),
       promoMontant,
-      codePromo: devis.codePromo
+      codePromo: devis.codePromo,
+      devisSignature: devis.devisSignature,
+      valideLe: devis.valideLe
     };
 
     const pdfBuffer = await generateDevisPDF(pdfData);
@@ -3128,7 +3130,9 @@ app.get('/api/devis/pdf/:token', async (req, res) => {
       prixTotal: devis.prixTotal,
       montantAcompte: devis.montantAcompte || (Math.round((Math.max(0, devis.prixTotal - calculerTotalRepasServeur(devis.repas)) * 0.3 + calculerTotalRepasServeur(devis.repas)) * 100) / 100),
       promoMontant,
-      codePromo: devis.codePromo
+      codePromo: devis.codePromo,
+      devisSignature: devis.devisSignature,
+      valideLe: devis.valideLe
     };
 
     const pdfBuffer = await generateDevisPDF(pdfData);
@@ -3517,7 +3521,7 @@ app.get('/api/devis/info/:token', async (req, res) => {
 // Valider un devis avec saisie des occupants (Client - POST)
 app.post('/api/devis/validate/:token', async (req, res) => {
   const { token } = req.params;
-  const { occupants, paymentMethod } = req.body;
+  const { occupants, paymentMethod, signature } = req.body;
 
   try {
     const devis = await prisma.reservation.findUnique({
@@ -3600,6 +3604,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           montantAcompte: montantAcompte,
           montantSolde: montantSolde,
           modePaiement: 'VIREMENT',
+          devisSignature: signature,
           valideLe: new Date()
         }
       });
@@ -3748,6 +3753,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           montantAcompte: montantAcompte,
           montantSolde: montantSolde,
           stripeSessionId: session.id,
+          devisSignature: signature,
           valideLe: new Date()
         }
       });
@@ -8055,6 +8061,120 @@ const executeDailyReminders = async () => {
       console.log(`Rappel J+10 envoyé pour la réservation ${reser.id}`);
     }
 
+    // --- 3. RAPPELS AUTOMATIQUES AUX INTERVENANTS POUR LEURS MISSIONS (J+3 avant la mission) ---
+    const missionReminderDate = new Date(today);
+    missionReminderDate.setDate(today.getDate() + 3);
+    const missionReminderStart = new Date(missionReminderDate);
+    missionReminderStart.setHours(0, 0, 0, 0);
+    const missionReminderEnd = new Date(missionReminderDate);
+    missionReminderEnd.setHours(23, 59, 59, 999);
+
+    const upcomingMissions = await prisma.mission.findMany({
+      where: {
+        statut: 'ACCEPTEE',
+        intervenant: {
+          recevoirRappels: true
+        },
+        OR: [
+          { date: { gte: missionReminderStart, lte: missionReminderEnd } },
+          {
+            date: null,
+            reservation: {
+              dateDebut: { gte: missionReminderStart, lte: missionReminderEnd }
+            }
+          }
+        ]
+      },
+      include: {
+        intervenant: true,
+        reservation: {
+          include: { client: true }
+        }
+      }
+    });
+
+    // Regrouper par intervenant
+    const missionsByInterv = {};
+    upcomingMissions.forEach(m => {
+      if (!missionsByInterv[m.intervenant.id]) {
+        missionsByInterv[m.intervenant.id] = {
+          interv: m.intervenant,
+          list: []
+        };
+      }
+      missionsByInterv[m.intervenant.id].list.push(m);
+    });
+
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://maladrerie-millau.com';
+    const BACKEND_URL = process.env.BACKEND_URL || 'https://maladrerie-millau.com';
+
+    // Envoyer les e-mails
+    for (const idKey of Object.keys(missionsByInterv)) {
+      const group = missionsByInterv[idKey];
+      const { interv, list } = group;
+      
+      const isPlural = list.length > 1;
+      const subject = isPlural 
+        ? `⏰ Rappel : Vos ${list.length} missions approchent - Gîte de la Maladrerie` 
+        : `⏰ Rappel : Votre mission approche - Gîte de la Maladrerie`;
+
+      let listHtml = list.map(m => {
+        const mDate = m.date ? new Date(m.date) : new Date(m.reservation.dateDebut);
+        return `
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 12px; text-align: left;">
+            <p style="margin: 0; font-weight: bold; font-size: 15px; color: #004B93;">${m.typeMission}</p>
+            <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">
+              <strong>Date :</strong> ${mDate.toLocaleDateString('fr-FR')} <br/>
+              <strong>Séjour :</strong> Réf #${m.reservationId} (Client : ${m.reservation.client?.nom || 'Inconnu'})
+            </p>
+          </div>
+        `;
+      }).join('');
+
+      const unsubUrl = `${BACKEND_URL}/api/intervenant/unsubscribe-reminders?email=${encodeURIComponent(interv.email)}&token=${interv.id}`;
+
+      await sendMail({
+        to: interv.email,
+        subject,
+        html: `
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+                  <tr>
+                    <td style="background-color: #004B93; padding: 30px; text-align: center;">
+                      <img src="${FRONTEND_URL}/logo-muc.png" alt="MUC Omnisports" style="max-height: 60px; margin-bottom: 15px;" />
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Gîte de La Maladrerie</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px; color: #333333; line-height: 1.6;">
+                      <h2 style="color: #004B93; margin-top: 0;">Bonjour ${interv.prenom},</h2>
+                      <p>Nous vous rappelons que vous avez des prestations prévues au gîte dans 3 jours (le <strong>${missionReminderDate.toLocaleDateString('fr-FR')}</strong>) :</p>
+                      
+                      <div style="margin: 20px 0;">
+                        ${listHtml}
+                      </div>
+
+                      <p style="font-size: 14px; color: #64748b;">Merci de vous organiser pour la réalisation de vos missions aux dates et horaires convenus.</p>
+                      
+                      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
+                      <p style="font-size: 11px; text-align: center; color: #94a3b8; margin: 0;">
+                        Cet e-mail est un rappel automatique. Vous pouvez vous désabonner à tout moment de ces rappels 
+                        en <a href="${unsubUrl}" style="color: #004B93; text-decoration: underline;">cliquant ici pour désactiver les alertes</a>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr><td style="background-color: #FDB913; height: 5px;"></td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        `
+      });
+      console.log(`Rappel de missions envoyé à ${interv.prenom} ${interv.nom} (${list.length} missions)`);
+    }
+
   } catch (error) {
     console.error("Erreur lors de l'exécution du Cron Job de rappels/annulations :", error);
   }
@@ -8549,6 +8669,174 @@ app.post('/api/reservation/occupants/:token', async (req, res) => {
   }
 });
 
+// Endpoint pour envoyer les liens de signature des fiches de police par mail au client
+app.post('/api/admin/reservations/:id/send-police-email', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: parseInt(id) },
+      include: { client: true }
+    });
+    if (!reservation) return res.status(404).json({ error: "Réservation introuvable." });
+    
+    let token = reservation.tokenPolice;
+    if (!token) {
+      token = require('crypto').randomBytes(24).toString('hex');
+      await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { tokenPolice: token }
+      });
+    }
+    
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const link = `${frontendUrl}/sign-police?token=${token}`;
+    
+    const adminSignatureHTML = await getAdminSignatureHTML(req.user.email || 'dr.mucomnisports@gmail.com');
+    
+    await sendMail({
+      to: reservation.client.email,
+      subject: `Saisie et Signature des Fiches de Police - Gîte de la Maladrerie`,
+      html: `
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+          <tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: sans-serif;">
+            <tr><td style="background-color: #004B93; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0;">Gîte de La Maladrerie</h1></td></tr>
+            <tr><td style="padding: 40px; color: #333333; line-height: 1.6;">
+              <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
+              <p>Afin de préparer au mieux votre accueil et de respecter la réglementation en vigueur, nous vous invitons à remplir et signer en ligne la <strong>Fiche Individuelle de Police</strong> pour chaque occupant (adulte et enfant) de votre groupe.</p>
+              <p>Cette démarche obligatoire ne vous prendra que quelques instants.</p>
+              <p style="text-align: center; margin: 30px 0;">
+                <a href="${link}" style="background-color: #004B93; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder aux Fiches de Police</a>
+              </p>
+              <p>Nous vous remercions pour votre collaboration et restons à votre entière disposition pour toute information complémentaire.</p>
+              ${adminSignatureHTML}
+            </td></tr>
+          </table></td></tr>
+        </table>
+      `
+    });
+    
+    res.json({ success: true, message: "E-mail de signature envoyé avec succès." });
+  } catch (err) {
+    console.error("Erreur envoi email police:", err);
+    res.status(500).json({ error: "Erreur serveur lors de l'envoi de l'e-mail." });
+  }
+});
+
+// Endpoint public pour récupérer les infos de la réservation avec le token de police
+app.get('/api/reservation/police-info/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenPolice: token },
+      include: { client: true, occupants: true }
+    });
+    if (!reservation) return res.status(404).json({ error: "Lien invalide ou expiré." });
+    
+    res.json({
+      id: reservation.id,
+      numeroDevis: reservation.numeroDevis,
+      dateDebut: reservation.dateDebut,
+      dateFin: reservation.dateFin,
+      client: {
+        nom: reservation.client.nom,
+        email: reservation.client.email,
+        telephone: reservation.client.telephone,
+        adressePostale: reservation.client.adressePostale
+      },
+      occupants: reservation.occupants,
+      fichesPolice: reservation.fichesPolice
+    });
+  } catch (err) {
+    console.error("Erreur récup police-info:", err);
+    res.status(500).json({ error: "Erreur serveur lors de la récupération des informations." });
+  }
+});
+
+// Endpoint public pour signer une fiche de police
+app.post('/api/reservation/police-sign/:token', async (req, res) => {
+  const { token } = req.params;
+  const {
+    occupantId,
+    nom,
+    prenom,
+    dateNaissance,
+    lieuNaissance,
+    nationalite,
+    domicile,
+    telephone,
+    email,
+    signature,
+    dateArrivee,
+    dateDepart
+  } = req.body;
+  
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenPolice: token }
+    });
+    if (!reservation) return res.status(404).json({ error: "Réservation introuvable." });
+    
+    let fiches = [];
+    if (reservation.fichesPolice) {
+      fiches = Array.isArray(reservation.fichesPolice) 
+        ? reservation.fichesPolice 
+        : JSON.parse(JSON.stringify(reservation.fichesPolice));
+    }
+    
+    const newFiche = {
+      occupantId: occupantId ? parseInt(occupantId) : null,
+      nom,
+      prenom,
+      dateNaissance,
+      lieuNaissance,
+      nationalite,
+      domicile,
+      telephone,
+      email,
+      signature,
+      dateArrivee,
+      dateDepart,
+      signedAt: new Date().toISOString()
+    };
+    
+    let updated = false;
+    if (occupantId) {
+      const idx = fiches.findIndex(f => f.occupantId === parseInt(occupantId));
+      if (idx > -1) {
+        fiches[idx] = newFiche;
+        updated = true;
+      }
+    }
+    if (!updated) {
+      fiches.push(newFiche);
+    }
+    
+    const updatedReservation = await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: { fichesPolice: fiches },
+      include: { client: true, occupants: true }
+    });
+    
+    res.json({
+      id: updatedReservation.id,
+      numeroDevis: updatedReservation.numeroDevis,
+      dateDebut: updatedReservation.dateDebut,
+      dateFin: updatedReservation.dateFin,
+      client: {
+        nom: updatedReservation.client.nom,
+        email: updatedReservation.client.email,
+        telephone: updatedReservation.client.telephone,
+        adressePostale: updatedReservation.client.adressePostale
+      },
+      occupants: updatedReservation.occupants,
+      fichesPolice: updatedReservation.fichesPolice
+    });
+  } catch (err) {
+    console.error("Erreur signature police publique:", err);
+    res.status(500).json({ error: "Erreur serveur lors de la sauvegarde." });
+  }
+});
+
 // ===================================
 // PORTAIL INTERVENANT ME & PROFILE & MISSIONS STATUS
 // ===================================
@@ -8576,11 +8864,14 @@ app.put('/api/intervenant/profile', checkAuth, async (req, res) => {
   if (req.user.role !== 'intervenant') {
     return res.status(403).json({ error: 'Accès interdit - Droits intervenant requis' });
   }
-  const { nom, prenom, email, telephone, password, disponibilites } = req.body;
+  const { nom, prenom, email, telephone, password, disponibilites, recevoirRappels } = req.body;
   try {
     const dataToUpdate = { nom, prenom, email, telephone };
     if (password && password.trim() !== '') {
       dataToUpdate.password = await bcrypt.hash(password, 10);
+    }
+    if (recevoirRappels !== undefined) {
+      dataToUpdate.recevoirRappels = recevoirRappels;
     }
 
     // Supprimer les anciennes disponibilités
@@ -8867,6 +9158,145 @@ app.get('/api/admin/factures/period', checkAuth, async (req, res) => {
   } catch (error) {
     console.error("Erreur récupération réservations par période :", error);
     res.status(500).json({ error: 'Erreur serveur lors de la récupération des réservations.' });
+  }
+});
+
+// --- ENDPOINT POUR L'AGENDA ICAL PERSONNEL DE L'INTERVENANT ---
+app.get('/api/calendar/ical/intervenant/:emailParam', async (req, res) => {
+  let email = req.params.emailParam;
+  if (!email) return res.status(400).send("Email requis");
+  
+  email = email.replace(/_at_/g, '@').trim();
+  
+  try {
+    const intervenant = await prisma.intervenant.findUnique({
+      where: { email }
+    });
+    if (!intervenant) return res.status(404).send("Intervenant non trouvé");
+
+    const missions = await prisma.mission.findMany({
+      where: {
+        intervenantId: intervenant.id,
+        statut: { in: ['ACCEPTEE', 'EN_ATTENTE'] }
+      },
+      include: {
+        reservation: {
+          include: { client: true }
+        }
+      }
+    });
+
+    let icalContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Gite de la Maladrerie//Staff Calendar Sync//FR',
+      'CALSCALE:GREGORIAN',
+      'X-WR-CALNAME:Gîte de la Maladrerie - Mes Missions',
+      'X-WR-TIMEZONE:Europe/Paris'
+    ];
+
+    missions.forEach(m => {
+      const reservation = m.reservation;
+      const start = m.date ? new Date(m.date) : new Date(reservation.dateDebut);
+      const end = m.date ? new Date(m.date) : new Date(reservation.dateFin);
+
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}${month}${day}`;
+      };
+
+      const uid = `mission-${m.id}@gite-la-maladrerie.fr`;
+      const summary = `📌 MA MISSION : ${m.typeMission}`;
+      
+      const clientName = reservation.client?.nom || 'Inconnu';
+      let descLines = [
+        `Mission : ${m.typeMission}`,
+        `Client : ${clientName}`,
+        `Séjour : Du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}`,
+        reservation.structure ? `Structure : ${reservation.structure}` : null,
+        `Chambres louées : ${(reservation.chambres || []).join(', ')}`,
+        `Rémunération prévue : ${m.montant ? `${m.montant.toFixed(2)} €` : 'Non renseignée'}`,
+        `Statut Mission : ${m.statut}`
+      ].filter(Boolean);
+
+      const description = descLines.join('\\n');
+
+      icalContent.push('BEGIN:VEVENT');
+      icalContent.push(`UID:${uid}`);
+      icalContent.push(`DTSTAMP:${formatDate(new Date())}T120000Z`);
+      if (m.date) {
+        icalContent.push(`DTSTART;VALUE=DATE:${formatDate(start)}`);
+        const nextDay = new Date(start);
+        nextDay.setDate(start.getDate() + 1);
+        icalContent.push(`DTEND;VALUE=DATE:${formatDate(nextDay)}`);
+      } else {
+        icalContent.push(`DTSTART;VALUE=DATE:${formatDate(start)}`);
+        icalContent.push(`DTEND;VALUE=DATE:${formatDate(end)}`);
+      }
+      icalContent.push(`SUMMARY:${summary}`);
+      icalContent.push(`DESCRIPTION:${description}`);
+      icalContent.push('END:VEVENT');
+    });
+
+    icalContent.push('END:VCALENDAR');
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="missions-${intervenant.prenom}.ics"`);
+    res.send(icalContent.join('\r\n'));
+  } catch (error) {
+    console.error("Erreur génération iCal intervenant :", error);
+    res.status(500).send("Erreur lors de la génération du calendrier");
+  }
+});
+
+// --- ENDPOINT PUBLIC POUR LE DÉSABONNEMENT DES RAPPELS DE MISSIONS ---
+app.get('/api/intervenant/unsubscribe-reminders', async (req, res) => {
+  const { email, token } = req.query;
+  if (!email || !token) {
+    return res.status(400).send("Paramètres invalides");
+  }
+  try {
+    const intervenant = await prisma.intervenant.findUnique({
+      where: { email }
+    });
+    if (!intervenant || String(intervenant.id) !== token) {
+      return res.status(400).send("Lien de désabonnement expiré ou invalide");
+    }
+
+    await prisma.intervenant.update({
+      where: { id: intervenant.id },
+      data: { recevoirRappels: false }
+    });
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <title>Désabonnement réussi</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f7f6; color: #333; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+          h1 { color: #004B93; }
+          p { font-size: 16px; line-height: 1.5; color: #666; }
+          .icon { font-size: 50px; margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="icon">🔕</div>
+          <h1>Désabonnement pris en compte</h1>
+          <p>Bonjour ${intervenant.prenom}, vous ne recevrez plus de rappels par e-mail concernant vos missions au Gîte de la Maladrerie.</p>
+          <p>Vous pouvez réactiver ces notifications à tout moment depuis votre profil sur votre Espace Équipe.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Erreur désabonnement:", error);
+    res.status(500).send("Erreur lors de la désinscription");
   }
 });
 
