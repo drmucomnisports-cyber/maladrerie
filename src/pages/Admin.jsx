@@ -240,6 +240,14 @@ const Admin = () => {
   const [intervenantForm, setIntervenantForm] = useState({ nom: '', prenom: '', email: '', telephone: '', password: '', disponibilites: [], statut: 'SALARIE' });
   const [isSavingIntervenant, setIsSavingIntervenant] = useState(false);
 
+  // Facturation intervenants
+  const [showBillingModal, setShowBillingModal] = useState(false);
+  const [billingIntervenant, setBillingIntervenant] = useState(null);
+  const [billingMonth, setBillingMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
   // Codes Promo
   const [promoCodes, setPromoCodes] = useState([]);
   const [showPromoModal, setShowPromoModal] = useState(false);
@@ -2546,6 +2554,18 @@ const Admin = () => {
                       </div>
                     </div>
                     <div className="flex gap-1.5 shrink-0 ml-4">
+                      {interv.statut === 'INDEPENDANT' && (
+                        <button
+                          onClick={() => {
+                            setBillingIntervenant(interv);
+                            setShowBillingModal(true);
+                          }}
+                          className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors"
+                          title="Voir la facturation"
+                        >
+                          <Banknote size={18} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => inviteIntervenant(interv)} 
                         disabled={invitingId === interv.id}
@@ -2569,6 +2589,79 @@ const Admin = () => {
           );
         })()}
       </div>
+
+      {showBillingModal && billingIntervenant && (() => {
+        const [year, month] = billingMonth.split('-').map(Number);
+        const monthStart = new Date(year, month - 1, 1);
+        const monthEnd = new Date(year, month, 0, 23, 59, 59);
+        
+        const missions = (billingIntervenant.missions || []).filter(m => {
+          const mDate = m.date ? new Date(m.date) : (m.reservation?.dateDebut ? new Date(m.reservation.dateDebut) : null);
+          if (!mDate) return false;
+          return mDate >= monthStart && mDate <= monthEnd;
+        });
+        
+        const totalMois = missions.reduce((sum, m) => sum + (m.montant || 0), 0);
+        
+        const monthName = monthStart.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
+              <button onClick={() => setShowBillingModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <X className="w-6 h-6" />
+              </button>
+              <h3 className="text-xl font-bold text-slate-800 mb-1 flex items-center gap-2">
+                <Banknote className="w-6 h-6 text-amber-500" />
+                Facturation
+              </h3>
+              <p className="text-slate-500 text-sm mb-5">{billingIntervenant.prenom} {billingIntervenant.nom} <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold ml-1">Indépendant</span></p>
+              
+              <div className="mb-5">
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Période</label>
+                <input
+                  type="month"
+                  value={billingMonth}
+                  onChange={(e) => setBillingMonth(e.target.value)}
+                  className="w-full bg-slate-50 p-3 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                />
+              </div>
+              
+              {missions.length === 0 ? (
+                <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="text-3xl mb-2">📭</div>
+                  <p className="text-slate-500 font-medium">Aucune prestation pour {monthName}.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 mb-5">
+                    {missions.map((m, idx) => {
+                      const mDate = m.date ? new Date(m.date) : (m.reservation?.dateDebut ? new Date(m.reservation.dateDebut) : null);
+                      return (
+                        <div key={idx} className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-slate-800 text-sm">{m.typeMission}</p>
+                            <p className="text-xs text-slate-500">
+                              {mDate ? mDate.toLocaleDateString('fr-FR') : '—'}
+                              {m.reservation?.client?.nom ? ` • Client : ${m.reservation.client.nom}` : ''}
+                            </p>
+                          </div>
+                          <span className="font-black text-slate-800 text-sm whitespace-nowrap">{(m.montant || 0).toFixed(2)} €</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 flex justify-between items-center">
+                    <span className="font-bold text-amber-800 uppercase text-sm tracking-wide">Total à facturer</span>
+                    <span className="font-black text-amber-900 text-xl">{totalMois.toFixed(2)} €</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {showClientModal && selectedClient && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">

@@ -7295,7 +7295,7 @@ app.get('/api/admin/intervenants', checkAuth, async (req, res) => {
       include: { 
         disponibilites: true,
         missions: {
-          include: { reservation: true }
+          include: { reservation: { include: { client: true } } }
         }
       }
     });
