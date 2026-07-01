@@ -4899,6 +4899,7 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         id: m.id,
         date: m.date || (m.reservation ? m.reservation.dateDebut : new Date()),
         intervenant: `${m.intervenant.prenom} ${m.intervenant.nom}`,
+        intervenantStatut: m.intervenant.statut,
         typeMission: m.typeMission,
         montant: getMissionCoutReel(m),
         clientNom: m.reservation?.client?.nom || 'Inconnu',
@@ -7294,9 +7295,9 @@ app.get('/api/admin/intervenants', checkAuth, async (req, res) => {
 });
 
 app.post('/api/admin/intervenants', checkAuth, async (req, res) => {
-  const { nom, prenom, email, telephone, password, disponibilites } = req.body;
+  const { nom, prenom, email, telephone, password, disponibilites, statut } = req.body;
   try {
-    const data = { nom, prenom, email, telephone };
+    const data = { nom, prenom, email, telephone, statut: statut || 'SALARIE' };
     if (password) {
       data.password = await bcrypt.hash(password, 10);
     }
@@ -7320,9 +7321,9 @@ app.post('/api/admin/intervenants', checkAuth, async (req, res) => {
 
 app.put('/api/admin/intervenants/:id', checkAuth, async (req, res) => {
   const { id } = req.params;
-  const { nom, prenom, email, telephone, password, disponibilites } = req.body;
+  const { nom, prenom, email, telephone, password, disponibilites, statut } = req.body;
   try {
-    const data = { nom, prenom, email, telephone };
+    const data = { nom, prenom, email, telephone, statut: statut || 'SALARIE' };
     if (password) {
       data.password = await bcrypt.hash(password, 10);
     }

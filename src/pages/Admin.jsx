@@ -141,6 +141,7 @@ const PCG_CATEGORIES = [
   { code: '6068', name: 'Achats alimentaires & consommables' },
   { code: '613', name: 'Loyer & locations' },
   { code: '6061', name: 'Fluides (Électricité, Eau, Gaz)' },
+  { code: '611', name: 'Sous-traitance & Prestations externes' },
   { code: '615', name: 'Entretien & réparations du gîte' },
   { code: '616', name: 'Primes d\'assurances' },
   { code: '623', name: 'Publicité & Communication' },
@@ -236,7 +237,7 @@ const Admin = () => {
 
   const [showIntervenantModal, setShowIntervenantModal] = useState(false);
   const [currentIntervenant, setCurrentIntervenant] = useState(null);
-  const [intervenantForm, setIntervenantForm] = useState({ nom: '', prenom: '', email: '', telephone: '', password: '', disponibilites: [] });
+  const [intervenantForm, setIntervenantForm] = useState({ nom: '', prenom: '', email: '', telephone: '', password: '', disponibilites: [], statut: 'SALARIE' });
   const [isSavingIntervenant, setIsSavingIntervenant] = useState(false);
 
   // Codes Promo
@@ -537,7 +538,8 @@ const Admin = () => {
       email: interv.email,
       telephone: interv.telephone,
       password: '', // On ne pré-remplit pas le mot de passe
-      disponibilites: interv.disponibilites || []
+      disponibilites: interv.disponibilites || [],
+      statut: interv.statut || 'SALARIE'
     });
     setShowIntervenantModal(true);
   };
@@ -2507,7 +2509,7 @@ const Admin = () => {
                   <button
                     onClick={() => {
                       setCurrentIntervenant(null);
-                      setIntervenantForm({ nom: '', prenom: '', email: '', telephone: '', disponibilites: [] });
+                      setIntervenantForm({ nom: '', prenom: '', email: '', telephone: '', password: '', disponibilites: [], statut: 'SALARIE' });
                       setShowIntervenantModal(true);
                     }}
                     className="bg-muc-yellow text-muc-blue px-4 py-2 rounded-lg font-black text-sm uppercase shrink-0"
@@ -2520,8 +2522,11 @@ const Admin = () => {
                 {filteredIntervenants.map((interv) => (
                   <div key={interv.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center">
                     <div className="flex-1">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap">
                         <h3 className="font-bold text-slate-800 text-lg">{interv.prenom} {interv.nom}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-black uppercase ${interv.statut === 'INDEPENDANT' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>
+                          {interv.statut === 'INDEPENDANT' ? 'Indépendant / Prestataire' : 'Salarié MUC'}
+                        </span>
                         <span className="text-sm text-slate-500">{interv.email}</span>
                         <span className="text-sm text-slate-500">{interv.telephone}</span>
                       </div>
@@ -3001,6 +3006,17 @@ const Admin = () => {
                 <label className="block text-sm font-bold text-slate-700 mb-1">Mot de passe (Laisser vide pour ne pas changer)</label>
                 <input type="password" value={intervenantForm.password} onChange={e => setIntervenantForm({ ...intervenantForm, password: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-muc-blue" placeholder="••••••••" />
               </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Statut de facturation</label>
+                <select 
+                  value={intervenantForm.statut || 'SALARIE'} 
+                  onChange={e => setIntervenantForm({ ...intervenantForm, statut: e.target.value })} 
+                  className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-muc-blue bg-white font-medium"
+                >
+                  <option value="SALARIE">Salarié MUC (Frais de personnel - PCG 641)</option>
+                  <option value="INDEPENDANT">Indépendant / Prestataire (Prestations de services - PCG 611)</option>
+                </select>
+              </div>
 
               <div className="pt-2 border-t border-slate-100">
                 <div className="flex justify-between items-center mb-2 mt-2">
@@ -3097,9 +3113,17 @@ const Admin = () => {
         });
 
         // Rémunérations
+        let d611 = 0; // Prestations externes (Indépendants)
+        let dList611 = [];
+
         (finances?.missionsDetails || []).forEach(m => {
-            d641 += m.montant;
-            dList641.push({ date: m.date, label: `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId})`, montant: m.montant, statut: m.statut });
+            if (m.intervenantStatut === 'INDEPENDANT') {
+                d611 += m.montant;
+                dList611.push({ date: m.date, label: `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId})`, montant: m.montant, statut: m.statut });
+            } else {
+                d641 += m.montant;
+                dList641.push({ date: m.date, label: `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId})`, montant: m.montant, statut: m.statut });
+            }
         });
 
         // Dépenses manuelles
@@ -3112,6 +3136,9 @@ const Admin = () => {
             } else if (code.startsWith('641')) {
                 d641 += e.montant;
                 dList641.push(item);
+            } else if (code.startsWith('611')) {
+                d611 += e.montant;
+                dList611.push(item);
             } else if (code.startsWith('447')) {
                 d447 += e.montant;
                 dList447.push(item);
@@ -3124,7 +3151,7 @@ const Admin = () => {
             }
         });
 
-        let totalDepenses = d601 + d641 + d447 + Object.values(dAutres).reduce((sum, g) => sum + g.total, 0);
+        let totalDepenses = d601 + d641 + d611 + d447 + Object.values(dAutres).reduce((sum, g) => sum + g.total, 0);
         
         const resultatNet = totalRecettes - totalDepenses;
 
@@ -3182,6 +3209,7 @@ const Admin = () => {
                         </div>
                         <div className="p-6 space-y-4">
                             <PCGRow code="601" title="Achats (Matières 1ères, repas)" total={d601} items={dList601} type="depense" />
+                            <PCGRow code="611" title="Sous-traitance & Prestations externes" total={d611} items={dList611} type="depense" />
                             <PCGRow code="641" title="Rémunérations du personnel" total={d641} items={dList641} type="depense" />
                             <PCGRow code="447" title="Reversement Taxe de Séjour" total={d447} items={dList447} type="depense" />
                             

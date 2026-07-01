@@ -82,6 +82,7 @@ model Intervenant {
   telephone      String
   email          String          @unique
   password       String?
+  statut         String          @default("SALARIE") // "SALARIE" ou "INDEPENDANT"
   disponibilites Disponibilite[]
   reservations   Reservation[]
   missions       Mission[]
