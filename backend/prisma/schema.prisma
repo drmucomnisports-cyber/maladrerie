@@ -92,15 +92,16 @@ model Intervenant {
 }
 
 model Mission {
-  id            Int         @id @default(autoincrement())
-  intervenant   Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
-  intervenantId Int
-  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  reservationId Int
-  typeMission   String
-  montant       Float
-  date          DateTime?
-  statut        String      @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE
+  id                Int         @id @default(autoincrement())
+  intervenant       Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+  intervenantId     Int
+  reservation       Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  reservationId     Int
+  typeMission       String
+  montant           Float
+  date              DateTime?
+  statut            String      @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE
+  rappelsDesactives Boolean     @default(false)
 }
 
 model Disponibilite {

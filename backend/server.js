@@ -8072,48 +8072,61 @@ const executeDailyReminders = async () => {
       console.log(`Rappel J+10 envoyé pour la réservation ${reser.id}`);
     }
 
-    // --- 3. RAPPELS AUTOMATIQUES AUX INTERVENANTS POUR LEURS MISSIONS (J+3 avant la mission) ---
-    const missionReminderDate = new Date(today);
-    missionReminderDate.setDate(today.getDate() + 3);
-    const missionReminderStart = new Date(missionReminderDate);
-    missionReminderStart.setHours(0, 0, 0, 0);
-    const missionReminderEnd = new Date(missionReminderDate);
-    missionReminderEnd.setHours(23, 59, 59, 999);
+    // --- 3. RAPPELS AUTOMATIQUES AUX INTERVENANTS POUR LEURS MISSIONS (J-7, J-3, J-1) ---
+    const getMissionsForDelay = async (days) => {
+      const targetDate = new Date(today);
+      targetDate.setDate(today.getDate() + days);
+      const targetStart = new Date(targetDate);
+      targetStart.setHours(0, 0, 0, 0);
+      const targetEnd = new Date(targetDate);
+      targetEnd.setHours(23, 59, 59, 999);
 
-    const upcomingMissions = await prisma.mission.findMany({
-      where: {
-        statut: 'ACCEPTEE',
-        intervenant: {
-          recevoirRappels: true
-        },
-        OR: [
-          { date: { gte: missionReminderStart, lte: missionReminderEnd } },
-          {
-            date: null,
-            reservation: {
-              dateDebut: { gte: missionReminderStart, lte: missionReminderEnd }
+      return await prisma.mission.findMany({
+        where: {
+          statut: 'ACCEPTEE',
+          rappelsDesactives: false,
+          intervenant: {
+            recevoirRappels: true
+          },
+          OR: [
+            { date: { gte: targetStart, lte: targetEnd } },
+            {
+              date: null,
+              reservation: {
+                dateDebut: { gte: targetStart, lte: targetEnd }
+              }
             }
+          ]
+        },
+        include: {
+          intervenant: true,
+          reservation: {
+            include: { client: true }
           }
-        ]
-      },
-      include: {
-        intervenant: true,
-        reservation: {
-          include: { client: true }
         }
-      }
-    });
+      });
+    };
+
+    const missionsJ7 = await getMissionsForDelay(7);
+    const missionsJ3 = await getMissionsForDelay(3);
+    const missionsJ1 = await getMissionsForDelay(1);
+
+    // Fusionner toutes les missions trouvées avec leur étiquette de délai
+    const allMissions = [];
+    missionsJ7.forEach(m => allMissions.push({ m, label: 'dans 7 jours', styleColor: '#1e3a8a' }));
+    missionsJ3.forEach(m => allMissions.push({ m, label: 'dans 3 jours', styleColor: '#b45309' }));
+    missionsJ1.forEach(m => allMissions.push({ m, label: 'demain', styleColor: '#b91c1c' }));
 
     // Regrouper par intervenant
     const missionsByInterv = {};
-    upcomingMissions.forEach(m => {
+    allMissions.forEach(({ m, label, styleColor }) => {
       if (!missionsByInterv[m.intervenant.id]) {
         missionsByInterv[m.intervenant.id] = {
           interv: m.intervenant,
           list: []
         };
       }
-      missionsByInterv[m.intervenant.id].list.push(m);
+      missionsByInterv[m.intervenant.id].list.push({ m, label, styleColor });
     });
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://maladrerie-millau.com';
@@ -8126,18 +8139,31 @@ const executeDailyReminders = async () => {
       
       const isPlural = list.length > 1;
       const subject = isPlural 
-        ? `⏰ Rappel : Vos ${list.length} missions approchent - Gîte de la Maladrerie` 
-        : `⏰ Rappel : Votre mission approche - Gîte de la Maladrerie`;
+        ? `⏰ Rappel : Vos ${list.length} missions approchent (J-7 / J-3 / J-1) - Gîte de la Maladrerie` 
+        : `⏰ Rappel : Votre mission approche (${list[0].label}) - Gîte de la Maladrerie`;
 
-      let listHtml = list.map(m => {
+      let listHtml = list.map(({ m, label, styleColor }) => {
         const mDate = m.date ? new Date(m.date) : new Date(m.reservation.dateDebut);
+        const optOutUrl = `${BACKEND_URL}/api/intervenant/unsubscribe-mission?missionId=${m.id}&token=${m.intervenantId}`;
+        
         return `
           <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 12px; text-align: left;">
-            <p style="margin: 0; font-weight: bold; font-size: 15px; color: #004B93;">${m.typeMission}</p>
-            <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">
-              <strong>Date :</strong> ${mDate.toLocaleDateString('fr-FR')} <br/>
-              <strong>Séjour :</strong> Réf #${m.reservationId} (Client : ${m.reservation.client?.nom || 'Inconnu'})
+            <div style="margin-bottom: 5px;">
+              <span style="font-weight: bold; font-size: 15px; color: #004B93;">${m.typeMission}</span>
+              <span style="background-color: ${styleColor}15; color: ${styleColor}; font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 9999px; text-transform: uppercase; float: right;">
+                ${label}
+              </span>
+              <div style="clear: both;"></div>
+            </div>
+            <p style="margin: 5px 0 10px 0; font-size: 13px; color: #64748b; line-height: 1.4;">
+              <strong>Date d'exécution :</strong> ${mDate.toLocaleDateString('fr-FR')} <br/>
+              <strong>Séjour client :</strong> Réf #${m.reservationId} (Client : ${m.reservation.client?.nom || 'Inconnu'})
             </p>
+            <div style="text-align: right; border-top: 1px dashed #e2e8f0; padding-top: 8px;">
+              <a href="${optOutUrl}" style="color: #ef4444; font-size: 11px; text-decoration: none; font-weight: bold;" target="_blank">
+                🔕 Ne plus me rappeler cette mission
+              </a>
+            </div>
           </div>
         `;
       }).join('');
@@ -8161,7 +8187,7 @@ const executeDailyReminders = async () => {
                   <tr>
                     <td style="padding: 40px; color: #333333; line-height: 1.6;">
                       <h2 style="color: #004B93; margin-top: 0;">Bonjour ${interv.prenom},</h2>
-                      <p>Nous vous rappelons que vous avez des prestations prévues au gîte dans 3 jours (le <strong>${missionReminderDate.toLocaleDateString('fr-FR')}</strong>) :</p>
+                      <p>Nous vous rappelons vos prochaines prestations planifiées au gîte :</p>
                       
                       <div style="margin: 20px 0;">
                         ${listHtml}
@@ -8170,9 +8196,9 @@ const executeDailyReminders = async () => {
                       <p style="font-size: 14px; color: #64748b;">Merci de vous organiser pour la réalisation de vos missions aux dates et horaires convenus.</p>
                       
                       <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
-                      <p style="font-size: 11px; text-align: center; color: #94a3b8; margin: 0;">
-                        Cet e-mail est un rappel automatique. Vous pouvez vous désabonner à tout moment de ces rappels 
-                        en <a href="${unsubUrl}" style="color: #004B93; text-decoration: underline;">cliquant ici pour désactiver les alertes</a>.
+                      <p style="font-size: 11px; text-align: center; color: #94a3b8; margin: 0; line-height: 1.5;">
+                        Cet e-mail est un rappel automatique.<br/>
+                        Pour désactiver tous les rappels (toutes missions confondues), vous pouvez <a href="${unsubUrl}" style="color: #004B93; text-decoration: underline;">cliquer ici</a>.
                       </p>
                     </td>
                   </tr>
@@ -8183,7 +8209,7 @@ const executeDailyReminders = async () => {
           </table>
         `
       });
-      console.log(`Rappel de missions envoyé à ${interv.prenom} ${interv.nom} (${list.length} missions)`);
+      console.log(`Rappels de missions multiples envoyés à ${interv.prenom} ${interv.nom} (${list.length} missions)`);
     }
 
   } catch (error) {
@@ -9308,6 +9334,65 @@ app.get('/api/intervenant/unsubscribe-reminders', async (req, res) => {
   } catch (error) {
     console.error("Erreur désabonnement:", error);
     res.status(500).send("Erreur lors de la désinscription");
+  }
+});
+
+// --- ENDPOINT PUBLIC POUR LA DÉSACTIVATION DES RAPPELS D'UNE MISSION SPÉCIFIQUE ---
+app.get('/api/intervenant/unsubscribe-mission', async (req, res) => {
+  const { missionId, token } = req.query;
+  if (!missionId || !token) {
+    return res.status(400).send("Paramètres invalides");
+  }
+  try {
+    const mission = await prisma.mission.findUnique({
+      where: { id: parseInt(missionId) },
+      include: { intervenant: true }
+    });
+
+    if (!mission || String(mission.intervenantId) !== token) {
+      return res.status(400).send("Lien de désactivation invalide ou expiré");
+    }
+
+    await prisma.mission.update({
+      where: { id: mission.id },
+      data: { rappelsDesactives: true }
+    });
+
+    const mDate = mission.date ? new Date(mission.date) : null;
+    const dateLabel = mDate ? `prévue le ${mDate.toLocaleDateString('fr-FR')}` : "de ce séjour";
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <title>Rappel désactivé pour cette mission</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f7f6; color: #333; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+          h1 { color: #d97706; }
+          p { font-size: 16px; line-height: 1.5; color: #666; }
+          .icon { font-size: 50px; margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="icon">🔕</div>
+          <h1>Rappels suspendus</h1>
+          <p>Bonjour ${mission.intervenant.prenom}, vous ne recevrez plus de rappels par e-mail pour cette mission spécifique :</p>
+          <p style="font-weight: bold; color: #334155; background-color: #f1f5f9; padding: 12px; border-radius: 8px;">
+            ${mission.typeMission} (${dateLabel})
+          </p>
+          <p style="font-size: 13px; color: #94a3b8; margin-top: 20px;">
+            Vous continuerez à recevoir les rappels pour vos autres missions planifiées.
+          </p>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Erreur désactivation rappel mission:", error);
+    res.status(500).send("Erreur lors de la désactivation du rappel");
   }
 });
 
