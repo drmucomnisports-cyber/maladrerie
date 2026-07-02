@@ -1431,13 +1431,20 @@ const Admin = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
+        showFeedback('Mission supprimée avec succès !', 'success');
+        if (currentReservationForMission) {
+          setCurrentReservationForMission({
+            ...currentReservationForMission,
+            missions: currentReservationForMission.missions.filter(m => m.id !== missionId)
+          });
+        }
         fetchReservations();
         fetchFinances();
       } else {
-        alert("Erreur lors de la suppression");
+        showFeedback("Erreur lors de la suppression", 'error');
       }
     } catch (err) {
-      alert("Erreur réseau");
+      showFeedback("Erreur réseau", 'error');
     }
   };
 
