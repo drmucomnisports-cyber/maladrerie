@@ -7444,6 +7444,17 @@ app.post('/api/admin/intervenants/:id/invite', checkAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/admin/missions/:id', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.mission.delete({ where: { id: parseInt(id) } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Erreur lors de la suppression de la mission:", error);
+    res.status(500).json({ error: 'Erreur lors de la suppression de la mission' });
+  }
+});
+
 app.delete('/api/admin/intervenants/:id', checkAuth, async (req, res) => {
   const { id } = req.params;
   try {
