@@ -11,6 +11,11 @@ import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
+const formatPrice = (price) => {
+  if (price === undefined || price === null || isNaN(price)) return '0,00 €';
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(price);
+};
+
 const locales = {
   'fr': fr,
 };
@@ -2465,7 +2470,7 @@ const Admin = () => {
                         </div>
                       </td>
                         <td className="p-4">
-                          <div className="font-black text-muc-blue">{res.prixTotal}€</div>
+                          <div className="font-black text-muc-blue">{formatPrice(res.prixTotal)}</div>
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col gap-1">
@@ -4663,8 +4668,8 @@ const Admin = () => {
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Finances</span>
-                            <p className="text-base font-black text-slate-800">{version.details.totalPrice} €</p>
-                            <p><strong>Acompte :</strong> {version.details.acomptePrice} € ({version.details.acomptePayed ? 'Payé' : 'Non payé'})</p>
+                            <p className="text-base font-black text-slate-800">{formatPrice(version.details.totalPrice)}</p>
+                            <p><strong>Acompte :</strong> {formatPrice(version.details.acomptePrice)} ({version.details.acomptePayed ? 'Payé' : 'Non payé'})</p>
                           </div>
                         </div>
                       </div>
