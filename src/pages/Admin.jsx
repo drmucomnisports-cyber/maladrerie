@@ -16,6 +16,68 @@ const formatPrice = (price) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(price);
 };
 
+const calculateBreakdown = (res) => {
+  if (!res) return { hebergement: 0, repas: 0, taxe: 0 };
+  
+  // 1. Repas
+  let repasTotal = 0;
+  if (res.repas) {
+    Object.values(res.repas).forEach(day => {
+      if (day.PETIT_DEJ) {
+        repasTotal += (parseInt(day.PETIT_DEJ.ADULTE || 0) * 6);
+        repasTotal += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_12 || 0) * 5);
+        repasTotal += (parseInt(day.PETIT_DEJ.ENFANT_MOINS_5 || 0) * 4);
+      }
+      if (day.DEJEUNER) {
+        repasTotal += (parseInt(day.DEJEUNER.ADULTE || 0) * 11.5);
+        repasTotal += (parseInt(day.DEJEUNER.ENFANT_MOINS_12 || 0) * 9.5);
+        repasTotal += (parseInt(day.DEJEUNER.ENFANT_MOINS_5 || 0) * 8);
+      }
+      if (day.DINER) {
+        repasTotal += (parseInt(day.DINER.ADULTE || 0) * 14);
+        repasTotal += (parseInt(day.DINER.ENFANT_MOINS_12 || 0) * 12);
+        repasTotal += (parseInt(day.DINER.ENFANT_MOINS_5 || 0) * 10);
+      }
+    });
+  }
+
+  // 2. Taxe de séjour
+  let taxeSejour = 0;
+  if (res.dateDebut && res.dateFin) {
+    const start = new Date(res.dateDebut);
+    const end = new Date(res.dateFin);
+    const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    if (nuits > 0) {
+      let nbAdultes = 0;
+      let nbOccupants = 0;
+      if (res.occupants && res.occupants.length > 0) {
+        nbAdultes = res.occupants.filter(o => o.estAdulte).length;
+        nbOccupants = res.occupants.length;
+      } else if (res.chambresDetails && Object.keys(res.chambresDetails).length > 0) {
+        Object.values(res.chambresDetails).forEach(room => {
+          nbAdultes += parseInt(room.adultes || 0);
+          nbOccupants += parseInt(room.adultes || 0) + parseInt(room.mineurs || room.enfants || 0);
+        });
+      }
+      if (nbAdultes > 0 && res.chambres && res.chambres.length > 0) {
+        const tarifPers = (nbOccupants >= res.chambres.length * 4) ? 22 : 25;
+        taxeSejour = nbAdultes * tarifPers * nuits * 0.044;
+      }
+    }
+  }
+
+  taxeSejour = Math.round(taxeSejour * 100) / 100;
+  
+  // 3. Hébergement (prixTotal - repas - taxe)
+  const hebergement = Math.max(0, (res.prixTotal || 0) - repasTotal - taxeSejour);
+
+  return {
+    hebergement: Math.round(hebergement * 100) / 100,
+    repas: Math.round(repasTotal * 100) / 100,
+    taxe: taxeSejour
+  };
+};
+
 const locales = {
   'fr': fr,
 };
@@ -2471,6 +2533,16 @@ const Admin = () => {
                       </td>
                         <td className="p-4">
                           <div className="font-black text-muc-blue">{formatPrice(res.prixTotal)}</div>
+                          {(() => {
+                            const breakdown = calculateBreakdown(res);
+                            return (
+                              <div className="text-[10px] text-slate-400 font-bold mt-1.5 space-y-0.5 leading-tight uppercase tracking-wider">
+                                <div>Héb. : {formatPrice(breakdown.hebergement)}</div>
+                                {breakdown.repas > 0 && <div className="text-orange-600">Repas : {formatPrice(breakdown.repas)}</div>}
+                                {breakdown.taxe > 0 && <div className="text-emerald-600">Taxe : {formatPrice(breakdown.taxe)}</div>}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col gap-1">
@@ -3716,7 +3788,17 @@ const Admin = () => {
                             <div className="text-xs text-slate-400 mt-0.5 font-medium">{nuits} nuits | {(res.chambres || []).length} chambre(s)</div>
                           </td>
                           <td className="p-4 text-right font-black text-slate-800">
-                            {res.prixTotal ? `${res.prixTotal.toFixed(2)} €` : '0.00 €'}
+                            <div>{formatPrice(res.prixTotal)}</div>
+                            {(() => {
+                              const breakdown = calculateBreakdown(res);
+                              return (
+                                <div className="text-[10px] text-slate-400 font-bold mt-1.5 space-y-0.5 leading-tight uppercase tracking-wider">
+                                  <div>Héb. : {formatPrice(breakdown.hebergement)}</div>
+                                  {breakdown.repas > 0 && <div className="text-orange-600">Repas : {formatPrice(breakdown.repas)}</div>}
+                                  {breakdown.taxe > 0 && <div className="text-emerald-600">Taxe : {formatPrice(breakdown.taxe)}</div>}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="p-4 text-center">
                             {res.statutPaiement === 'PAYE' ? (
