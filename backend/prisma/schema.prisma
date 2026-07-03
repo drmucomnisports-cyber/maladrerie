@@ -43,7 +43,15 @@ model Reservation {
   tokenDevis      String?      @unique
   tokenPolice     String?      @unique
   devisSignature  String?
+  devisSignatureDate DateTime?
+  devisSignatureIp   String?
   tokenModification String?    @unique
+  tokenLieuxSign    String?    @unique
+  signatureLieuxName String?
+  signatureLieuxDate DateTime?
+  signatureLieuxIp   String?
+  signatureLieuxImage String?
+  signatureLieuxRemarques String?
   modificationProposed Json?
   expireLe        DateTime?    // Pour les devis (48h)
   numeroDevis     String?      @unique
@@ -62,6 +70,8 @@ model Reservation {
   payeLe          DateTime?
   souhaitePayerSoldeArrivee Boolean @default(false)
   fichesPolice    Json?
+  devisHistories  DevisHistory[]
+  versionActuelle Int          @default(1)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -151,5 +161,25 @@ model Expense {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model DevisHistory {
+  id              Int         @id @default(autoincrement())
+  reservation     Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  reservationId   Int
+  numeroDevis     String
+  version         Int         @default(1)
+  dateDebut       DateTime?
+  dateFin         DateTime?
+  codePromo       String?
+  chambres        Int[]
+  chambresDetails Json?
+  options         Json?
+  repas           Json?
+  salles          Json?
+  prixTotal       Float
+  dateCreation    DateTime    @default(now())
+  modifiePar      String?
+  details         Json?
 }
 

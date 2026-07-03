@@ -15,6 +15,7 @@ import OccupantsCollect from './pages/OccupantsCollect';
 import ReservationModify from './pages/ReservationModify';
 import ReservationPay from './pages/ReservationPay';
 import FichePoliceSign from './pages/FichePoliceSign';
+import SignInventory from './pages/SignInventory';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
         <Route path="/reservation/occupants" element={<OccupantsCollect />} />
         <Route path="/reservation/modify" element={<ReservationModify />} />
         <Route path="/sign-police" element={<FichePoliceSign />} />
+        <Route path="/sign-inventory" element={<SignInventory />} />
       </Routes>
     </Router>
   );

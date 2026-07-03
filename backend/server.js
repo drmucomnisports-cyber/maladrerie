@@ -554,6 +554,59 @@ const getClientAttachments = () => {
   return attachments;
 };
 
+const getRulesVignettesHTML = () => {
+  return `
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin: 25px 0; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+      <h3 style="color: #004B93; margin-top: 0; font-size: 15px; font-weight: bold; border-bottom: 2px solid #FFD700; padding-bottom: 6px; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px;">📢 Les 6 Règles d'Or du Gîte (Consignes CGV)</h3>
+      <p style="font-size: 12.5px; color: #475569; margin-bottom: 15px;">Pour garantir le confort de tous et le respect du gîte, merci de prendre connaissance de ces consignes importantes :</p>
+      
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td width="48%" valign="top">
+            <!-- Règle 1: Capacité -->
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; border-left: 4px solid #004B93; margin-bottom: 12px;">
+              <strong style="color: #1e293b; font-size: 12px; display: block; margin-bottom: 3px;">👥 Respect de la Capacité</strong>
+              <span style="font-size: 11px; color: #64748b; line-height: 1.4; display: block;">Le nombre d'occupants ne doit jamais dépasser la capacité déclarée lors de votre réservation.</span>
+            </div>
+            
+            <!-- Règle 2: Nuisances -->
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
+              <strong style="color: #1e293b; font-size: 12px; display: block; margin-bottom: 3px;">🔇 Tranquillité & Bruit</strong>
+              <span style="font-size: 11px; color: #64748b; line-height: 1.4; display: block;">Le calme est requis après 22h00 pour le respect du voisinage. Fêtes interdites en extérieur.</span>
+            </div>
+
+            <!-- Règle 3: Rangement Vaisselle -->
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; border-left: 4px solid #10b981; margin-bottom: 12px;">
+              <strong style="color: #1e293b; font-size: 12px; display: block; margin-bottom: 3px;">🧹 Consignes de départ</strong>
+              <span style="font-size: 11px; color: #64748b; line-height: 1.4; display: block;">Vaisselle lavée et rangée, poubelles vidées et triées, draps retirés et meubles replacés à leur place d'origine.</span>
+            </div>
+          </td>
+          <td width="4%">&nbsp;</td>
+          <td width="48%" valign="top">
+            <!-- Règle 4: Caution -->
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 12px;">
+              <strong style="color: #1e293b; font-size: 12px; display: block; margin-bottom: 3px;">🛡️ Dépôt de garantie (Caution)</strong>
+              <span style="font-size: 11px; color: #64748b; line-height: 1.4; display: block;">L'empreinte de caution de 500 € par Stripe est obligatoire et doit être effectuée avant votre arrivée.</span>
+            </div>
+            
+            <!-- Règle 5: Restauration -->
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; border-left: 4px solid #ec4899; margin-bottom: 12px;">
+              <strong style="color: #1e293b; font-size: 12px; display: block; margin-bottom: 3px;">🍳 Repas & Cuisine</strong>
+              <span style="font-size: 11px; color: #64748b; line-height: 1.4; display: block;">Repas à réserver/modifier au plus tard le jeudi S-1 précédant le séjour. Nourriture interdite dans les chambres.</span>
+            </div>
+
+            <!-- Règle 6: Horaires -->
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; border-left: 4px solid #8b5cf6; margin-bottom: 12px;">
+              <strong style="color: #1e293b; font-size: 12px; display: block; margin-bottom: 3px;">🕒 Arrivées & Départs</strong>
+              <span style="font-size: 11px; color: #64748b; line-height: 1.4; display: block;">Accueil/remise des clés à partir de 17h00. Restitution des clés et état des lieux de sortie à 11h00.</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+};
+
 async function getAdminEmailsForPreference(preferenceKey, fallbackEmails = []) {
   try {
     const admins = await prisma.adminAccount.findMany({
@@ -809,6 +862,10 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
                       <p style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-size: 13px; color: #166534; margin-top: 20px;">
                         📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes les <strong>CGV (PDF)</strong>, l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Le présent contrat est complété par l'état des lieux et l'inventaire en annexe. Il appartient aux occupants d'en vérifier l'exactitude dès leur arrivée. Tout écart doit impérativement nous être signalé dans les premières heures de l'entrée dans les lieux.
                       </p>
+                      <p style="background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; font-size: 13px; color: #1e3a8a; margin-top: 20px;">
+                        📝 <strong>Émargement à l'arrivée :</strong> Afin de valider la remise des clés, l'état des lieux et l'inventaire devront être émargés en ligne le jour de votre arrivée à partir de 17h00 (via un lien reçu par e-mail ou en scannant le QR code de l'intervenant sur place).
+                      </p>
+                      ${getRulesVignettesHTML()}
                       ` : ''}
 
                       ${isAcompte ? `
@@ -1626,6 +1683,10 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
                     <p style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-size: 13px; color: #166534; margin: 25px 0;">
                       📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes les <strong>CGV (PDF)</strong>, l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Le présent contrat est complété par l'état des lieux et l'inventaire en annexe. Il appartient aux occupants d'en vérifier l'exactitude dès leur arrivée. Tout écart doit impérativement nous être signalé dans les premières heures de l'entrée dans les lieux.
                     </p>
+                    <p style="background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; font-size: 13px; color: #1e3a8a; margin: 25px 0;">
+                      📝 <strong>Émargement à l'arrivée :</strong> Afin de valider la remise des clés, l'état des lieux et l'inventaire devront être émargés en ligne le jour de votre arrivée à partir de 17h00 (via un lien reçu par e-mail ou en scannant le QR code de l'intervenant sur place).
+                    </p>
+                    ${getRulesVignettesHTML()}
 
                     ${(!isLastMinuteStay && montantSolde > 0) ? `
                     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 8px; margin: 20px 0; font-size: 13px; border-left: 4px solid #10b981;">
@@ -1748,6 +1809,101 @@ app.get('/api/reservations/:id/reject', checkAuth, async (req, res) => {
   }
 });
 
+const saveDevisHistory = async (reservationId, adminEmail = null) => {
+  try {
+    const res = await prisma.reservation.findUnique({
+      where: { id: parseInt(reservationId) },
+      include: { occupants: true }
+    });
+    if (!res) return;
+
+    // Calculer le prochain numéro de version
+    const lastHistory = await prisma.devisHistory.findFirst({
+      where: { reservationId: res.id },
+      orderBy: { version: 'desc' }
+    });
+    const nextVersion = lastHistory ? lastHistory.version + 1 : 1;
+
+    // Calcul des occupants
+    let totalAdultes = 0;
+    let totalEnfants = 0;
+    if (res.occupants && res.occupants.length > 0) {
+      totalAdultes = res.occupants.filter(o => o.estAdulte).length;
+      totalEnfants = res.occupants.filter(o => !o.estAdulte).length;
+    } else if (res.chambresDetails) {
+      Object.values(res.chambresDetails).forEach(ch => {
+        totalAdultes += parseInt(ch.adultes || 0);
+        totalEnfants += parseInt(ch.mineurs || ch.enfants || 0);
+      });
+    }
+
+    // Calcul des repas
+    let totalPtitDej = 0;
+    let totalDiner = 0;
+    if (res.repas) {
+      Object.values(res.repas).forEach(r => {
+        if (r.PETIT_DEJ) {
+          totalPtitDej += (parseInt(r.PETIT_DEJ.ADULTE) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_12) || 0) + (parseInt(r.PETIT_DEJ.ENFANT_MOINS_5) || 0);
+        }
+        if (r.DINER) {
+          totalDiner += (parseInt(r.DINER.ADULTE) || 0) + (parseInt(r.DINER.ENFANT_MOINS_12) || 0) + (parseInt(r.DINER.ENFANT_MOINS_5) || 0);
+        }
+      });
+    }
+
+    const detailsSnapshot = {
+      dateDebut: res.dateDebut,
+      dateFin: res.dateFin,
+      chambres: res.chambres,
+      chambresDetails: res.chambresDetails || {},
+      options: res.options || {},
+      repas: res.repas || {},
+      salles: res.salles || {},
+      prixTotal: res.prixTotal || 0,
+      montantAcompte: res.montantAcompte || 0,
+      statutPaiement: res.statutPaiement || 'EN_ATTENTE',
+      codePromo: res.codePromo,
+      // Propriétés formatées pour le frontend
+      adultes: totalAdultes,
+      enfants: totalEnfants,
+      repasCount: totalPtitDej,
+      dinersCount: totalDiner,
+      optionsDetails: res.options || {},
+      totalPrice: res.prixTotal || 0,
+      acomptePrice: res.montantAcompte || 0,
+      acomptePayed: res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE'
+    };
+
+    await prisma.devisHistory.create({
+      data: {
+        reservationId: res.id,
+        numeroDevis: res.numeroDevis || 'DEVIS',
+        version: nextVersion,
+        dateDebut: res.dateDebut,
+        dateFin: res.dateFin,
+        codePromo: res.codePromo,
+        chambres: res.chambres,
+        chambresDetails: res.chambresDetails || {},
+        options: res.options || {},
+        repas: res.repas || {},
+        salles: res.salles || {},
+        prixTotal: res.prixTotal || 0,
+        modifiePar: adminEmail,
+        details: detailsSnapshot
+      }
+    });
+
+    // Mettre à jour versionActuelle sur la réservation
+    await prisma.reservation.update({
+      where: { id: res.id },
+      data: { versionActuelle: nextVersion }
+    });
+    console.log(`[DEVIS HISTORY] Version enregistrée pour le devis #${res.id} (N° ${res.numeroDevis}) par ${adminEmail || 'système'}`);
+  } catch (err) {
+    console.error("Erreur lors de la sauvegarde de l'historique du devis :", err);
+  }
+};
+
 // ===== GESTION DES DEVIS (PROSPECTS) =====
 
 // Créer un devis
@@ -1868,6 +2024,9 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       },
       include: { client: true }
     });
+
+    // Enregistrer dans l'historique
+    await saveDevisHistory(devis.id, resolvedAdminEmail);
 
     const refClient = `C-${year}-${devis.clientId}`;
 
@@ -2156,6 +2315,64 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
   }
 });
 
+// Récupérer l'historique des versions d'un devis
+app.get('/api/admin/devis/:id/history', checkAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const history = await prisma.devisHistory.findMany({
+      where: { reservationId: parseInt(id) },
+      orderBy: { version: 'desc' }
+    });
+    const formattedHistory = history.map(h => ({
+      ...h,
+      modifierEmail: h.modifiePar,
+      modifiedAt: h.dateCreation
+    }));
+    res.json(formattedHistory);
+  } catch (error) {
+    console.error("Erreur récupération historique devis:", error);
+    res.status(500).json({ error: "Erreur lors de la récupération de l'historique du devis." });
+  }
+});
+
+// Restaurer une version de devis
+app.post('/api/admin/devis/:id/history/:historyId/restore', checkAuth, async (req, res) => {
+  const { id, historyId } = req.params;
+  try {
+    const historyEntry = await prisma.devisHistory.findUnique({
+      where: { id: parseInt(historyId) }
+    });
+    if (!historyEntry || historyEntry.reservationId !== parseInt(id)) {
+      return res.status(404).json({ error: "Version d'historique introuvable." });
+    }
+    const expiration = new Date();
+    expiration.setHours(expiration.getHours() + 48);
+
+    const reservationUpdated = await prisma.reservation.update({
+      where: { id: parseInt(id) },
+      data: {
+        dateDebut: historyEntry.dateDebut,
+        dateFin: historyEntry.dateFin,
+        chambres: historyEntry.chambres,
+        chambresDetails: historyEntry.chambresDetails,
+        options: historyEntry.options,
+        repas: historyEntry.repas,
+        salles: historyEntry.salles,
+        prixTotal: historyEntry.prixTotal,
+        codePromo: historyEntry.codePromo,
+        statut: 'DEVIS_EN_ATTENTE',
+        expireLe: expiration
+      },
+      include: { client: true }
+    });
+    await saveDevisHistory(reservationUpdated.id, req.user.email);
+    res.json(reservationUpdated);
+  } catch (error) {
+    console.error("Erreur lors de la restauration du devis:", error);
+    res.status(500).json({ error: "Erreur lors de la restauration du devis." });
+  }
+});
+
 // Mettre à jour un devis existant (Admin)
 app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
   const { id } = req.params;
@@ -2195,6 +2412,8 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
       },
       include: { client: true }
     });
+
+    await saveDevisHistory(devisUpdate.id, req.user.email);
 
     if (sendEmail !== false) {
       try {
@@ -2427,6 +2646,8 @@ app.post('/api/admin/devis/:id/prolong', checkAuth, async (req, res) => {
       },
       include: { client: true }
     });
+
+    await saveDevisHistory(devisUpdated.id, req.user.email);
 
     // Envoi de l'e-mail de prolongation au client avec le PDF mis à jour
     try {
@@ -3605,6 +3826,8 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           montantSolde: montantSolde,
           modePaiement: 'VIREMENT',
           devisSignature: signature,
+          devisSignatureDate: new Date(),
+          devisSignatureIp: req.headers['x-forwarded-for'] || req.socket.remoteAddress || '',
           valideLe: new Date()
         }
       });
@@ -3754,6 +3977,8 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           montantSolde: montantSolde,
           stripeSessionId: session.id,
           devisSignature: signature,
+          devisSignatureDate: new Date(),
+          devisSignatureIp: req.headers['x-forwarded-for'] || req.socket.remoteAddress || '',
           valideLe: new Date()
         }
       });
@@ -8240,6 +8465,101 @@ app.get('/api/cron/reminders', async (req, res) => {
   }
 });
 
+// ===== CRON JOB : ENVOI DES MAILS ÉTAT DES LIEUX À L'ARRIVÉE (17H00) =====
+const executeDailyLieuxEmails = async () => {
+  console.log("Exécution du Cron Job : Envoi des liens de signature d'état des lieux (17h00)...");
+  
+  // Trouver les réservations qui débutent aujourd'hui et sont au statut RESERVE (validées)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  try {
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        statut: 'RESERVE',
+        dateDebut: {
+          gte: todayStart,
+          lte: todayEnd
+        },
+        signatureLieuxDate: null // Pas encore signé
+      },
+      include: { client: true }
+    });
+
+    console.log(`${reservations.length} réservation(s) de départ d'aujourd'hui en attente d'état des lieux.`);
+
+    for (const res of reservations) {
+      let token = res.tokenLieuxSign;
+      if (!token) {
+        token = require('crypto').randomBytes(32).toString('hex');
+        await prisma.reservation.update({
+          where: { id: res.id },
+          data: { tokenLieuxSign: token }
+        });
+      }
+
+      const signLink = `${FRONTEND_URL}/sign-inventory?token=${token}`;
+
+      await sendMail({
+        to: res.client.email,
+        subject: "📝 Émargement obligatoire en ligne : État des lieux & Inventaire - Gîte de la Maladrerie",
+        html: `
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: sans-serif;">
+              <tr><td style="background-color: #004B93; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0;">Gîte de La Maladrerie</h1></td></tr>
+              <tr><td style="padding: 40px; color: #333333; line-height: 1.6;">
+                <h2 style="color: #004B93; margin-top: 0;">Bonjour ${res.client.nom},</h2>
+                <p>Votre séjour débute aujourd'hui au <strong>Gîte de la Maladrerie</strong>. Afin de finaliser la remise des clés et votre installation, veuillez signer en ligne l'état des lieux et l'inventaire du gîte.</p>
+                
+                <p style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 15px; border-radius: 8px; font-size: 13px; color: #856404; margin: 20px 0;">
+                  ⚠️ <strong>Procédure d'émargement :</strong> Cliquez sur le bouton ci-dessous pour accéder à l'interface de signature simplifiée. Vous pourrez télécharger l'état des lieux et l'inventaire, saisir votre nom et valider votre accord en 1 clic. Tout écart constaté sur place doit être signalé dans les premières heures.
+                </p>
+                
+                <p style="text-align: center; margin: 30px 0;">
+                  <a href="${signLink}" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2);">📝 SIGNER L'ÉTAT DES LIEUX EN LIGNE</a>
+                </p>
+                
+                <p>Nous vous souhaitons un excellent séjour au gîte !</p>
+                <p>L'équipe du Gîte de la Maladrerie - MUC Omnisports</p>
+              </td></tr>
+            </table></td></tr>
+          </table>
+        `
+      });
+      console.log(`E-mail de signature d'état des lieux envoyé à ${res.client.email} pour la résa #${res.id}`);
+    }
+  } catch (err) {
+    console.error("Erreur exécution cron lieux emails:", err);
+  }
+};
+
+// S'exécute à 17h00 tous les jours
+cron.schedule('0 17 * * *', async () => {
+  try {
+    await executeDailyLieuxEmails();
+  } catch (err) {
+    console.error("Erreur cron lieux emails:", err);
+  }
+});
+
+// Endpoint HTTP pour déclenchement Vercel Cron ou manuel
+app.get('/api/cron/lieux-emails', async (req, res) => {
+  const isVercelCron = req.headers['x-vercel-cron'] === '1';
+  const isValidToken = req.query.token === process.env.CRON_SECRET;
+  if (!isVercelCron && !isValidToken && process.env.NODE_ENV === 'production') {
+    return res.status(401).send('Non autorisé');
+  }
+  try {
+    await executeDailyLieuxEmails();
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Erreur HTTP cron lieux-emails:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ===== CRON JOB : DÉCLARATION MENSUELLE DE TAXE DE SÉJOUR =====
 // S'exécute le 1er de chaque mois à 09:00
 const executeMonthlyTaxReport = async () => {
@@ -8871,6 +9191,153 @@ app.post('/api/reservation/police-sign/:token', async (req, res) => {
   } catch (err) {
     console.error("Erreur signature police publique:", err);
     res.status(500).json({ error: "Erreur serveur lors de la sauvegarde." });
+  }
+});
+
+// --- ENDPOINTS POUR L'ÉTAT DES LIEUX ET L'INVENTAIRE (CLIENT) ---
+
+// 1. Récupérer les informations de la réservation avec le token d'état des lieux
+app.get('/api/reservation/lieux-info/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenLieuxSign: token },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Lien d'état des lieux invalide ou expiré." });
+    }
+    
+    res.json({
+      id: reservation.id,
+      numeroDevis: reservation.numeroDevis,
+      dateDebut: reservation.dateDebut,
+      dateFin: reservation.dateFin,
+      signatureLieuxDate: reservation.signatureLieuxDate,
+      signatureLieuxName: reservation.signatureLieuxName,
+      signatureLieuxIp: reservation.signatureLieuxIp,
+      signatureLieuxRemarques: reservation.signatureLieuxRemarques,
+      client: {
+        nom: reservation.client?.nom || '',
+        prenom: reservation.client?.prenom || '',
+        email: reservation.client?.email || '',
+        telephone: reservation.client?.telephone || '',
+        adressePostale: reservation.client?.adressePostale || ''
+      }
+    });
+  } catch (err) {
+    console.error("Erreur récup lieux-info:", err);
+    res.status(500).json({ error: "Erreur serveur lors de la récupération des détails." });
+  }
+});
+
+// 2. Signer l'état des lieux et l'inventaire en ligne
+app.post('/api/reservation/lieux-sign/:token', async (req, res) => {
+  const { token } = req.params;
+  const { nomSignataire, signature, remarques } = req.body;
+  
+  if (!nomSignataire || !nomSignataire.trim()) {
+    return res.status(400).json({ error: "Le nom du signataire est requis." });
+  }
+  if (!signature) {
+    return res.status(400).json({ error: "La signature manuscrite est obligatoire." });
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { tokenLieuxSign: token },
+      include: { client: true }
+    });
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable." });
+    }
+
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    const updatedReservation = await prisma.reservation.update({
+      where: { id: reservation.id },
+      data: {
+        signatureLieuxName: nomSignataire,
+        signatureLieuxDate: new Date(),
+        signatureLieuxIp: ip,
+        signatureLieuxImage: signature,
+        signatureLieuxRemarques: remarques || ''
+      },
+      include: { client: true }
+    });
+
+    // Envoyer un mail de confirmation avec le PDF signé
+    try {
+      const { generateLieuxPDF } = require('./utils/generateLieuxPDF');
+      const pdfBuffer = await generateLieuxPDF(updatedReservation);
+      
+      if (updatedReservation.client?.email && updatedReservation.client?.email !== 'N/A') {
+        await sendMail({
+          to: updatedReservation.client.email,
+          subject: "✍️ Confirmation d'émargement : État des lieux & Inventaire - Gîte de la Maladrerie",
+          attachments: [
+            {
+              content: pdfBuffer.toString('base64'),
+              name: `Etat_des_lieux_signe_${updatedReservation.id}.pdf`
+            }
+          ],
+          html: `
+            <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+              <h2 style="color: #004B93; text-align: center;">Gîte de La Maladrerie</h2>
+              <p>Bonjour ${updatedReservation.client.prenom || updatedReservation.client.nom},</p>
+              <p>Nous vous confirmons la bonne réception de votre émargement en ligne de l'<strong>état des lieux</strong> et de l'<strong>inventaire du gîte</strong>, effectué ce jour.</p>
+              <p>Vous trouverez ci-joint l'exemplaire signé au format PDF pour vos archives.</p>
+              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #004B93;">
+                <p style="margin: 0;"><strong>Signataire :</strong> ${nomSignataire}</p>
+                <p style="margin: 5px 0 0 0;"><strong>Date d'émargement :</strong> ${new Date().toLocaleString('fr-FR')}</p>
+                ${remarques ? `<p style="margin: 5px 0 0 0;"><strong>Observations signalées :</strong> ${remarques}</p>` : ''}
+              </div>
+              <p>Nous vous souhaitons un excellent séjour au Gîte de la Maladrerie !</p>
+              <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+              <p style="font-size: 12px; color: #666; text-align: center;">Ce mail est automatique, merci de ne pas y répondre directement.</p>
+            </div>
+          `
+        });
+      }
+    } catch (mailErr) {
+      console.error("Erreur lors de l'envoi du mail de confirmation état des lieux:", mailErr);
+    }
+
+    res.json(updatedReservation);
+  } catch (err) {
+    console.error("Erreur lors de la signature de l'état des lieux:", err);
+    res.status(500).json({ error: "Erreur serveur lors de l'enregistrement de l'émargement." });
+  }
+});
+
+// 3. Télécharger le contrat d'état des lieux signé en format PDF
+app.get('/api/reservation/lieux-pdf/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const reservation = await prisma.reservation.findFirst({
+      where: {
+        OR: [
+          { tokenLieuxSign: token },
+          { tokenDevis: token },
+          { tokenModification: token }
+        ]
+      },
+      include: { client: true }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Réservation introuvable ou lien invalide." });
+    }
+
+    const { generateLieuxPDF } = require('./utils/generateLieuxPDF');
+    const pdfBuffer = await generateLieuxPDF(reservation);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Etat_des_lieux_${reservation.id}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Erreur téléchargement PDF lieux:", error);
+    res.status(500).json({ error: 'Erreur lors du téléchargement du PDF de l\'état des lieux' });
   }
 });
 

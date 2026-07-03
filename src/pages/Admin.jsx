@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText, Users, Mail } from 'lucide-react';
+import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText, Users, Mail, History } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 import SignaturePad from '../components/SignaturePad';
@@ -157,7 +157,6 @@ const Admin = () => {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
   // Nouveaux états
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteModalId, setDeleteModalId] = useState(null);
@@ -317,6 +316,11 @@ const Admin = () => {
     notifIntervenantMissions: true
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Historique des Devis
+  const [historyModalDevis, setHistoryModalDevis] = useState(null);
+  const [devisHistory, setDevisHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Paiement manuel
   const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
@@ -1169,7 +1173,6 @@ const Admin = () => {
     setReservations([]);
     navigate('/login');
   };
-
   const fetchReservations = async () => {
     setLoading(true);
     try {
@@ -1656,6 +1659,53 @@ const Admin = () => {
       }
     } catch (err) {
       showFeedback("Erreur réseau.", "error");
+    }
+  };
+
+  const fetchDevisHistory = async (devisId) => {
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(`${API_URL}/api/admin/devis/${devisId}/history`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDevisHistory(data);
+      } else {
+        console.error("Erreur chargement historique:", await response.text());
+      }
+    } catch (err) {
+      console.error("Erreur API historique:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleRestoreDevisVersion = async (devisId, versionId) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir restaurer cette version du devis ? Cela écrasera les informations actuelles.")) {
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/admin/devis/${devisId}/history/${versionId}/restore`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        showFeedback("Version restaurée avec succès !");
+        setHistoryModalDevis(null);
+        fetchReservations();
+      } else {
+        const data = await response.json();
+        alert(`Erreur: ${data.error || "Impossible de restaurer cette version"}`);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la restauration du devis:", error);
+      alert("Une erreur est survenue lors de la restauration.");
     }
   };
 
@@ -2464,6 +2514,16 @@ const Admin = () => {
                                   title="Visualiser le PDF"
                                 >
                                   <FileText size={14} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setHistoryModalDevis(res);
+                                    fetchDevisHistory(res.id);
+                                  }}
+                                  className="p-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded transition-colors"
+                                  title="Historique des versions"
+                                >
+                                  <History size={14} />
                                 </button>
                                 <button
                                   onClick={async () => {
@@ -4526,6 +4586,101 @@ const Admin = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modale Historique Devis */}
+      {historyModalDevis && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
+            <div className="bg-purple-900 p-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Historique des versions du Devis</h3>
+                <p className="text-sm opacity-90">ID Devis: {historyModalDevis.id} | Client: {historyModalDevis.client?.nom} {historyModalDevis.client?.prenom}</p>
+              </div>
+              <button 
+                onClick={() => setHistoryModalDevis(null)}
+                className="p-1 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
+              {loadingHistory ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-900 mb-4"></div>
+                  <p className="text-slate-600 font-medium">Chargement de l'historique...</p>
+                </div>
+              ) : devisHistory.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  Aucun historique disponible pour ce devis.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {devisHistory.map((version) => {
+                    const isCurrent = version.version === historyModalDevis.versionActuelle;
+                    return (
+                      <div 
+                        key={version.id} 
+                        className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all ${
+                          isCurrent ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-100 hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-3">
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                              isCurrent ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              Version {version.version} {isCurrent && '(Actuelle)'}
+                            </span>
+                            <span className="text-sm text-slate-500">
+                              Modifié par <strong className="text-slate-700">{version.modifierEmail || 'Système'}</strong> le {new Date(version.modifiedAt).toLocaleDateString('fr-FR')} à {new Date(version.modifiedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {!isCurrent && (
+                            <button
+                              onClick={() => handleRestoreDevisVersion(historyModalDevis.id, version.id)}
+                              className="px-4 py-1.5 bg-purple-900 text-white rounded-lg hover:bg-purple-800 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                            >
+                              <Clock size={12} />
+                              Restaurer cette version
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-slate-600">
+                          <div>
+                            <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Dates & Séjour</span>
+                            <p><strong>Arrivée :</strong> {new Date(version.details.dateDebut).toLocaleDateString('fr-FR')}</p>
+                            <p><strong>Départ :</strong> {new Date(version.details.dateFin).toLocaleDateString('fr-FR')}</p>
+                            <p><strong>Adultes :</strong> {version.details.adultes} | <strong>Enfants :</strong> {version.details.enfants}</p>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Options & Repas</span>
+                            <p><strong>Repas :</strong> {version.details.repasCount || 0} petits déj, {version.details.dinersCount || 0} dîners</p>
+                            <p><strong>Options :</strong> {version.details.optionsDetails?.draps ? 'Draps ' : ''}{version.details.optionsDetails?.menage ? 'Ménage ' : ''}{version.details.optionsDetails?.taxeSejour ? 'Taxe ' : ''}</p>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Finances</span>
+                            <p className="text-base font-black text-slate-800">{version.details.totalPrice} €</p>
+                            <p><strong>Acompte :</strong> {version.details.acomptePrice} € ({version.details.acomptePayed ? 'Payé' : 'Non payé'})</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-slate-100 border-t border-slate-200 flex justify-end">
+              <button 
+                onClick={() => setHistoryModalDevis(null)}
+                className="px-6 py-2 bg-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-400 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       )}
