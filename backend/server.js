@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const { BrevoClient } = require('@getbrevo/brevo');
+const nodemailer = require('nodemailer');
 const { generateDevisPDF } = require('./utils/generateDevisPDF');
 const cron = require('node-cron');
 const bcrypt = require('bcryptjs');
@@ -481,37 +482,79 @@ const getStripeDescription = (res, isCaution = false) => {
 };
 
 const sendMail = async (options) => {
+  // Déterminer s'il faut utiliser l'API Brevo (clé API valide commençant par xkeysib-)
+  const brevoKey = process.env.BREVO_API_KEY;
+  const useApi = brevoKey && brevoKey.startsWith('xkeysib-');
+
+  if (useApi) {
+    try {
+      const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
+      
+      const emailPayload = {
+        subject: options.subject,
+        htmlContent: options.html,
+        sender: { 
+          name: "Gite de la Maladrerie - MUC", 
+          email: "dr.mucomnisports@gmail.com" 
+        },
+        to: toEmails,
+        headers: {
+          'X-Mailin-Track-Click': '0',
+          'X-Mailin-Track': '0'
+        },
+        attachment: options.attachments ? options.attachments.map(att => ({
+          content: att.content,
+          name: att.name
+        })) : undefined
+      };
+
+      if (options.cc) {
+        emailPayload.cc = options.cc.split(',').map(email => ({ email: email.trim() }));
+      }
+
+      await brevo.transactionalEmails.sendTransacEmail(emailPayload);
+      console.log(`Email envoyé via API Brevo avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
+      return;
+    } catch (error) {
+      console.error("Erreur lors de l'envoi de l'email via API Brevo:", error.message || error);
+      console.log("Tentative de repli vers l'envoi SMTP...");
+    }
+  }
+
+  // Repli : Envoi SMTP classique (sécurisé avec nodemailer)
   try {
-    const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
-    
-    const emailPayload = {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    const mailOptions = {
+      from: `"Gite de la Maladrerie - MUC" <${process.env.SMTP_SENDER || 'dr.mucomnisports@gmail.com'}>`,
+      to: options.to,
       subject: options.subject,
-      htmlContent: options.html,
-      sender: { 
-        name: "Gite de la Maladrerie - MUC", 
-        email: "dr.mucomnisports@gmail.com" 
-      },
-      to: toEmails,
-      headers: {
-        'X-Mailin-Track-Click': '0',
-        'X-Mailin-Track': '0'
-      },
-      attachment: options.attachments ? options.attachments.map(att => ({
-        content: att.content,
-        name: att.name
-      })) : undefined
+      html: options.html
     };
 
-    // Support CC (copie carbone)
     if (options.cc) {
-      emailPayload.cc = options.cc.split(',').map(email => ({ email: email.trim() }));
+      mailOptions.cc = options.cc;
     }
 
-    await brevo.transactionalEmails.sendTransacEmail(emailPayload);
-    
-    console.log(`Email envoyé via API Brevo avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
-  } catch (error) {
-    console.error("Erreur lors de l'envoi de l'email via API:", error.message || error);
+    if (options.attachments) {
+      mailOptions.attachments = options.attachments.map(att => ({
+        filename: att.name,
+        content: Buffer.from(att.content, 'base64')
+      }));
+    }
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Email envoyé via SMTP avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
+  } catch (smtpError) {
+    console.error("Erreur lors de l'envoi de l'email via SMTP (échec total):", smtpError.message || smtpError);
   }
 };
 

@@ -6,11 +6,19 @@
       "use": "@vercel/static-build"
     },
     {
+      "src": "api/stripe/webhook.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "api/index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/api/stripe/webhook",
+      "dest": "api/stripe/webhook.js"
+    },
     {
       "src": "/api/(.*)",
       "dest": "api/index.js"
