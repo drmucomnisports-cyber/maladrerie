@@ -188,11 +188,73 @@ async function generateDevisPDF(data) {
              doc.lineWidth(0.5);
              y += 10;
 
+             // Calcul des totaux par catégorie
+             let totalHeb = 0;
+             let totalSalles = 0;
+             let totalRepas = 0;
+             let totalOptions = 0;
+
+             if (data.detailsLignes) {
+                 data.detailsLignes.forEach(ligne => {
+                     const designation = ligne.designation || '';
+                     if (/repas|déjeuner|dîner|diner|goûter|gouter|petit/i.test(designation)) {
+                         totalRepas += (ligne.total || 0);
+                     } else if (/salle/i.test(designation)) {
+                         totalSalles += (ligne.total || 0);
+                     } else {
+                         totalHeb += (ligne.total || 0);
+                     }
+                 });
+             }
+
+             if (data.options) {
+                 data.options.forEach(opt => {
+                     totalOptions += (opt.total || 0);
+                 });
+             }
+
+             let totalTaxe = data.taxeSejourDetails ? (data.taxeSejourDetails.total || 0) : 0;
+
              // Box Total
              checkPageBreak(120);
              const totalBoxY = y - 5;
              doc.rect(leftCol + 280, totalBoxY, 232, 95).fill('#F8F9FA');
              doc.fillColor('#000000');
+
+             // Affichage du détail par catégorie sur la gauche
+             doc.save();
+             let catY = totalBoxY + 5;
+             doc.fontSize(10).font('Helvetica-Bold').fillColor('#004B93').text('Détail du total :', leftCol, catY);
+             catY += 15;
+
+             doc.fontSize(8.5).font('Helvetica').fillColor('#333333');
+
+             const addCatLine = (label, amount, isNegative = false) => {
+                 doc.font('Helvetica').text(label, leftCol, catY);
+                 const prefix = isNegative ? '-' : '';
+                 doc.font('Helvetica-Bold').text(`${prefix}${amount.toFixed(2)} €`, leftCol + 150, catY, { align: 'right', width: 80 });
+                 catY += 13;
+             };
+
+             if (totalHeb > 0) {
+                 addCatLine('Total Hébergement', totalHeb);
+             }
+             if (totalSalles > 0) {
+                 addCatLine('Total Salles de réunion', totalSalles);
+             }
+             if (totalRepas > 0) {
+                 addCatLine('Total Repas / Restauration', totalRepas);
+             }
+             if (totalOptions > 0) {
+                 addCatLine('Total Options & Forfaits', totalOptions);
+             }
+             if (totalTaxe > 0) {
+                 addCatLine('Taxe de séjour', totalTaxe);
+             }
+             if (data.promoMontant > 0) {
+                 addCatLine(`Remise (Code: ${data.codePromo})`, data.promoMontant, true);
+             }
+             doc.restore();
              
              y += 5;
              doc.fontSize(12).font('Helvetica-Bold').fillColor('#004B93').text('TOTAL TTC', leftCol + 290, y);
