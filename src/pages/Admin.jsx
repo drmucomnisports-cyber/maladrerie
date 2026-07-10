@@ -1729,6 +1729,29 @@ const Admin = () => {
     }
   };
 
+  const handleResendDevis = async (devis) => {
+    if (!window.confirm(`Confirmer le renvoi du devis ${devis.numeroDevis} par e-mail à ${devis.client.email} ?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/admin/devis/${devis.id}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        showFeedback(`Devis ${devis.numeroDevis} renvoyé avec succès par e-mail !`);
+      } else {
+        const data = await res.json();
+        showFeedback(data.error || "Erreur lors du renvoi.", "error");
+      }
+    } catch (err) {
+      showFeedback("Erreur réseau.", "error");
+    }
+  };
+
   const fetchDevisHistory = async (devisId) => {
     setLoadingHistory(true);
     try {
@@ -2584,6 +2607,13 @@ const Admin = () => {
                                   title="Prolonger la validité"
                                 >
                                   <Clock size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleResendDevis(res)}
+                                  className="p-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded transition-colors"
+                                  title="Renvoyer le devis par e-mail"
+                                >
+                                  <Mail size={14} />
                                 </button>
                                 <button
                                   onClick={() => window.open(`${API_URL}/api/admin/devis/${res.id}/pdf?token=${token}`, '_blank')}
