@@ -81,8 +81,8 @@ const generateFeedbackHTML = (title, message, isSuccess = true) => {
   `;
 };
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const BACKEND_URL = process.env.BACKEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5000');
+const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
 
 app.use(cors({
   origin: [
@@ -2883,7 +2883,7 @@ app.post('/api/admin/devis/:id/prolong', checkAuth, async (req, res) => {
       };
 
       const pdfBuffer = await generateDevisPDF(pdfData);
-      const validationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/devis/validate?token=${devisFinal.tokenModification}`;
+      const validationLink = `${process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173')}/devis/validate?token=${devisFinal.tokenModification}`;
 
       await sendMail({
         to: devisFinal.client.email,
@@ -3672,7 +3672,7 @@ app.post('/api/admin/reservations/:id/send-facture', checkAuth, async (req, res)
 
     const { pdfBuffer, pdfFileName } = await getInvoicePdfBuffer(parseInt(id), includeOccupants);
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://maladrerie-millau.com';
+    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
     
     await sendMail({
       to: reservation.client.email,
@@ -4848,7 +4848,7 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
       const missionsHtml = createdMissions.map(m => `<li style="margin-bottom: 12px;">${getMissionDetail(m, reservation.dateDebut, reservation.dateFin)}</li>`).join('');
       const totalRemuneration = createdMissions.reduce((sum, m) => sum + m.montant, 0);
 
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+      const backendUrl = process.env.BACKEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5000');
       const acceptUrl = `${backendUrl}/api/reservations/${id}/intervenants/${intervenantId}/accept`;
       const rejectUrl = `${backendUrl}/api/reservations/${id}/intervenants/${intervenantId}/reject`;
 
@@ -7232,7 +7232,7 @@ app.post('/api/admin/reservations', checkAuth, async (req, res) => {
       }
 
       try {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
         const checkInDate = new Date(dateDebut);
         const today = new Date();
         checkInDate.setHours(0, 0, 0, 0);
@@ -8397,8 +8397,8 @@ const executeDailyReminders = async () => {
       missionsByInterv[m.intervenant.id].list.push({ m, label, styleColor });
     });
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://maladrerie-millau.com';
-    const BACKEND_URL = process.env.BACKEND_URL || 'https://maladrerie-millau.com';
+    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
+    const BACKEND_URL = process.env.BACKEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5000');
 
     // Envoyer les e-mails
     for (const idKey of Object.keys(missionsByInterv)) {
@@ -9088,7 +9088,7 @@ app.post('/api/admin/reservations/:id/send-police-email', checkAuth, async (req,
       });
     }
     
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
     const link = `${frontendUrl}/sign-police?token=${token}`;
     
     const adminSignatureHTML = await getAdminSignatureHTML(req.user.email || 'dr.mucomnisports@gmail.com');

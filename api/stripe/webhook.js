@@ -130,7 +130,7 @@ export default async function handler(req, res) {
       const session = event.data.object;
       const reservationId = session.metadata?.reservationId;
       const paymentType = session.metadata?.paymentType?.toLowerCase();
-      const FRONTEND_URL = process.env.FRONTEND_URL || 'https://gite-maladrerie.fr';
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'https://www.gite-maladrerie.fr';
 
       console.log(`[WEBHOOK] 💳 checkout.session.completed — RésaId: ${reservationId}, Type: ${paymentType}`);
 
