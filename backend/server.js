@@ -97,6 +97,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Route temporaire de diagnostic
+app.get('/api/debug-env', (req, res) => {
+  res.json({
+    FRONTEND_URL: process.env.FRONTEND_URL || 'not-set',
+    VERCEL: process.env.VERCEL || 'not-set',
+    NODE_ENV: process.env.NODE_ENV || 'not-set',
+    resolved_frontend: FRONTEND_URL,
+    resolved_backend: BACKEND_URL
+  });
+});
+
 // Stripe Webhook doit être avant express.json()
 app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (request, response) => {
   const sig = request.headers['stripe-signature'];
