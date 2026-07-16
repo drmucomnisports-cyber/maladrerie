@@ -3527,10 +3527,27 @@ const Admin = () => {
         let dList447 = [];
         let dListAutres = {};
 
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        let p601 = 0; // Achats prévus
+        let pList601 = [];
+        let p611 = 0; // Presta externes prévues
+        let pList611 = [];
+        let p641 = 0; // Rémunérations prévues
+        let pList641 = [];
+
         // Achats automatiques de repas
         (finances?.repasCoutsDetailles || []).forEach(r => {
-            d601 += r.montant;
-            dList601.push({ date: r.date, label: r.label, montant: r.montant, statut: 'Auto' });
+            const rDate = new Date(r.date);
+            rDate.setHours(0,0,0,0);
+            if (rDate > today) {
+                p601 += r.montant;
+                pList601.push({ date: r.date, label: r.label, montant: r.montant, statut: 'À venir' });
+            } else {
+                d601 += r.montant;
+                dList601.push({ date: r.date, label: r.label, montant: r.montant, statut: 'Auto' });
+            }
         });
 
         // Rémunérations
@@ -3545,45 +3562,59 @@ const Admin = () => {
 
         (finances?.missionsDetails || []).forEach(m => {
             const isSalarie = m.intervenantStatut !== 'INDEPENDANT';
-            const mDate = m.date || new Date();
+            const mDate = m.date ? new Date(m.date) : new Date();
+            const compareDate = new Date(mDate);
+            compareDate.setHours(0,0,0,0);
+            const isFuture = compareDate > today;
+
             const monthLabel = getMonthYearLabel(mDate);
             const labelFactureAttendue = isSalarie
                 ? `Rémunération ${m.intervenant} - ${monthLabel}`
                 : `Facture ${m.intervenant} - ${monthLabel}`;
             const pcgAttendu = isSalarie ? '641' : '611';
             
-            // On vérifie si la dépense globale (facture/rémunération) a déjà été enregistrée manuellement
+            // On vérifie si la dépense globale a déjà été enregistrée manuellement
             const depenseExiste = (finances?.expenses || []).some(e => 
                 e.label === labelFactureAttendue && e.comptePcg === pcgAttendu
             );
 
             const montantComptabilise = depenseExiste ? 0 : m.montant;
             const labelAffiche = depenseExiste 
-                ? `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId}) [Inclus dans ${isSalarie ? 'rémunération' : 'facture'}]`
+                ? `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId}) [Inclus]`
                 : `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId})`;
 
-            if (!isSalarie) {
-                d611 += montantComptabilise;
-                dList611.push({ 
-                    date: m.date, 
-                    label: labelAffiche, 
-                    montant: montantComptabilise, 
-                    originalMontant: m.montant, 
-                    statut: m.statut,
-                    inclus: depenseExiste
-                });
+            if (isFuture) {
+                if (!isSalarie) {
+                    p611 += montantComptabilise;
+                    pList611.push({ date: m.date, label: labelAffiche, montant: montantComptabilise, statut: 'À venir' });
+                } else {
+                    p641 += montantComptabilise;
+                    pList641.push({ date: m.date, label: labelAffiche, montant: montantComptabilise, statut: 'À venir' });
+                }
             } else {
-                d641 += montantComptabilise;
-                dList641.push({ 
-                    date: m.date, 
-                    label: labelAffiche, 
-                    montant: montantComptabilise, 
-                    originalMontant: m.montant, 
-                    statut: m.statut,
-                    inclus: depenseExiste
-                });
+                if (!isSalarie) {
+                    d611 += montantComptabilise;
+                    dList611.push({ date: m.date, label: labelAffiche, montant: montantComptabilise, statut: m.statut, inclus: depenseExiste });
+                } else {
+                    d641 += montantComptabilise;
+                    dList641.push({ date: m.date, label: labelAffiche, montant: montantComptabilise, statut: m.statut, inclus: depenseExiste });
+                }
             }
         });
+
+        // Recettes prévisionnelles
+        let pRecettesTotal = 0;
+        let pListRecettes = [];
+        (finances?.prochainsPaiements || []).forEach(p => {
+            pRecettesTotal += p.montant;
+            pListRecettes.push({
+                date: p.dateDebut,
+                label: `Résa #${p.reservationId} (${p.clientNom}) - ${p.typeAttendu}`,
+                montant: p.montant,
+                statut: 'Attendu'
+            });
+        });
+        const totalPrevisionnelDepenses = p601 + p611 + p641;
 
         // Dépenses manuelles
         (finances?.expenses || []).forEach(e => {
@@ -3697,10 +3728,53 @@ const Admin = () => {
 
                 {/* RÉSULTAT */}
                 <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 flex flex-col items-center justify-center text-center transform transition-all hover:scale-[1.01]">
-                    <h3 className="text-slate-400 font-black uppercase tracking-widest text-sm mb-2">Résultat Net (Recettes - Dépenses)</h3>
+                    <h3 className="text-slate-400 font-black uppercase tracking-widest text-sm mb-2">Résultat Net Actuel (Recettes Réelles - Dépenses Réelles)</h3>
                     <p className={`text-6xl font-black ${resultatNet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {resultatNet >= 0 ? '+' : ''}{resultatNet.toFixed(2)} €
                     </p>
+                </div>
+
+                {/* TRÉSORERIE PRÉVISIONNELLE (FUTUR) */}
+                <div className="mt-12 bg-indigo-50/50 rounded-2xl shadow-xl border-t-8 border-t-indigo-500 overflow-hidden">
+                    <div className="p-6 border-b border-indigo-100 flex justify-between items-center bg-indigo-100/50">
+                        <h3 className="font-black text-indigo-900 uppercase tracking-widest flex items-center gap-2">
+                            <span className="text-2xl">🔮</span> Trésorerie Prévisionnelle (À venir)
+                        </h3>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Balance Future</p>
+                            <span className={`text-2xl font-black ${pRecettesTotal - totalPrevisionnelDepenses >= 0 ? 'text-indigo-600' : 'text-red-500'}`}>
+                                {(pRecettesTotal - totalPrevisionnelDepenses) >= 0 ? '+' : ''}{(pRecettesTotal - totalPrevisionnelDepenses).toFixed(2)} €
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-indigo-100">
+                        {/* DÉPENSES À VENIR */}
+                        <div className="p-6 space-y-4">
+                            <h4 className="font-black text-sm text-indigo-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-400"></span> Dépenses à venir (-{totalPrevisionnelDepenses.toFixed(2)} €)
+                            </h4>
+                            <PCGRow code="601" title="Achats repas futurs (Auto)" total={p601} items={pList601} type="depense" />
+                            <PCGRow code="611" title="Factures Indépendants à venir" total={p611} items={pList611} type="depense" />
+                            <PCGRow code="641" title="Rémunérations Salariés à venir" total={p641} items={pList641} type="depense" />
+                            
+                            {(pList601.length === 0 && pList611.length === 0 && pList641.length === 0) && (
+                                <p className="text-sm italic text-indigo-400 text-center py-4">Aucune dépense prévisionnelle.</p>
+                            )}
+                        </div>
+
+                        {/* RECETTES À VENIR */}
+                        <div className="p-6 space-y-4 bg-indigo-50/30">
+                            <h4 className="font-black text-sm text-indigo-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-400"></span> Recettes à venir (+{pRecettesTotal.toFixed(2)} €)
+                            </h4>
+                            <PCGRow code="ATT" title="Restes à encaisser (Acomptes/Soldes)" total={pRecettesTotal} items={pListRecettes} type="recette" />
+                            
+                            {pListRecettes.length === 0 && (
+                                <p className="text-sm italic text-indigo-400 text-center py-4">Aucun paiement en attente.</p>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* TAXE DE SEJOUR MENSUELLE */}
