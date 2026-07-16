@@ -1116,13 +1116,31 @@ async function getOrAssignNumeroFacture(reservationId) {
 
   if (estConfirmee) {
     const year = new Date(reservation.dateDebut || new Date()).getFullYear();
-    // Compter les factures existantes pour cette-année-là
-    const count = await prisma.reservation.count({
+    
+    // Récupérer toutes les factures existantes pour cette année afin de trouver le max
+    const existingReservations = await prisma.reservation.findMany({
       where: {
         numeroFacture: { startsWith: `FA-${year}-` }
+      },
+      select: {
+        numeroFacture: true
       }
     });
-    const numeroFacture = `FA-${year}-${String(count + 1).padStart(4, '0')}`;
+
+    let maxSuffix = 0;
+    existingReservations.forEach(r => {
+      if (r.numeroFacture) {
+        const parts = r.numeroFacture.split('-');
+        if (parts.length === 3) {
+          const suffixNum = parseInt(parts[2], 10);
+          if (!isNaN(suffixNum) && suffixNum > maxSuffix) {
+            maxSuffix = suffixNum;
+          }
+        }
+      }
+    });
+
+    const numeroFacture = `FA-${year}-${String(maxSuffix + 1).padStart(4, '0')}`;
     
     // Mettre à jour en base de données
     await prisma.reservation.update({
@@ -1999,13 +2017,29 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
     
     const prixSejour = totalPrixBase;
 
-    // 3. Générer le numéro de devis séquentiel
-    const count = await prisma.reservation.count({
+    // 3. Générer le numéro de devis séquentiel (sécurisé contre les collisions)
+    const existingDevis = await prisma.reservation.findMany({
       where: {
         numeroDevis: { startsWith: `D-${year}-` }
+      },
+      select: {
+        numeroDevis: true
       }
     });
-    const numeroDevis = `D-${year}-${String(count + 1).padStart(3, '0')}`;
+
+    let maxDevisSuffix = 0;
+    existingDevis.forEach(d => {
+      if (d.numeroDevis) {
+        const parts = d.numeroDevis.split('-');
+        if (parts.length === 3) {
+          const suffixNum = parseInt(parts[2], 10);
+          if (!isNaN(suffixNum) && suffixNum > maxDevisSuffix) {
+            maxDevisSuffix = suffixNum;
+          }
+        }
+      }
+    });
+    const numeroDevis = `D-${year}-${String(maxDevisSuffix + 1).padStart(3, '0')}`;
 
     const token = require('crypto').randomBytes(24).toString('hex');
     const expiration = new Date();
@@ -4492,7 +4526,7 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
       `
     });
 
-    res.json({ message: "Lien de solde envoyé", url: session.url });
+    res.json({ message: "Lien de solde envoyé", url: paymentLink });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erreur lors de la génération du solde" });
@@ -5331,7 +5365,8 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
       expenses,
       repasCoutsDetailles,
       totalCoutRepasCalcules,
-      recettesDetaillees
+      recettesDetaillees,
+      missionsDetails
     });
 
   } catch (error) {

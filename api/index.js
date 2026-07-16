@@ -1,3 +1,3 @@
-// Build: 2026-07-10 07:51
 import app from '../backend/server.js';
-export default app;
+const expressApp = app.default || app;
+export default expressApp;

@@ -264,6 +264,9 @@ const Admin = () => {
   });
   const [missionIntervenantId, setMissionIntervenantId] = useState('');
   const [isAssigningMissions, setIsAssigningMissions] = useState(false);
+  const [customMissionTitle, setCustomMissionTitle] = useState('');
+  const [customMissionMontant, setCustomMissionMontant] = useState('');
+  const [customMissionChecked, setCustomMissionChecked] = useState(false);
 
   // Facturation
   const [reservationsFactures, setReservationsFactures] = useState([]);
@@ -916,9 +919,17 @@ const Admin = () => {
   };
 
   const handleAddBillingToExpenses = async (interv, total, monthLabel) => {
-    const label = `Facture ${interv.prenom} ${interv.nom} - ${monthLabel}`;
+    const isSalarie = interv.statut !== 'INDEPENDANT';
+    const label = isSalarie
+      ? `Rémunération ${interv.prenom} ${interv.nom} - ${monthLabel}`
+      : `Facture ${interv.prenom} ${interv.nom} - ${monthLabel}`;
     const [year, month] = billingMonth.split('-').map(Number);
     const dateFacture = new Date(year, month, 0).toISOString().substring(0, 10);
+    const comptePcg = isSalarie ? "641" : "611";
+    const categorie = isSalarie ? "Charges de personnel / Salaires" : "Sous-traitance & Prestations externes";
+    const description = isSalarie
+      ? `Rémunération automatique générée depuis l'espace intervenant pour le mois de ${monthLabel}`
+      : `Facturation automatique générée depuis l'espace intervenant pour le mois de ${monthLabel}`;
 
     try {
       const response = await fetch(`${API_URL}/api/admin/expenses`, {
@@ -930,14 +941,14 @@ const Admin = () => {
         body: JSON.stringify({
           label,
           montant: parseFloat(total),
-          categorie: "Sous-traitance & Prestations externes",
-          comptePcg: "611",
-          description: `Facturation automatique générée depuis l'espace intervenant pour le mois de ${monthLabel}`,
+          categorie,
+          comptePcg,
+          description,
           date: dateFacture
         })
       });
       if (response.ok) {
-        showFeedback('Facture enregistrée comme dépense avec succès !');
+        showFeedback(isSalarie ? 'Rémunération enregistrée comme dépense avec succès !' : 'Facture enregistrée comme dépense avec succès !');
         fetchFinances();
       } else {
         const data = await response.json();
@@ -1430,6 +1441,22 @@ const Admin = () => {
       .filter(([_, v]) => v.checked)
       .map(([typeMission, v]) => ({ typeMission, montant: v.montant }));
 
+    if (customMissionChecked) {
+      if (!customMissionTitle.trim()) {
+        showFeedback('Veuillez saisir un intitulé pour la mission personnalisée.', 'error');
+        return;
+      }
+      const customAmt = parseFloat(customMissionMontant);
+      if (isNaN(customAmt) || customAmt <= 0) {
+        showFeedback('Veuillez saisir un montant valide pour la mission personnalisée.', 'error');
+        return;
+      }
+      selectedMissions.push({
+        typeMission: customMissionTitle.trim(),
+        montant: customAmt
+      });
+    }
+
     if (selectedMissions.length === 0) {
       showFeedback('Veuillez sélectionner au moins une mission.', 'error');
       return;
@@ -1464,6 +1491,9 @@ const Admin = () => {
           'Astreinte de nuit à domicile': { checked: false, montant: 100 }
         });
         setMissionIntervenantId('');
+        setCustomMissionTitle('');
+        setCustomMissionMontant('');
+        setCustomMissionChecked(false);
       } else {
         const errData = await res.json();
         showFeedback(errData.error || "Erreur lors de l'ajout des missions", 'error');
@@ -2783,7 +2813,7 @@ const Admin = () => {
                       </div>
                     </div>
                     <div className="flex gap-1.5 shrink-0 ml-4">
-                      {interv.statut === 'INDEPENDANT' && (
+                      {(interv.statut === 'INDEPENDANT' || interv.statut === 'SALARIE') && (
                         <button
                           onClick={async () => {
                             setBillingIntervenantId(interv.id);
@@ -2791,7 +2821,7 @@ const Admin = () => {
                             await fetchIntervenants();
                           }}
                           className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors"
-                          title="Voir la facturation"
+                          title={interv.statut === 'INDEPENDANT' ? "Voir la facturation" : "Voir la rémunération"}
                         >
                           <Banknote size={18} />
                         </button>
@@ -2856,9 +2886,13 @@ const Admin = () => {
         const currentYear = new Date().getFullYear();
         const yearsOptions = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
 
-        const labelDepenseAttendu = `Facture ${currentInterv.prenom} ${currentInterv.nom} - ${monthName}`;
+        const isSalarie = currentInterv.statut !== 'INDEPENDANT';
+        const labelDepenseAttendu = isSalarie
+          ? `Rémunération ${currentInterv.prenom} ${currentInterv.nom} - ${monthName}`
+          : `Facture ${currentInterv.prenom} ${currentInterv.nom} - ${monthName}`;
+        const pcgAttendu = isSalarie ? '641' : '611';
         const depenseExiste = (finances?.expenses || []).some(e => 
-          e.label === labelDepenseAttendu && e.comptePcg === '611'
+          e.label === labelDepenseAttendu && e.comptePcg === pcgAttendu
         );
         
         return (
@@ -2869,9 +2903,14 @@ const Admin = () => {
               </button>
               <h3 className="text-xl font-bold text-slate-800 mb-1 flex items-center gap-2">
                 <Banknote className="w-6 h-6 text-amber-500" />
-                Facturation
+                {isSalarie ? 'Rémunération' : 'Facturation'}
               </h3>
-              <p className="text-slate-500 text-sm mb-5">{currentInterv.prenom} {currentInterv.nom} • <span className="text-xs font-bold text-muc-blue">Indépendant / Prestataire</span></p>
+              <p className="text-slate-500 text-sm mb-5">
+                {currentInterv.prenom} {currentInterv.nom} •{' '}
+                <span className="text-xs font-bold text-muc-blue">
+                  {isSalarie ? 'Salarié MUC' : 'Indépendant / Prestataire'}
+                </span>
+              </p>
               
               <div className="mb-5">
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Choisir la période</label>
@@ -2923,7 +2962,9 @@ const Admin = () => {
                   </div>
                   
                   <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 flex justify-between items-center mb-4">
-                    <span className="font-bold text-amber-800 uppercase text-sm tracking-wide">Total à facturer</span>
+                    <span className="font-bold text-amber-800 uppercase text-sm tracking-wide">
+                      {isSalarie ? 'Total à verser' : 'Total à facturer'}
+                    </span>
                     <span className="font-black text-amber-900 text-xl">{totalMois.toFixed(2)} €</span>
                   </div>
 
@@ -2931,7 +2972,7 @@ const Admin = () => {
                     <div className="mt-4">
                       {depenseExiste ? (
                         <div className="bg-emerald-50 text-emerald-800 p-3.5 rounded-xl border border-emerald-200 text-center font-bold text-sm flex items-center justify-center gap-2">
-                          <Check className="w-5 h-5" /> Enregistré en dépense (PCG 611)
+                          <Check className="w-5 h-5" /> Enregistré en dépense (PCG {pcgAttendu})
                         </div>
                       ) : (
                         <button
@@ -3496,13 +3537,51 @@ const Admin = () => {
         let d611 = 0; // Prestations externes (Indépendants)
         let dList611 = [];
 
+        const getMonthYearLabel = (dateStr) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        };
+
         (finances?.missionsDetails || []).forEach(m => {
-            if (m.intervenantStatut === 'INDEPENDANT') {
-                d611 += m.montant;
-                dList611.push({ date: m.date, label: `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId})`, montant: m.montant, statut: m.statut });
+            const isSalarie = m.intervenantStatut !== 'INDEPENDANT';
+            const mDate = m.date || new Date();
+            const monthLabel = getMonthYearLabel(mDate);
+            const labelFactureAttendue = isSalarie
+                ? `Rémunération ${m.intervenant} - ${monthLabel}`
+                : `Facture ${m.intervenant} - ${monthLabel}`;
+            const pcgAttendu = isSalarie ? '641' : '611';
+            
+            // On vérifie si la dépense globale (facture/rémunération) a déjà été enregistrée manuellement
+            const depenseExiste = (finances?.expenses || []).some(e => 
+                e.label === labelFactureAttendue && e.comptePcg === pcgAttendu
+            );
+
+            const montantComptabilise = depenseExiste ? 0 : m.montant;
+            const labelAffiche = depenseExiste 
+                ? `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId}) [Inclus dans ${isSalarie ? 'rémunération' : 'facture'}]`
+                : `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId})`;
+
+            if (!isSalarie) {
+                d611 += montantComptabilise;
+                dList611.push({ 
+                    date: m.date, 
+                    label: labelAffiche, 
+                    montant: montantComptabilise, 
+                    originalMontant: m.montant, 
+                    statut: m.statut,
+                    inclus: depenseExiste
+                });
             } else {
-                d641 += m.montant;
-                dList641.push({ date: m.date, label: `${m.typeMission} - ${m.intervenant} (Résa #${m.reservationId})`, montant: m.montant, statut: m.statut });
+                d641 += montantComptabilise;
+                dList641.push({ 
+                    date: m.date, 
+                    label: labelAffiche, 
+                    montant: montantComptabilise, 
+                    originalMontant: m.montant, 
+                    statut: m.statut,
+                    inclus: depenseExiste
+                });
             }
         });
 
@@ -4274,13 +4353,62 @@ const Admin = () => {
                         </div>
                       </label>
                     ))}
+
+                    <div className={`p-3 rounded-lg border-2 transition-all ${
+                      customMissionChecked 
+                        ? 'border-muc-blue bg-muc-blue/5' 
+                        : 'border-dashed border-slate-300 bg-slate-50 hover:border-slate-400'
+                      }`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={customMissionChecked}
+                              onChange={e => setCustomMissionChecked(e.target.checked)}
+                              className="w-5 h-5 rounded accent-[#004B93]"
+                            />
+                            <span className={`text-sm font-bold ${customMissionChecked ? 'text-muc-blue' : 'text-slate-600'}`}>
+                              ✨ Autre mission personnalisée
+                            </span>
+                          </div>
+                          {customMissionChecked && (
+                            <input
+                              type="text"
+                              placeholder="Intitulé de la mission (ex: Transfert gare, Rangement spécial...)"
+                              value={customMissionTitle}
+                              onChange={e => setCustomMissionTitle(e.target.value)}
+                              className="w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-muc-blue bg-white"
+                              required
+                            />
+                          )}
+                        </div>
+                        {customMissionChecked && (
+                          <div className="flex items-center gap-2 pt-6">
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={customMissionMontant}
+                              onChange={e => setCustomMissionMontant(e.target.value)}
+                              className="w-20 text-right px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-muc-blue bg-white"
+                              required
+                            />
+                            <span className="text-sm font-bold text-slate-500">€</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {Object.values(missionChecks).some(v => v.checked) && (
+                {(Object.values(missionChecks).some(v => v.checked) || customMissionChecked) && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                     <span className="text-sm font-bold text-green-700">
-                      Total : {Object.values(missionChecks).filter(v => v.checked).reduce((sum, v) => sum + v.montant, 0).toFixed(2)} €
+                      Total : {(
+                        Object.values(missionChecks).filter(v => v.checked).reduce((sum, v) => sum + v.montant, 0) +
+                        (customMissionChecked ? (parseFloat(customMissionMontant) || 0) : 0)
+                      ).toFixed(2)} €
                     </span>
                   </div>
                 )}
@@ -4288,7 +4416,7 @@ const Admin = () => {
                 <div className="flex justify-end pt-2">
                   <button
                     type="submit"
-                    disabled={isAssigningMissions || !Object.values(missionChecks).some(v => v.checked)}
+                    disabled={isAssigningMissions || (!Object.values(missionChecks).some(v => v.checked) && !customMissionChecked)}
                     className="px-6 py-2.5 bg-muc-blue text-white font-bold rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {isAssigningMissions && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
@@ -6133,7 +6261,16 @@ const Admin = () => {
                                   <td className="p-3 text-xs text-slate-500">
                                       <span className="bg-slate-100 px-2 py-1 rounded-full">{item.statut || '-'}</span>
                                   </td>
-                                  <td className="p-3 font-bold text-right text-slate-800">{item.montant.toFixed(2)} €</td>
+                                  <td className="p-3 font-bold text-right text-slate-800">
+                                      {item.inclus ? (
+                                          <span className="text-slate-400 font-normal">
+                                              <span className="line-through text-xs mr-1">{item.originalMontant ? item.originalMontant.toFixed(2) : '0.00'} €</span>
+                                              <span>0.00 €</span>
+                                          </span>
+                                      ) : (
+                                          `${(item.montant || 0).toFixed(2)} €`
+                                      )}
+                                  </td>
                               </tr>
                           )) : (
                               <tr>

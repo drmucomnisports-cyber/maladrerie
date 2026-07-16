@@ -333,13 +333,13 @@ const DevisValidate = () => {
                   </div>
 
                   <div className="flex justify-between items-center text-sm font-black text-[#004B93] bg-[#004B93]/10 p-3 rounded-xl">
-                    <span>Acompte à payer (30%)</span>
-                    <span>{(devis.prixTotal * 0.3).toFixed(2)} €</span>
+                    <span>Acompte à payer</span>
+                    <span>{(devis.montantAcompte !== undefined && devis.montantAcompte !== null ? devis.montantAcompte : devis.prixTotal * 0.3).toFixed(2)} €</span>
                   </div>
 
                   <div className="flex justify-between items-center text-xs font-bold text-slate-500">
-                    <span>Solde restant (70%)</span>
-                    <span>{(devis.prixTotal * 0.7).toFixed(2)} €</span>
+                    <span>Solde restant</span>
+                    <span>{(devis.montantSolde !== undefined && devis.montantSolde !== null ? devis.montantSolde : devis.prixTotal * 0.7).toFixed(2)} €</span>
                   </div>
                 </div>
               </div>
@@ -512,7 +512,7 @@ const DevisValidate = () => {
                     ) : paymentMethod === 'stripe' ? (
                       <>
                         <CreditCard size={20} />
-                        Valider et payer l'acompte ({(devis.prixTotal * 0.3).toFixed(2)} €)
+                        Valider et payer l'acompte ({(devis.montantAcompte !== undefined && devis.montantAcompte !== null ? devis.montantAcompte : devis.prixTotal * 0.3).toFixed(2)} €)
                       </>
                     ) : (
                       <>

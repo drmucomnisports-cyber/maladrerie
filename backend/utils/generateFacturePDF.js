@@ -2,6 +2,18 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
+const getAssetPath = (filename) => {
+    const cwd = process.cwd();
+    // Vercel ou exécution depuis la racine du projet
+    const pathVercel = path.join(cwd, 'backend', 'assets', filename);
+    if (fs.existsSync(pathVercel)) return pathVercel;
+    // Exécution locale dans le dossier backend/
+    const pathLocal = path.join(cwd, 'assets', filename);
+    if (fs.existsSync(pathLocal)) return pathLocal;
+    // Comportement de secours historique (depuis backend/utils/)
+    return path.join(__dirname, '../assets', filename);
+};
+
 /**
  * Génère un buffer PDF pour une facture détaillée
  * @param {Object} data 
@@ -26,7 +38,7 @@ async function generateFacturePDF(data) {
             doc.rect(0, 0, 612, 100).fill('#004B93');
             
             try {
-                const logoPath = path.join(__dirname, '../assets/logo-muc.jpg');
+                const logoPath = getAssetPath('logo-muc.jpg');
                 if (fs.existsSync(logoPath)) {
                     doc.image(logoPath, 500, 20, { width: 60 });
                 }
