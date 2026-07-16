@@ -177,16 +177,28 @@ export default async function handler(req, res) {
 
       // -- Enregistrement des frais --
       if (stripeFee > 0 && ['acompte', 'solde', 'totalite'].includes(paymentType)) {
-        await prisma.expense.create({
-          data: {
-            date: new Date(),
-            label: `Frais Stripe - Réservation #${reservationId} (${paymentType.toUpperCase()})`,
-            montant: stripeFee,
-            categorie: 'Frais bancaires & Commissions Stripe',
-            comptePcg: '627',
-            description: `Session Stripe: ${session.id}`
+        try {
+          const existingExpense = await prisma.expense.findFirst({
+            where: { description: `Session Stripe: ${session.id}` }
+          });
+          if (!existingExpense) {
+            await prisma.expense.create({
+              data: {
+                date: new Date(),
+                label: `Frais Stripe - Réservation #${reservationId} (${paymentType.toUpperCase()})`,
+                montant: stripeFee,
+                categorie: 'Frais bancaires & Commissions Stripe',
+                comptePcg: '627',
+                description: `Session Stripe: ${session.id}`
+              }
+            });
+            console.log(`[WEBHOOK] Frais Stripe de ${stripeFee} € enregistrés pour la session ${session.id}`);
+          } else {
+            console.log(`[WEBHOOK] Frais Stripe déjà enregistrés pour la session ${session.id}`);
           }
-        }).catch(e => console.error('[WEBHOOK] Erreur création dépense:', e.message));
+        } catch (e) {
+          console.error('[WEBHOOK] Erreur création dépense:', e.message);
+        }
       }
 
       // ==============================================

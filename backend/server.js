@@ -143,17 +143,29 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
       // Enregistrer automatiquement les frais Stripe en dépense
       if (stripeFee > 0 && (paymentType === 'acompte' || paymentType === 'solde' || paymentType === 'totalite')) {
         try {
-          await prisma.expense.create({
-            data: {
-              date: new Date(),
-              label: `Frais Stripe - Réservation #${reservationId} (${paymentType.toUpperCase()})`,
-              montant: stripeFee,
-              categorie: 'Frais bancaires & Commissions Stripe',
-              comptePcg: '627',
-              description: `Automatique: Frais Stripe pour la session ${session.id}`
+          const existingExpense = await prisma.expense.findFirst({
+            where: {
+              description: {
+                contains: session.id
+              }
             }
           });
-          console.log(`Frais Stripe de ${stripeFee} € enregistrés en dépense pour la résa ${reservationId}`);
+
+          if (!existingExpense) {
+            await prisma.expense.create({
+              data: {
+                date: new Date(),
+                label: `Frais Stripe - Réservation #${reservationId} (${paymentType.toUpperCase()})`,
+                montant: stripeFee,
+                categorie: 'Frais bancaires & Commissions Stripe',
+                comptePcg: '627',
+                description: `Automatique: Frais Stripe pour la session ${session.id}`
+              }
+            });
+            console.log(`Frais Stripe de ${stripeFee} € enregistrés en dépense pour la résa ${reservationId}`);
+          } else {
+            console.log(`Frais Stripe déjà enregistrés pour la session ${session.id} (Résa #${reservationId})`);
+          }
         } catch (expErr) {
           console.error("Erreur création dépense commission Stripe:", expErr);
         }
