@@ -13,26 +13,37 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
 // Helper : Lecture du raw body — compatible avec tous les runtimes
 // ==============================================================
 const getRawBody = async (req) => {
-  // Cas spécifique Vercel : Vercel injecte le body brut intact dans req.rawBody
+  // 1. Si Vercel a déjà injecté req.rawBody, on l'utilise en priorité
   if (req.rawBody) {
     return Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(req.rawBody, 'utf8');
   }
 
-  // Cas 1 : Le body est déjà un Buffer (certains runtimes pré-bufferisent)
+  // 2. Si le stream est toujours lisible, on tente de le lire directement du réseau
+  // (Ce qui évite de déclencher le getter req.body de Vercel qui consomme et parse le stream)
+  if (req.readable && !req.readableEnded) {
+    try {
+      const raw = await new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', (chunk) => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', (err) => reject(err));
+      });
+      if (raw && raw.length > 0) {
+        return raw;
+      }
+    } catch (e) {
+      console.warn('[WEBHOOK] Erreur lecture stream direct:', e.message);
+    }
+  }
+
+  // 3. Repli historique si le stream est déjà consommé ou vide
   if (req.body) {
     if (Buffer.isBuffer(req.body)) return req.body;
     if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8');
-    // JSON déjà parsé — on ne peut plus vérifier la signature Stripe
     return Buffer.from(JSON.stringify(req.body), 'utf8');
   }
 
-  // Cas 2 : Lecture du stream de la requête
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
-  });
+  return Buffer.alloc(0);
 };
 
 // ==============================================================
