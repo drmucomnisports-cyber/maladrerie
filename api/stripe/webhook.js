@@ -82,7 +82,9 @@ export default async function handler(req, res) {
   // --- Diagnostic : toujours logger l'appel entrant ---
   console.log(`[WEBHOOK] ▶ ${req.method} /api/stripe/webhook`);
   console.log(`[WEBHOOK] Headers stripe-signature: ${req.headers['stripe-signature'] ? 'PRÉSENT' : 'ABSENT'}`);
-  console.log(`[WEBHOOK] STRIPE_WEBHOOK_SECRET configuré: ${process.env.STRIPE_WEBHOOK_SECRET ? 'OUI' : 'NON'}`);
+  const secret = process.env.STRIPE_WEBHOOK_SECRET || '';
+  const secretPrefix = secret ? `${secret.substring(0, 12)}...` : 'NON_CONFIGURÉ';
+  console.log(`[WEBHOOK] STRIPE_WEBHOOK_SECRET utilisé (début) : ${secretPrefix}`);
 
   if (req.method !== 'POST') {
     console.log(`[WEBHOOK] ⚠️ Méthode non autorisée: ${req.method}`);
