@@ -2,17 +2,7 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
-const getAssetPath = (filename) => {
-    const cwd = process.cwd();
-    // Vercel ou exécution depuis la racine du projet
-    const pathVercel = path.join(cwd, 'backend', 'assets', filename);
-    if (fs.existsSync(pathVercel)) return pathVercel;
-    // Exécution locale dans le dossier backend/
-    const pathLocal = path.join(cwd, 'assets', filename);
-    if (fs.existsSync(pathLocal)) return pathLocal;
-    // Comportement de secours historique (depuis backend/utils/)
-    return path.join(__dirname, '../assets', filename);
-};
+const getAssetPath = require('./getAssetPath');
 
 /**
  * Génère un buffer PDF pour une facture détaillée

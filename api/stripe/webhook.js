@@ -1,25 +1,28 @@
 // ============================================================
 // Handler Vercel Serverless pour le Webhook Stripe
-// Version robuste avec diagnostic intégré
+// Version robuste avec diagnostic intégré, idempotence et cache Prisma
 // ============================================================
 
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
-import nodemailer from 'nodemailer';
+import mailer from '../../backend/utils/mailer.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
+
+// ==============================================================
+// Cache Prisma (éviter la saturation des connexions sur Vercel)
+// ==============================================================
+const prisma = globalThis.__prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalThis.__prisma = prisma;
 
 // ==============================================================
 // Helper : Lecture du raw body — compatible avec tous les runtimes
 // ==============================================================
 const getRawBody = async (req) => {
-  // 1. Si Vercel a déjà injecté req.rawBody, on l'utilise en priorité
   if (req.rawBody) {
     return Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(req.rawBody, 'utf8');
   }
 
-  // 2. Si le stream est toujours lisible, on tente de le lire directement du réseau
-  // (Ce qui évite de déclencher le getter req.body de Vercel qui consomme et parse le stream)
   if (req.readable && !req.readableEnded) {
     try {
       const raw = await new Promise((resolve, reject) => {
@@ -36,7 +39,6 @@ const getRawBody = async (req) => {
     }
   }
 
-  // 3. Repli historique si le stream est déjà consommé ou vide
   if (req.body) {
     if (Buffer.isBuffer(req.body)) return req.body;
     if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8');
@@ -47,50 +49,9 @@ const getRawBody = async (req) => {
 };
 
 // ==============================================================
-// Helper : Envoi e-mail
-// ==============================================================
-const sendConfirmationMail = async ({ to, nom, montant, type }) => {
-  if (!to || to === 'N/A') return;
-  try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    });
-
-    const typeLabel = type === 'acompte' ? 'Acompte' : type === 'caution' ? 'Caution' : 'Solde';
-    await transporter.sendMail({
-      from: `"Gîte de la Maladrerie" <${process.env.SMTP_SENDER || 'david.roujet@mucomnisports.fr'}>`,
-      to,
-      subject: `✅ Confirmation de paiement — ${typeLabel} — Gîte de la Maladrerie`,
-      html: `
-        <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-          <div style="background-color: #004B93; padding: 24px; text-align: center;">
-            <h1 style="color: #fff; margin: 0; font-size: 20px;">Gîte de La Maladrerie</h1>
-          </div>
-          <div style="padding: 30px;">
-            <h2 style="color: #004B93;">Bonjour ${nom},</h2>
-            <p>Nous avons bien reçu votre paiement de <strong>${montant} €</strong> (${typeLabel.toLowerCase()}) par carte bancaire.</p>
-            <p>Merci pour votre confiance et à très bientôt !</p>
-          </div>
-          <div style="background: #f8fafc; padding: 12px; text-align: center; font-size: 11px; color: #64748b;">
-            Gîte de la Maladrerie — MUC Omnisports — david.roujet@mucomnisports.fr
-          </div>
-        </div>
-      `
-    });
-    console.log(`[WEBHOOK] ✉️ Email envoyé à ${to}`);
-  } catch (err) {
-    console.error('[WEBHOOK] Erreur envoi email:', err.message);
-  }
-};
-
-// ==============================================================
 // Handler Principal
 // ==============================================================
 export default async function handler(req, res) {
-  // --- Diagnostic : toujours logger l'appel entrant ---
   console.log(`[WEBHOOK] ▶ ${req.method} /api/stripe/webhook`);
   console.log(`[WEBHOOK] Headers stripe-signature: ${req.headers['stripe-signature'] ? 'PRÉSENT' : 'ABSENT'}`);
   const secret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -98,20 +59,16 @@ export default async function handler(req, res) {
   console.log(`[WEBHOOK] STRIPE_WEBHOOK_SECRET utilisé (début) : ${secretPrefix}`);
 
   if (req.method !== 'POST') {
-    console.log(`[WEBHOOK] ⚠️ Méthode non autorisée: ${req.method}`);
-    res.setHeader('Allow', 'POST');
     return res.status(405).send('Method Not Allowed');
   }
 
-  // --- Lecture du body brut ---
   let rawBody;
   try {
     rawBody = await getRawBody(req);
     console.log(`[WEBHOOK] Body lu: ${rawBody.length} octets`);
   } catch (err) {
-    console.error('[WEBHOOK] ❌ Erreur lecture body:', err.message);
-    // Répondre 200 pour éviter que Stripe re-tente sans cesse
-    return res.status(200).json({ received: true, warning: 'body_read_error' });
+    console.error('[WEBHOOK] ❌ Erreur lecture rawBody:', err.message);
+    return res.status(400).send(`Erreur Body: ${err.message}`);
   }
 
   const sig = req.headers['stripe-signature'];
@@ -123,27 +80,21 @@ export default async function handler(req, res) {
       event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
       console.log(`[WEBHOOK] ✅ Signature Stripe valide — Event: ${event.type}`);
     } else {
-      // Sans secret ou sans signature : accepter en mode dégradé
       console.warn('[WEBHOOK] ⚠️ Mode dégradé — signature non vérifiée');
       try {
         event = JSON.parse(rawBody.toString('utf8'));
       } catch (parseErr) {
-        console.error('[WEBHOOK] ❌ Impossible de parser le body:', parseErr.message);
-        return res.status(200).json({ received: true, warning: 'parse_error' });
+        console.error('[WEBHOOK] ❌ Impossible de parser le JSON dégradé:', parseErr.message);
+        return res.status(400).send('Format JSON invalide');
       }
     }
   } catch (err) {
     console.error('[WEBHOOK] ❌ Vérification signature échouée:', err.message);
-    // IMPORTANT : Ne retourner 400 QUE si la signature est présente et invalide
-    // Cela indique une vraie tentative malveillante ou un mauvais secret
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   // --- Traitement des événements Stripe ---
-  let prisma;
   try {
-    prisma = new PrismaClient();
-
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       const reservationId = session.metadata?.reservationId;
@@ -155,6 +106,29 @@ export default async function handler(req, res) {
       if (!reservationId) {
         console.warn('[WEBHOOK] ⚠️ reservationId manquant dans les metadata');
         return res.status(200).json({ received: true });
+      }
+
+      // -- IDEMPOTENCE : Vérifier si l'événement a déjà été traité via une dépense Stripe Fees --
+      // Ou via le statut de la réservation pour éviter un double traitement.
+      const resDb = await prisma.reservation.findUnique({
+        where: { id: parseInt(reservationId) },
+        include: { client: true, intervenant: true }
+      });
+
+      if (!resDb) {
+        console.warn(`[WEBHOOK] ⚠️ Réservation #${reservationId} introuvable en DB`);
+        return res.status(200).json({ received: true });
+      }
+
+      let isAlreadyProcessed = false;
+      if (paymentType === 'acompte' && resDb.statutPaiement === 'ACOMPTE_PAYE') isAlreadyProcessed = true;
+      if (paymentType === 'acompte' && resDb.statutPaiement === 'PAYE') isAlreadyProcessed = true;
+      if ((paymentType === 'solde' || paymentType === 'totalite') && (resDb.statutPaiement === 'PAYE' || resDb.statutPaiement === 'SOLDE_PAYE')) isAlreadyProcessed = true;
+      if (paymentType === 'caution' && resDb.statutCaution === 'DEPOSEE') isAlreadyProcessed = true;
+
+      if (isAlreadyProcessed) {
+         console.log(`[WEBHOOK] ⚠️ Événement ${paymentType} déjà traité pour la réservation #${reservationId}. Ignoré.`);
+         return res.status(200).json({ received: true });
       }
 
       // -- Calcul des frais Stripe réels --
@@ -193,8 +167,6 @@ export default async function handler(req, res) {
               }
             });
             console.log(`[WEBHOOK] Frais Stripe de ${stripeFee} € enregistrés pour la session ${session.id}`);
-          } else {
-            console.log(`[WEBHOOK] Frais Stripe déjà enregistrés pour la session ${session.id}`);
           }
         } catch (e) {
           console.error('[WEBHOOK] Erreur création dépense:', e.message);
@@ -205,16 +177,12 @@ export default async function handler(req, res) {
       // CAS ACOMPTE
       // ==============================================
       if (paymentType === 'acompte') {
-        const resDb = await prisma.reservation.findUnique({
-          where: { id: parseInt(reservationId) },
-          include: { client: true }
-        });
-
         let targetStatus = 'ACOMPTE_PAYE';
-        if (resDb?.statutPaiement === 'SOLDE_PAYE') targetStatus = 'PAYE';
+        if (resDb.statutPaiement === 'SOLDE_PAYE') targetStatus = 'PAYE';
 
         let stripeSoldeId = null;
-        if (targetStatus === 'ACOMPTE_PAYE' && resDb?.montantSolde > 0) {
+        let balancePaymentLink = '';
+        if (targetStatus === 'ACOMPTE_PAYE' && resDb.montantSolde > 0) {
           try {
             const soldeSession = await stripe.checkout.sessions.create({
               payment_method_types: ['card'],
@@ -226,12 +194,13 @@ export default async function handler(req, res) {
               customer_email: resDb.client?.email || undefined
             });
             stripeSoldeId = soldeSession.id;
+            balancePaymentLink = soldeSession.url;
           } catch (e) { console.error('[WEBHOOK] Erreur session solde:', e.message); }
         }
 
         const reservation = await prisma.reservation.update({
           where: { id: parseInt(reservationId) },
-          data: { statutPaiement: targetStatus, statut: 'RESERVE', modePaiement: 'STRIPE', stripeSoldeId: stripeSoldeId || undefined, payeLe: resDb?.payeLe || new Date() },
+          data: { statutPaiement: targetStatus, statut: 'RESERVE', modePaiement: 'STRIPE', stripeSoldeId: stripeSoldeId || undefined, payeLe: resDb.payeLe || new Date() },
           include: { client: true }
         });
 
@@ -239,34 +208,35 @@ export default async function handler(req, res) {
           await prisma.promoCode.updateMany({ where: { code: reservation.codePromo.toUpperCase() }, data: { usageActuel: { increment: 1 } } }).catch(() => {});
         }
 
-        await sendConfirmationMail({ to: reservation.client?.email, nom: reservation.client?.nom, montant: (session.amount_total / 100).toFixed(2), type: 'acompte' });
+        await mailer.sendPaymentConfirmationEmails(prisma, reservation, 'acompte', session.amount_total / 100, balancePaymentLink);
         console.log(`[WEBHOOK] ✅ Acompte traité — Résa #${reservationId} → ${targetStatus}`);
 
       // ==============================================
       // CAS SOLDE / TOTALITÉ
       // ==============================================
       } else if (paymentType === 'solde' || paymentType === 'totalite') {
-        const resDb = await prisma.reservation.findUnique({ where: { id: parseInt(reservationId) } });
         let targetStatus = 'PAYE';
-        if (paymentType === 'solde' && resDb?.montantAcompte > 0 && resDb?.statutPaiement !== 'ACOMPTE_PAYE') {
+        if (paymentType === 'solde' && resDb.montantAcompte > 0 && resDb.statutPaiement !== 'ACOMPTE_PAYE') {
           targetStatus = 'SOLDE_PAYE';
         }
         const reservation = await prisma.reservation.update({
           where: { id: parseInt(reservationId) },
-          data: { statutPaiement: targetStatus, modePaiement: 'STRIPE', payeLe: resDb?.payeLe || new Date() },
+          data: { statutPaiement: targetStatus, statut: 'RESERVE', modePaiement: 'STRIPE', payeLe: resDb.payeLe || new Date() },
           include: { client: true }
         });
-        await sendConfirmationMail({ to: reservation.client?.email, nom: reservation.client?.nom, montant: (session.amount_total / 100).toFixed(2), type: paymentType });
+        await mailer.sendPaymentConfirmationEmails(prisma, reservation, paymentType, session.amount_total / 100);
         console.log(`[WEBHOOK] ✅ Solde/Totalité traité — Résa #${reservationId} → ${targetStatus}`);
 
       // ==============================================
       // CAS CAUTION
       // ==============================================
       } else if (paymentType === 'caution') {
-        await prisma.reservation.update({
+        const reservation = await prisma.reservation.update({
           where: { id: parseInt(reservationId) },
-          data: { statutCaution: 'DEPOSEE', stripeCautionId: session.payment_intent }
+          data: { statutCaution: 'DEPOSEE', stripeCautionId: session.payment_intent },
+          include: { client: true }
         });
+        await mailer.sendPaymentConfirmationEmails(prisma, reservation, 'caution', session.amount_total / 100);
         console.log(`[WEBHOOK] ✅ Caution déposée — Résa #${reservationId}`);
       } else {
         console.log(`[WEBHOOK] ℹ️ Type de paiement non géré: ${paymentType}`);
@@ -277,19 +247,13 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('[WEBHOOK] ❌ Erreur traitement:', err);
-    // Retourner 200 pour éviter les re-tentatives Stripe sur une erreur interne
     return res.status(200).json({ received: true, warning: 'processing_error' });
-  } finally {
-    if (prisma) await prisma.$disconnect().catch(() => {});
   }
 
-  // ✅ Répondre 200 — indispensable pour que Stripe considère le webhook comme reçu
+  // ✅ Répondre 200
   return res.status(200).json({ received: true });
 }
 
-// NOTE : Dans @vercel/node (hors Next.js), il n'y a pas de body parser automatique.
-// Le body est disponible comme stream. La directive ci-dessous est ignorée par Vercel
-// mais documentée pour clarté.
 export const config = {
   api: { bodyParser: false }
 };

@@ -7,6 +7,7 @@ const { PrismaClient } = require('@prisma/client');
 const { BrevoClient } = require('@getbrevo/brevo');
 const nodemailer = require('nodemailer');
 const { generateDevisPDF } = require('./utils/generateDevisPDF');
+const getAssetPath = require('./utils/getAssetPath');
 const cron = require('node-cron');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -573,11 +574,11 @@ const sendMail = async (options) => {
 const getClientAttachments = () => {
   const attachments = [];
   try {
-    const inventairePath = path.join(__dirname, 'assets/Inventaire - 15-04-2026.docx');
-    const etatDesLieuxPath = path.join(__dirname, 'assets/ÉTAT DES LIEUX GITE - Client.docx');
-    const cgvPath = path.join(__dirname, 'assets/CGV - Gite de la Maladrerie.pdf');
+    const inventairePath = getAssetPath('Inventaire - 15-04-2026.docx');
+    const etatDesLieuxPath = getAssetPath('ÉTAT DES LIEUX GITE - Client.docx');
+    const cgvPath = getAssetPath('CGV - Gite de la Maladrerie.pdf');
 
-    if (fs.existsSync(inventairePath)) {
+    if (inventairePath && fs.existsSync(inventairePath)) {
       attachments.push({
         content: fs.readFileSync(inventairePath).toString('base64'),
         name: "Inventaire - Gite de la Maladrerie.docx"
@@ -586,7 +587,7 @@ const getClientAttachments = () => {
       console.warn("Fichier inventaire manquant à :", inventairePath);
     }
 
-    if (fs.existsSync(etatDesLieuxPath)) {
+    if (etatDesLieuxPath && fs.existsSync(etatDesLieuxPath)) {
       attachments.push({
         content: fs.readFileSync(etatDesLieuxPath).toString('base64'),
         name: "Etat des lieux - Gite de la Maladrerie.docx"
@@ -595,7 +596,7 @@ const getClientAttachments = () => {
       console.warn("Fichier état des lieux manquant à :", etatDesLieuxPath);
     }
 
-    if (fs.existsSync(cgvPath)) {
+    if (cgvPath && fs.existsSync(cgvPath)) {
       attachments.push({
         content: fs.readFileSync(cgvPath).toString('base64'),
         name: "CGV - Gite de la Maladrerie.pdf"
