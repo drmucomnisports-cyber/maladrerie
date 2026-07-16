@@ -13,6 +13,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
 // Helper : Lecture du raw body — compatible avec tous les runtimes
 // ==============================================================
 const getRawBody = async (req) => {
+  // Cas spécifique Vercel : Vercel injecte le body brut intact dans req.rawBody
+  if (req.rawBody) {
+    return Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(req.rawBody, 'utf8');
+  }
+
   // Cas 1 : Le body est déjà un Buffer (certains runtimes pré-bufferisent)
   if (req.body) {
     if (Buffer.isBuffer(req.body)) return req.body;
