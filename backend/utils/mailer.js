@@ -6,9 +6,12 @@ const crypto = require('crypto');
 
 // Initialiser Brevo
 let brevo = null;
-if (process.env.BREVO_API_KEY && process.env.BREVO_API_KEY.startsWith('xkeysib-')) {
-  brevo = new BrevoClient();
-  brevo.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+if (process.env.BREVO_API_KEY) {
+  try {
+    brevo = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
+  } catch (err) {
+    console.error("Erreur lors de l'initialisation de BrevoClient:", err);
+  }
 }
 
 const sendMail = async (options) => {
