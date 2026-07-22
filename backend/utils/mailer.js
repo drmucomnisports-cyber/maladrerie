@@ -86,6 +86,7 @@ const sendMail = async (options) => {
     console.log(`Email envoyé via SMTP avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
   } catch (smtpError) {
     console.error("Erreur lors de l'envoi de l'email via SMTP (échec total):", smtpError.message || smtpError);
+    throw new Error("L'envoi de l'email a échoué (API Brevo et relais SMTP en échec).");
   }
 };
 
