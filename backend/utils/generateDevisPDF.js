@@ -259,10 +259,13 @@ async function generateDevisPDF(data) {
              doc.restore();
              
              y += 5;
-             doc.fontSize(12).font('Helvetica-Bold').fillColor('#004B93').text('TOTAL TTC', leftCol + 290, y);
+             doc.fontSize(12).font('Helvetica-Bold').fillColor('#004B93').text('TOTAL', leftCol + 290, y);
              doc.text(`${data.prixTotal.toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
              
-             y += 20;
+             y += 14;
+             doc.fontSize(8).font('Helvetica-Oblique').fillColor('#666666').text('TVA non applicable, art. 293 B du CGI', leftCol + 290, y);
+             
+             y += 18;
              doc.fontSize(9).font('Helvetica-Bold').fillColor('#000000').text('Dont Acompte à régler :', leftCol + 290, y);
              let acompteVal = data.montantAcompte ? data.montantAcompte : (data.prixTotal * 0.3);
              doc.text(`${acompteVal.toFixed(2)} €`, colTotal, y, { align: 'right', width: colTotalW });
