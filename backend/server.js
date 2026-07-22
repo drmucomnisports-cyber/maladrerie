@@ -3712,19 +3712,6 @@ app.get('/api/admin/reservations/:id/facture-pdf', checkAuth, async (req, res) =
   }
 });
 
-app.get('/api/test-brevo', async (req, res) => {
-  try {
-    await sendMail({
-      to: 'david.roujet@mucomnisports.fr',
-      subject: 'Test Brevo API',
-      html: '<p>Test</p>'
-    });
-    res.json({ success: true, message: "Email sent" });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message, stack: err.stack });
-  }
-});
-
 // --- ENDPOINT POUR ENVOYER LA FACTURE PAR EMAIL ---
 app.post('/api/admin/reservations/:id/send-facture', checkAuth, async (req, res) => {
   const { id } = req.params;
