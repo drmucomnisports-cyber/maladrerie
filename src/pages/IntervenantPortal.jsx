@@ -1005,6 +1005,20 @@ function IntervenantPortal() {
                                 {res.statutPaiement === 'PAYE' ? 'Payé' : 'Attente'}
                               </span>
                             </div>
+                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/50">
+                              <span className="text-slate-500 font-bold uppercase">Caution</span>
+                              {res.statutCaution === 'DEPOSEE' ? (
+                                <span className="text-green-600 font-bold">Dép.</span>
+                              ) : res.statutCaution === 'RESTITUEE' ? (
+                                <span className="text-slate-500 font-bold">Rest.</span>
+                              ) : res.statutCaution === 'UTILISEE' ? (
+                                <span className="text-red-600 font-bold">Retenue</span>
+                              ) : res.stripeCautionId ? (
+                                <span className="text-blue-600 font-bold">Lien envoyé</span>
+                              ) : (
+                                <span className="text-amber-600 font-bold">Attente</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="p-4">
@@ -1662,6 +1676,13 @@ function IntervenantPortal() {
                 <div className="text-left flex-1">
                   <span className="block font-bold text-slate-800">La totalité (100%)</span>
                   <span className="block text-xs text-slate-500">Envoyer le lien total</span>
+                </div>
+              </button>
+              <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'caution'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-amber-500/15 border-2 border-slate-100 hover:border-amber-500 rounded-xl transition-all group">
+                <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-amber-500 flex items-center justify-center text-slate-500 group-hover:text-white transition-colors"><Shield size={20} /></div>
+                <div className="text-left flex-1">
+                  <span className="block font-bold text-slate-800">La caution</span>
+                  <span className="block text-xs text-slate-500">Envoyer le lien d'empreinte bancaire</span>
                 </div>
               </button>
             </div>

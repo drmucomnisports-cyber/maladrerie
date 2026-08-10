@@ -43,6 +43,10 @@
       "dest": "/sitemap.xml"
     },
     {
+      "src": "/googledcc0ca1db9abbc14.html",
+      "dest": "/googledcc0ca1db9abbc14.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
