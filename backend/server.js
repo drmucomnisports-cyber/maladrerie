@@ -498,6 +498,7 @@ const sendMail = async (options) => {
   // Déterminer s'il faut utiliser l'API Brevo (clé API valide commençant par xkeysib-)
   const brevoKey = process.env.BREVO_API_KEY;
   const useApi = brevoKey && brevoKey.startsWith('xkeysib-');
+  const defaultSender = process.env.SMTP_SENDER || process.env.BREVO_SENDER || 'david.roujet@mucomnisports.fr';
 
   if (useApi) {
     try {
@@ -507,8 +508,8 @@ const sendMail = async (options) => {
         subject: options.subject,
         htmlContent: options.html,
         sender: { 
-          name: "Gite de la Maladrerie - MUC", 
-          email: "dr.mucomnisports@gmail.com" 
+          name: options.fromName || "Gîte de la Maladrerie - MUC", 
+          email: options.from || defaultSender 
         },
         to: toEmails,
         headers: {
@@ -547,7 +548,7 @@ const sendMail = async (options) => {
     });
 
     const mailOptions = {
-      from: `"Gite de la Maladrerie - MUC" <${process.env.SMTP_SENDER || 'dr.mucomnisports@gmail.com'}>`,
+      from: `"${options.fromName || 'Gîte de la Maladrerie - MUC'}" <${options.from || defaultSender}>`,
       to: options.to,
       subject: options.subject,
       html: options.html
