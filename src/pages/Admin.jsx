@@ -3826,14 +3826,25 @@ const Admin = () => {
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">Gestion & Édition des Factures</h2>
               {reservationsFactures.length > 0 && (
-                <button
-                  onClick={() => {
-                    window.open(`${API_URL}/api/admin/factures/period/zip?dateDebut=${dateDebutFacture}&dateFin=${dateFinFacture}&token=${token}`, '_blank');
-                  }}
-                  className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md"
-                >
-                  📦 Télécharger les {reservationsFactures.length} factures (ZIP)
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => {
+                      window.open(`${API_URL}/api/admin/factures/period/pnm?dateDebut=${dateDebutFacture}&dateFin=${dateFinFacture}&token=${token}`, '_blank');
+                    }}
+                    className="inline-flex items-center justify-center gap-2 bg-muc-blue hover:bg-blue-800 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md"
+                    title="Exporter au format Sage 100 Comptabilité (.PNM 164 caractères)"
+                  >
+                    📊 Exporter pour Sage 100 (.PNM)
+                  </button>
+                  <button
+                    onClick={() => {
+                      window.open(`${API_URL}/api/admin/factures/period/zip?dateDebut=${dateDebutFacture}&dateFin=${dateFinFacture}&token=${token}`, '_blank');
+                    }}
+                    className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md"
+                  >
+                    📦 Télécharger les {reservationsFactures.length} factures (ZIP)
+                  </button>
+                </div>
               )}
             </div>
             

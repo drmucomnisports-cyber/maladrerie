@@ -223,6 +223,58 @@ const getAdminEmailsForPreference = (prisma, preferenceKey) => {
   return process.env.SMTP_SENDER || 'david.roujet@mucomnisports.fr';
 };
 
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+const generateCautionSessionUrl = async (prisma, reservation) => {
+  if (!stripe || !reservation || reservation.statutCaution === 'DEPOSEE') return null;
+  try {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://www.gite-maladrerie.fr';
+    const dDebut = new Date(reservation.dateDebut).toLocaleDateString('fr-FR');
+    const dFin = new Date(reservation.dateFin).toLocaleDateString('fr-FR');
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: 'Caution - Empreinte bancaire (Gîte de La Maladrerie)',
+            description: `Dépôt de garantie pour la réservation #${reservation.id} du ${dDebut} au ${dFin}`,
+          },
+          unit_amount: 50000, // 500€
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      billing_address_collection: 'required',
+      payment_intent_data: {
+        capture_method: 'manual', // Empreinte 500€ sans débit immédiat
+      },
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/payment-cancel`,
+      customer_email: (reservation.client?.email && reservation.client?.email !== 'N/A') ? reservation.client.email : undefined,
+      metadata: {
+        reservationId: reservation.id.toString(),
+        paymentType: 'caution'
+      }
+    });
+
+    if (session && session.url) {
+      if (prisma && prisma.reservation) {
+        await prisma.reservation.update({
+          where: { id: reservation.id },
+          data: { stripeCautionId: session.id }
+        }).catch(e => console.error("Erreur mise à jour stripeCautionId:", e.message));
+      }
+      return session.url;
+    }
+  } catch (err) {
+    console.error("Erreur création session caution pour email solde:", err.message);
+  }
+  return null;
+};
+
 const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, amount, balancePaymentLink = '') => {
   try {
     const isCaution = paymentType.toLowerCase() === 'caution';
@@ -236,6 +288,11 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
 
     const isSoldeComplet = isSolde && (reservation.statutPaiement === 'PAYE');
     const isSoldePartiel = isSolde && (reservation.statutPaiement === 'SOLDE_PAYE');
+
+    let cautionButtonUrl = null;
+    if (isSolde && reservation.statutCaution !== 'DEPOSEE') {
+      cautionButtonUrl = await generateCautionSessionUrl(prisma, reservation);
+    }
 
     if (isCaution) {
       typeLabel = 'Dépôt de garantie (Caution)';
@@ -253,7 +310,7 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
     } else if (isSoldeComplet) {
       typeLabel = "Solde du séjour";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Votre réservation est désormais entièrement payée !`;
-      cgvReference = `Avant votre entrée dans les lieux, il vous sera demandé d'effectuer l'empreinte bancaire pour le dépôt de garantie (caution de 500 €). Si ce n'est pas déjà fait, vous recevrez un lien de paiement dédié quelques jours avant votre arrivée.`;
+      cgvReference = `Avant votre entrée dans les lieux, il vous est demandé d'effectuer l'empreinte bancaire pour le dépôt de garantie (caution de 500 € - aucun débit). ${cautionButtonUrl ? 'Vous pouvez la réaliser dès maintenant ci-dessous.' : ''}`;
     } else if (isSoldePartiel) {
       typeLabel = "Solde du séjour (Règlement partiel)";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Attention : l'acompte de <strong>${(reservation.montantAcompte || 0).toFixed(2)} €</strong> reste à régler.`;
@@ -325,6 +382,26 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
                 </tr>
               </table>
             </div>
+
+            ${cautionButtonUrl ? `
+            <!-- Bloc Invitation Caution Stripe -->
+            <div style="background-color: #eff6ff; border: 2px solid #3b82f6; border-radius: 12px; padding: 24px; text-align: center; margin: 30px 0; box-shadow: 0 4px 6px rgba(59,130,246,0.1);">
+              <h3 style="margin: 0 0 10px 0; color: #004B93; font-size: 18px; font-weight: bold;">🛡️ Dépôt de garantie (Caution de 500 €)</h3>
+              <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.5;">
+                Votre séjour est payé ! Afin de finaliser la préparation de votre entrée dans les lieux, merci d'effectuer dès maintenant l'<strong>empreinte bancaire sécurisée de 500 €</strong>.<br>
+                <strong style="color: #059669;">Il s'agit d'une simple empreinte : aucun montant n'est débité de votre compte.</strong>
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <a href="${cautionButtonUrl}" style="background-color: #004B93; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,75,147,0.2);">
+                      ⚡ Réaliser l'empreinte de caution (500 €)
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            ` : ''}
 
             ${!isCaution && tokenModification ? `
             <div style="text-align: center; margin: 30px 0;">

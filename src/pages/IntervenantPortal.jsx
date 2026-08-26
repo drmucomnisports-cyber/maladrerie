@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, 
   Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, 
-  Coins, Edit3, FileText, Users, Mail, User, Lock, Plus, Phone
+  Coins, Edit3, FileText, Users, Mail, User, Lock, Plus, Phone, Eye
 } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
@@ -84,6 +84,7 @@ function IntervenantPortal() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteModalId, setDeleteModalId] = useState(null);
   const [editingReservation, setEditingReservation] = useState(null);
+  const [selectedDetailRes, setSelectedDetailRes] = useState(null);
 
   // Paiement Manuel
   const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
@@ -933,12 +934,37 @@ function IntervenantPortal() {
                               });
                             }
                             const total = totalAdultes + totalEnfants;
+                            
+                            const hasMenage = res.options?.menage;
+                            const hasDraps = res.options?.litsFaits || res.options?.drapGrandLit || res.options?.drapPetitLit || res.options?.draps;
+                            const hasLinge = res.options?.lingeFourni || res.options?.serviettes;
+
                             return (
                               <>
                                 <div className="text-xs font-bold text-slate-700 mt-1 bg-slate-100 px-2 py-0.5 rounded inline-block leading-tight">
                                   👥 {total} occupant{total > 1 ? 's' : ''}
                                   <span className="font-normal text-slate-500 block text-[10px]">({totalAdultes} Ad., {totalEnfants} Enf.)</span>
                                 </div>
+
+                                {/* Badges d'Options */}
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {hasMenage && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200" title="Ménage fin de séjour inclus">
+                                      🧹 Ménage
+                                    </span>
+                                  )}
+                                  {hasDraps && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200" title="Option Lits faits / Draps">
+                                      🛏️ Draps
+                                    </span>
+                                  )}
+                                  {hasLinge && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200" title="Linge de toilette & Serviettes">
+                                      🧺 Linge
+                                    </span>
+                                  )}
+                                </div>
+
                                 {(res.statut === 'RESERVE' || res.statut === 'TERMINE') && (
                                   <button
                                     onClick={() => {
@@ -976,13 +1002,29 @@ function IntervenantPortal() {
                                 });
                               }
                               if (totalPtitDej === 0 && totalDej === 0 && totalDiner === 0) {
-                                return <span className="text-slate-400 normal-case italic font-medium">Aucune</span>;
+                                return (
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-slate-400 normal-case italic font-medium">Aucun repas</span>
+                                    <button
+                                      onClick={() => setSelectedDetailRes(res)}
+                                      className="text-[10px] text-muc-blue hover:underline font-bold text-left"
+                                    >
+                                      🔍 Détails complets
+                                    </button>
+                                  </div>
+                                );
                               }
                               return (
                                 <>
                                   {totalPtitDej > 0 && <span className="text-orange-600">🥐 {totalPtitDej} Petit-déj</span>}
                                   {totalDej > 0 && <span className="text-green-600">🍲 {totalDej} Déj</span>}
                                   {totalDiner > 0 && <span className="text-blue-600">🍝 {totalDiner} Dîn</span>}
+                                  <button
+                                    onClick={() => setSelectedDetailRes(res)}
+                                    className="text-[10px] text-muc-blue hover:underline font-bold text-left mt-0.5 normal-case"
+                                  >
+                                    🔍 Planning repas & détails
+                                  </button>
                                 </>
                               );
                             })()}
@@ -1039,6 +1081,13 @@ function IntervenantPortal() {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-1.5">
+                            <button
+                              onClick={() => setSelectedDetailRes(res)}
+                              className="p-2 bg-muc-blue/10 text-muc-blue rounded-lg hover:bg-muc-blue hover:text-white transition-colors"
+                              title="Voir les détails complets (Chambres, Lits, Options, Repas)"
+                            >
+                              <Eye size={18} />
+                            </button>
                             {/* Aucun bouton Accepter/Refuser n'est rendu pour l'intervenant */}
                             {res.statut === 'RESERVE' && (
                               <>
@@ -2193,6 +2242,236 @@ function IntervenantPortal() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE : Détails complets de la réservation */}
+      {selectedDetailRes && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* En-tête de la modale */}
+            <div className="p-6 bg-gradient-to-r from-muc-blue to-blue-900 text-white flex justify-between items-start rounded-t-3xl sticky top-0 z-10">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="bg-white/20 text-white font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider">
+                    Réservation #{selectedDetailRes.id}
+                  </span>
+                  <span className={`text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider ${
+                    selectedDetailRes.statut === 'RESERVE' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
+                  }`}>
+                    {selectedDetailRes.statut === 'RESERVE' ? 'Confirmée' : selectedDetailRes.statut}
+                  </span>
+                </div>
+                <h2 className="text-2xl font-black mt-2">
+                  👤 {selectedDetailRes.client?.nom || 'Client inconnu'}
+                </h2>
+                <p className="text-blue-100 text-sm mt-1 flex flex-wrap items-center gap-4">
+                  <span>📅 Du {new Date(selectedDetailRes.dateDebut).toLocaleDateString('fr-FR')} au {new Date(selectedDetailRes.dateFin).toLocaleDateString('fr-FR')}</span>
+                  <span>✉️ {selectedDetailRes.client?.email || '-'}</span>
+                  {selectedDetailRes.client?.telephone && <span>📞 {selectedDetailRes.client?.telephone}</span>}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedDetailRes(null)}
+                className="p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all font-bold text-xl"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+
+              {/* Section 1: Hébergement & Chambres */}
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80">
+                <h3 className="text-base font-black text-muc-blue uppercase tracking-wider flex items-center gap-2 mb-3">
+                  🛏️ Chambres & Configuration des Lits
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Chambres assignées */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Chambres réservées</div>
+                    <div className="text-base font-black text-slate-800">
+                      {(selectedDetailRes.chambres || []).map(id => CHAMBRES_NAMES[id] || `Ch. ${id}`).join(', ') || 'Aucune chambre spécifiée'}
+                    </div>
+                  </div>
+
+                  {/* Salles */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Salles de réunion</div>
+                    <div className="text-base font-black text-slate-800">
+                      {selectedDetailRes.salles?.salle15 || selectedDetailRes.salles?.salle12 ? (
+                        <div className="space-y-1">
+                          {selectedDetailRes.salles?.salle15 && <div>💼 Salle 15 places</div>}
+                          {selectedDetailRes.salles?.salle12 && <div>💼 Salle 12 places</div>}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-sm font-normal italic">Aucune salle réservée</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Détails par chambre */}
+                {selectedDetailRes.chambresDetails && Object.keys(selectedDetailRes.chambresDetails).length > 0 && (
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Détail par chambre :</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {Object.entries(selectedDetailRes.chambresDetails).map(([chNum, details]) => (
+                        <div key={chNum} className="bg-white p-3.5 rounded-xl border border-slate-200 text-xs shadow-sm">
+                          <div className="font-black text-muc-blue mb-1 text-sm">{CHAMBRES_NAMES[chNum] || `Chambre ${chNum}`}</div>
+                          <div className="text-slate-600">👥 Occupants: <strong>{(parseInt(details.adultes)||0) + (parseInt(details.enfants)||0)}</strong> ({details.adultes||0} ad, {details.enfants||0} enf)</div>
+                          {details.litsSimples > 0 && <div className="text-slate-600">🛏️ Lits simples: <strong>{details.litsSimples}</strong></div>}
+                          {details.litsDoubles > 0 && <div className="text-slate-600">🛌 Lits doubles: <strong>{details.litsDoubles}</strong></div>}
+                          {details.drap && <div className="text-emerald-600 font-bold mt-1.5 flex items-center gap-1">✨ Lits faits / Draps</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Options & Services Inclus */}
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80">
+                <h3 className="text-base font-black text-muc-blue uppercase tracking-wider flex items-center gap-2 mb-3">
+                  ✨ Options & Prestations Incluses
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  
+                  {/* Ménage */}
+                  <div className={`p-4 rounded-xl border text-xs font-bold ${
+                    selectedDetailRes.options?.menage 
+                      ? 'bg-amber-50 border-amber-300 text-amber-900' 
+                      : 'bg-white border-slate-200 text-slate-400'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🧹</span>
+                      <div>
+                        <div className="font-black text-sm">Ménage fin de séjour</div>
+                        <div className="mt-0.5">{selectedDetailRes.options?.menage ? '✅ INCLUS / À réaliser' : '❌ Non inclus'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lits faits / Draps */}
+                  <div className={`p-4 rounded-xl border text-xs font-bold ${
+                    selectedDetailRes.options?.litsFaits || selectedDetailRes.options?.drapGrandLit || selectedDetailRes.options?.drapPetitLit || selectedDetailRes.options?.draps
+                      ? 'bg-blue-50 border-blue-300 text-blue-900' 
+                      : 'bg-white border-slate-200 text-slate-400'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🛏️</span>
+                      <div>
+                        <div className="font-black text-sm">Configuration Draps & Lits</div>
+                        <div className="mt-0.5">
+                          {selectedDetailRes.options?.litsFaits ? '✅ Lits faits à l\'arrivée' : 
+                           (selectedDetailRes.options?.drapGrandLit || selectedDetailRes.options?.drapPetitLit || selectedDetailRes.options?.draps) ? '✅ Draps fournis' : '❌ Non inclus'}
+                        </div>
+                        {selectedDetailRes.options?.drapGrandLit > 0 && <div className="text-[11px] font-normal">Grands lits: {selectedDetailRes.options.drapGrandLit}</div>}
+                        {selectedDetailRes.options?.drapPetitLit > 0 && <div className="text-[11px] font-normal">Petits lits: {selectedDetailRes.options.drapPetitLit}</div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Linge & Serviettes */}
+                  <div className={`p-4 rounded-xl border text-xs font-bold ${
+                    selectedDetailRes.options?.lingeFourni || selectedDetailRes.options?.serviettes
+                      ? 'bg-purple-50 border-purple-300 text-purple-900' 
+                      : 'bg-white border-slate-200 text-slate-400'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🧺</span>
+                      <div>
+                        <div className="font-black text-sm">Linge de toilette</div>
+                        <div className="mt-0.5">{selectedDetailRes.options?.lingeFourni || selectedDetailRes.options?.serviettes ? '✅ Serviettes fournies' : '❌ Non inclus'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Section 3: Planning Détaillé de Restauration (Jour par Jour) */}
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80">
+                <h3 className="text-base font-black text-muc-blue uppercase tracking-wider flex items-center gap-2 mb-3">
+                  🍽️ Restauration - Planning Jour par Jour
+                </h3>
+
+                {selectedDetailRes.repas && Object.keys(selectedDetailRes.repas).length > 0 ? (
+                  <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-black uppercase border-b border-slate-200">
+                          <th className="p-3">Date</th>
+                          <th className="p-3 text-center">🥐 Petit-déjeuner</th>
+                          <th className="p-3 text-center">🍲 Déjeuner</th>
+                          <th className="p-3 text-center">🍝 Dîner</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {Object.entries(selectedDetailRes.repas).sort(([a], [b]) => a.localeCompare(b)).map(([dateKey, repasDay]) => {
+                          const pd = repasDay.PETIT_DEJ || {};
+                          const dj = repasDay.DEJEUNER || {};
+                          const dn = repasDay.DINER || {};
+
+                          const pdCount = (parseInt(pd.ADULTE)||0) + (parseInt(pd.ENFANT_MOINS_12)||0) + (parseInt(pd.ENFANT_MOINS_5)||0);
+                          const djCount = (parseInt(dj.ADULTE)||0) + (parseInt(dj.ENFANT_MOINS_12)||0) + (parseInt(dj.ENFANT_MOINS_5)||0);
+                          const dnCount = (parseInt(dn.ADULTE)||0) + (parseInt(dn.ENFANT_MOINS_12)||0) + (parseInt(dn.ENFANT_MOINS_5)||0);
+
+                          const dateObj = new Date(dateKey + 'T00:00:00');
+                          const dateFormatted = isNaN(dateObj.getTime()) ? dateKey : dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+                          return (
+                            <tr key={dateKey} className="hover:bg-slate-50">
+                              <td className="p-3 font-bold text-slate-800 capitalize">{dateFormatted}</td>
+                              <td className="p-3 text-center font-bold text-orange-600">
+                                {pdCount > 0 ? `${pdCount} (${pd.ADULTE||0} ad, ${pdCount - (pd.ADULTE||0)} enf)` : '-'}
+                              </td>
+                              <td className="p-3 text-center font-bold text-green-600">
+                                {djCount > 0 ? `${djCount} (${dj.ADULTE||0} ad, ${djCount - (dj.ADULTE||0)} enf)` : '-'}
+                              </td>
+                              <td className="p-3 text-center font-bold text-blue-600">
+                                {dnCount > 0 ? `${dnCount} (${dn.ADULTE||0} ad, ${dnCount - (dn.ADULTE||0)} enf)` : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 text-slate-400 italic text-xs">
+                    Aucune prestation de restauration réservée pour ce séjour.
+                  </div>
+                )}
+              </div>
+
+              {/* Section 4: Remarques & Commentaires */}
+              {selectedDetailRes.remarques && (
+                <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
+                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-wider mb-1">
+                    📝 Remarques particulières du séjour
+                  </h3>
+                  <p className="text-sm text-amber-800 font-medium whitespace-pre-wrap">
+                    {selectedDetailRes.remarques}
+                  </p>
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end rounded-b-3xl">
+              <button
+                onClick={() => setSelectedDetailRes(null)}
+                className="px-6 py-2.5 bg-muc-blue text-white font-black text-xs uppercase tracking-wider rounded-xl hover:bg-blue-800 transition-all shadow-md"
+              >
+                Fermer
+              </button>
+            </div>
+
           </div>
         </div>
       )}

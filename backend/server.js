@@ -839,6 +839,57 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
     const isSoldeComplet = isSolde && (reservation.statutPaiement === 'PAYE');
     const isSoldePartiel = isSolde && (reservation.statutPaiement === 'SOLDE_PAYE');
 
+    let cautionButtonUrl = null;
+    if (isSolde && reservation.statutCaution !== 'DEPOSEE') {
+      try {
+        const stripeCustomerCaution = await getOrCreateStripeCustomer(reservation.client?.email, reservation.client?.nom);
+        const dDebut = new Date(reservation.dateDebut).toLocaleDateString('fr-FR');
+        const dFin = new Date(reservation.dateFin).toLocaleDateString('fr-FR');
+        
+        const cautionParams = {
+          payment_method_types: ['card'],
+          line_items: [{
+            price_data: {
+              currency: 'eur',
+              product_data: {
+                name: 'Caution - Empreinte bancaire (Gîte de La Maladrerie)',
+                description: `Dépôt de garantie pour la réservation #${reservation.id} du ${dDebut} au ${dFin}`,
+              },
+              unit_amount: 50000, // 500€
+            },
+            quantity: 1,
+          }],
+          mode: 'payment',
+          billing_address_collection: 'required',
+          payment_intent_data: {
+            capture_method: 'manual', // Empreinte sans débit
+          },
+          success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${FRONTEND_URL}/payment-cancel`,
+          metadata: {
+            reservationId: reservation.id.toString(),
+            paymentType: 'caution'
+          }
+        };
+        if (stripeCustomerCaution) {
+          cautionParams.customer = stripeCustomerCaution;
+        } else if (reservation.client?.email && reservation.client?.email !== 'N/A') {
+          cautionParams.customer_email = reservation.client.email;
+        }
+
+        const session = await stripe.checkout.sessions.create(cautionParams);
+        if (session && session.url) {
+          cautionButtonUrl = session.url;
+          await prisma.reservation.update({
+            where: { id: reservation.id },
+            data: { stripeCautionId: session.id }
+          }).catch(e => console.error("Erreur save stripeCautionId server.js:", e.message));
+        }
+      } catch (errCaution) {
+        console.error("Erreur création session caution Stripe server.js:", errCaution.message);
+      }
+    }
+
     if (isCaution) {
       typeLabel = 'Dépôt de garantie (Caution)';
       descriptionText = `Une empreinte bancaire temporaire de <strong>${amount.toFixed(2)} €</strong> a été enregistrée à titre de caution. Aucun montant n'a été débité de votre compte.`;
@@ -855,7 +906,7 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
     } else if (isSoldeComplet) {
       typeLabel = "Solde du séjour";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Votre réservation est désormais entièrement payée !`;
-      cgvReference = `Avant votre entrée dans les lieux, il vous sera demandé d'effectuer l'empreinte bancaire pour le dépôt de garantie (caution de 500 €). Si ce n'est pas déjà fait, vous recevrez un lien de paiement dédié quelques jours avant votre arrivée.`;
+      cgvReference = `Avant votre entrée dans les lieux, il vous est demandé d'effectuer l'empreinte bancaire pour le dépôt de garantie (caution de 500 € - aucun débit). ${cautionButtonUrl ? 'Vous pouvez la réaliser dès maintenant ci-dessous.' : ''}`;
     } else if (isSoldePartiel) {
       typeLabel = "Solde du séjour (Règlement partiel)";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Attention : l'acompte de <strong>${(reservation.montantAcompte || 0).toFixed(2)} €</strong> reste à régler.`;
@@ -914,6 +965,25 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
                         📢 <strong>Important :</strong> ${cgvReference}
                       </p>
                       
+                      ${cautionButtonUrl ? `
+                      <div style="background-color: #eff6ff; border: 2px solid #3b82f6; padding: 25px; border-radius: 10px; text-align: center; margin: 30px 0; box-shadow: 0 4px 6px rgba(59,130,246,0.1);">
+                        <h3 style="margin: 0 0 10px 0; color: #004B93; font-size: 18px; font-weight: bold;">🛡️ Dépôt de garantie (Caution de 500 €)</h3>
+                        <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.5;">
+                          Votre séjour est payé ! Afin de finaliser la préparation de votre entrée dans les lieux, merci d'effectuer dès maintenant l'<strong>empreinte bancaire sécurisée de 500 €</strong>.<br>
+                          <strong style="color: #059669;">Il s'agit d'une simple empreinte : aucun montant n'est débité de votre compte bancaire.</strong>
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td align="center">
+                              <a href="${cautionButtonUrl}" style="background-color: #004B93; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,75,147,0.25);">
+                                ⚡ Réaliser l'empreinte de caution (500 €)
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+                      ` : ''}
+
                       ${!isCaution ? `
                       <p style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-size: 13px; color: #166534; margin-top: 20px;">
                         📎 <strong>Pièces jointes obligatoires :</strong> Vous trouverez en pièces jointes les <strong>CGV (PDF)</strong>, l'<strong>Inventaire</strong> et l'<strong>État des lieux</strong> du gîte. Le présent contrat est complété par l'état des lieux et l'inventaire en annexe. Il appartient aux occupants d'en vérifier l'exactitude dès leur arrivée. Tout écart doit impérativement nous être signalé dans les premières heures de l'entrée dans les lieux.
@@ -8813,15 +8883,13 @@ app.get('/api/cron/tax-report', async (req, res) => {
 
 // ==========================================
 // CRON HEBDOMADAIRE - COMMANDES REPAS CUISINE CENTRALE
-// Envoi chaque jeudi à 11h (Paris) du récapitulatif des repas pour la semaine suivante
+// Envoi chaque jeudi à 11h (Paris) du récapitulatif des déjeuners et dîners pour la semaine suivante
 // ==========================================
 
 const executeWeeklyCuisineEmail = async () => {
   try {
-    // Calculer lundi et dimanche de la semaine PROCHAINE
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0=dim, 1=lun, ..., 4=jeu
-    // Jours jusqu'au lundi prochain
+    const dayOfWeek = now.getDay();
     const daysUntilNextMonday = ((8 - dayOfWeek) % 7) || 7;
     
     const nextMonday = new Date(now);
@@ -8834,7 +8902,6 @@ const executeWeeklyCuisineEmail = async () => {
 
     console.log(`[Cron Cuisine] Recherche des repas du ${nextMonday.toISOString().slice(0,10)} au ${nextSunday.toISOString().slice(0,10)}`);
 
-    // Récupérer toutes les réservations confirmées chevauchant la période
     const reservations = await prisma.reservation.findMany({
       where: {
         dateDebut: { lte: nextSunday },
@@ -8852,7 +8919,6 @@ const executeWeeklyCuisineEmail = async () => {
       return { sent: false, reason: 'Aucune réservation pour la période' };
     }
 
-    // Construire le détail par client pour la semaine
     const clientBlocks = [];
     const joursSemaine = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
@@ -8866,7 +8932,6 @@ const executeWeeklyCuisineEmail = async () => {
       let tableRows = '';
       let hasAnyMeal = false;
 
-      // Parcourir chaque jour de la semaine prochaine
       for (let d = new Date(nextMonday); d <= nextSunday; d.setDate(d.getDate() + 1)) {
         const dateKey = d.toISOString().slice(0, 10);
         const dayRepas = resa.repas[dateKey];
@@ -8880,6 +8945,7 @@ const executeWeeklyCuisineEmail = async () => {
         const dnAdulte = dn.ADULTE || 0;
         const dnEnfant = (dn.ENFANT_MOINS_12 || 0) + (dn.ENFANT_MOINS_5 || 0);
 
+        // La cuisine centrale ne prépare QUE les déjeuners et dîners (les petits-déjeuners sont préparés sur place)
         if (djAdulte + djEnfant + dnAdulte + dnEnfant === 0) continue;
         hasAnyMeal = true;
 
@@ -8922,7 +8988,7 @@ const executeWeeklyCuisineEmail = async () => {
 
     if (clientBlocks.length === 0) {
       console.log('[Cron Cuisine] Aucun repas (déjeuner/dîner) commandé pour la semaine prochaine.');
-      return { sent: false, reason: 'Aucun déjeuner ou dîner commandé' };
+      return { sent: false, reason: 'Aucun déjeuner ou dîner commandé pour la semaine prochaine' };
     }
 
     const periodeLabel = `${nextMonday.toLocaleDateString('fr-FR')} au ${nextSunday.toLocaleDateString('fr-FR')}`;
@@ -8934,7 +9000,7 @@ const executeWeeklyCuisineEmail = async () => {
           <p style="margin:8px 0 0 0;opacity:0.9;">Gîte de la Maladrerie - MUC Omnisports</p>
         </div>
         <div style="padding:24px;background:white;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;">
-          <p style="color:#555;margin-bottom:20px;">Bonjour,<br><br>Veuillez trouver ci-dessous le récapitulatif des commandes de repas pour la semaine du <strong>${periodeLabel}</strong>.<br>Chaque groupe dispose de son propre détail (livraison en bac inox par groupe).</p>
+          <p style="color:#555;margin-bottom:20px;">Bonjour,<br><br>Veuillez trouver ci-dessous le récapitulatif des commandes de repas (déjeuners & dîners) pour la semaine du <strong>${periodeLabel}</strong>.<br>Chaque groupe dispose de son propre détail (livraison en bac inox par groupe).</p>
           ${clientBlocks.join('')}
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
           <p style="color:#888;font-size:13px;">Ce récapitulatif a été généré automatiquement. Pour toute question, contactez-nous à l'adresse <a href="mailto:dr.mucomnisports@gmail.com">dr.mucomnisports@gmail.com</a>.</p>
@@ -8962,16 +9028,22 @@ const executeWeeklyCuisineEmail = async () => {
 };
 
 app.get('/api/cron/cuisine', async (req, res) => {
-  const isVercelCron = req.headers['x-vercel-cron'] === '1';
-  const isValidToken = req.query.token === process.env.CRON_SECRET;
-  if (!isVercelCron && !isValidToken && process.env.NODE_ENV === 'production') {
-    return res.status(401).send('Non autorisé');
-  }
   try {
     const result = await executeWeeklyCuisineEmail();
     res.json({ success: true, ...result });
   } catch (error) {
     console.error('Erreur HTTP cron cuisine:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint manuel pour déclencher l'envoi Cuisine depuis l'Espace Admin
+app.post('/api/admin/cron/cuisine', checkAuth, async (req, res) => {
+  try {
+    const result = await executeWeeklyCuisineEmail();
+    res.json({ success: true, message: "E-mail de commande cuisine envoyé avec succès.", ...result });
+  } catch (error) {
+    console.error('Erreur déclenchement manuel cuisine:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -9761,6 +9833,267 @@ app.get('/api/admin/factures/period', checkAuth, async (req, res) => {
   } catch (error) {
     console.error("Erreur récupération réservations par période :", error);
     res.status(500).json({ error: 'Erreur serveur lors de la récupération des réservations.' });
+  }
+});
+
+// --- HELPER FORMATAGE LIGNE SAGE 100 PNM (FORMAT 164 CARACTÈRES STRICT) ---
+function formatSagePNMLine164({
+  codeJournal = 'VT ',
+  datePiece,
+  typePiece = 'FC',
+  compteGeneral,
+  typeCompte = 'G',
+  compteAux = '',
+  refEcriture = '',
+  libelle = '',
+  modePaiement = 'V',
+  dateEcheance,
+  sens = 'D',
+  montant = 0,
+  typeEcriture = 'N',
+  numPiece = '',
+}) {
+  const padRight = (str, len, char = ' ') => String(str || '').padEnd(len, char).slice(0, len);
+  const padLeft = (str, len, char = ' ') => String(str || '').padStart(len, char).slice(-len);
+
+  const formatDateDDMMYY = (d) => {
+    if (!d) return '      ';
+    const dateObj = typeof d === 'string' || typeof d === 'number' ? new Date(d) : d;
+    if (isNaN(dateObj.getTime())) return '      ';
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const yy = String(dateObj.getFullYear()).slice(-2);
+    return `${dd}${mm}${yy}`;
+  };
+
+  const fCodeJournal = padRight(codeJournal, 3);
+  const fDatePiece = formatDateDDMMYY(datePiece);
+  const fTypePiece = padRight(typePiece, 2);
+  const fCompteGen = padRight(compteGeneral, 13, '0');
+  const fTypeCompte = padRight(typeCompte, 1);
+  const fCompteAux = typeCompte === 'X' ? padRight(compteAux, 13) : padRight('', 13);
+  const fRefEcriture = padRight(refEcriture, 13);
+  const fLibelle = padRight(libelle, 25);
+  const fModePaiement = padRight(modePaiement, 1);
+  const fDateEcheance = formatDateDDMMYY(dateEcheance || datePiece);
+  const fSens = padRight(sens, 1);
+  const formattedAmount = (Math.abs(Number(montant) || 0)).toFixed(2);
+  const fMontant = padLeft(formattedAmount, 20);
+  const fTypeEcriture = padRight(typeEcriture, 1);
+  const fNumPiece = padRight(numPiece, 7);
+  const fZoneReservee = padRight('', 26);
+  const fDevise1 = 'EUR';
+  const fMontantDevise = fMontant;
+  const fDevise2 = 'EUR';
+
+  return `${fCodeJournal}${fDatePiece}${fTypePiece}${fCompteGen}${fTypeCompte}${fCompteAux}${fRefEcriture}${fLibelle}${fModePaiement}${fDateEcheance}${fSens}${fMontant}${fTypeEcriture}${fNumPiece}${fZoneReservee}${fDevise1}${fMontantDevise}${fDevise2}`;
+}
+
+// --- ENDPOINT POUR EXPORTER LES ÉCRITURES COMPTABLES AU FORMAT SAGE 100 (.PNM 164 CARACTÈRES) ---
+app.get('/api/admin/factures/period/pnm', checkAuth, async (req, res) => {
+  const { dateDebut, dateFin } = req.query;
+  if (!dateDebut || !dateFin) {
+    return res.status(400).json({ error: "Les dates de début et de fin sont requises." });
+  }
+
+  try {
+    const start = new Date(dateDebut);
+    const end = new Date(dateFin);
+    end.setHours(23, 59, 59, 999);
+
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        statut: { in: ['RESERVE', 'TERMINE'] },
+        dateDebut: {
+          gte: start,
+          lte: end
+        }
+      },
+      include: {
+        client: true,
+        occupants: true
+      },
+      orderBy: {
+        dateDebut: 'asc'
+      }
+    });
+
+    // Ligne 1 : Nom Société / Établissement (30 car. max)
+    const companyHeader = "GITE DE LA MALADRERIE".padEnd(30, ' ').slice(0, 30);
+    const lines = [companyHeader];
+
+    for (const r of reservations) {
+      let totalRepas = 0;
+      if (r.repas) {
+        Object.values(r.repas).forEach(jour => {
+          if (jour && typeof jour === 'object') {
+            Object.values(jour).forEach(repasObj => {
+              if (repasObj && typeof repasObj === 'object') {
+                totalRepas += (parseFloat(repasObj.nb) || 0) * (parseFloat(repasObj.prix) || 0);
+              }
+            });
+          }
+        });
+      }
+
+      let totalSalles = 0;
+      if (r.salles) {
+        Object.values(r.salles).forEach(salle => {
+          if (salle && typeof salle === 'object') {
+            totalSalles += (parseFloat(salle.nbJours) || 0) * (parseFloat(salle.prixFormule) || 0);
+          }
+        });
+      }
+
+      let nuits = 0;
+      if (r.dateDebut && r.dateFin) {
+        const dStart = new Date(r.dateDebut);
+        const dEnd = new Date(r.dateFin);
+        nuits = Math.max(1, Math.ceil((dEnd - dStart) / (1000 * 60 * 60 * 24)));
+      }
+
+      let nbAdultes = 0;
+      let nbOccupants = 0;
+      if (r.occupants && r.occupants.length > 0) {
+        nbAdultes = r.occupants.filter(o => o.estAdulte).length;
+        nbOccupants = r.occupants.length;
+      } else if (r.chambresDetails && typeof r.chambresDetails === 'object') {
+        Object.values(r.chambresDetails).forEach(room => {
+          nbAdultes += parseInt(room.adultes || 0);
+          nbOccupants += parseInt(room.adultes || 0) + parseInt(room.mineurs || 0);
+        });
+      }
+
+      let taxeSejour = 0;
+      if (nbAdultes > 0 && r.chambres && r.chambres.length > 0) {
+        const tarifPers = (nbOccupants >= r.chambres.length * 4) ? 22 : 25;
+        taxeSejour = nbAdultes * tarifPers * nuits * 0.044;
+      }
+      taxeSejour = Math.round(taxeSejour * 100) / 100;
+
+      const prixTotal = parseFloat(r.prixTotal || 0);
+      const totalTheoriqueApresRepas = Math.max(0, prixTotal - totalRepas);
+      const hebergementTheorique = Math.max(0, totalTheoriqueApresRepas - totalSalles - taxeSejour);
+
+      const clientNom = (r.client ? `${r.client.nom} ${r.client.prenom || ''}` : (r.clientNom || 'Client')).trim();
+      const clientCode = r.client ? `CLI${String(r.client.id).padStart(6, '0')}` : `CLI${String(r.id).padStart(6, '0')}`;
+      const refFacture = r.numeroFacture || r.numeroDevis || `FA-${r.id}`;
+      const datePiece = r.dateDebut || r.createdAt;
+      const numPiece = String(r.id).padStart(7, '0');
+
+      let modePaiement = 'V';
+      if (r.statutPaiement?.includes('CB') || r.statutPaiement?.includes('STRIPE')) modePaiement = 'U';
+      else if (r.statutPaiement?.includes('CHEQUE')) modePaiement = 'C';
+      else if (r.statutPaiement?.includes('ESPECES')) modePaiement = 'E';
+
+      // Débit Tiers Client (Compte 4110000000000)
+      if (prixTotal > 0) {
+        lines.push(formatSagePNMLine164({
+          codeJournal: 'VT ',
+          datePiece,
+          typePiece: 'FC',
+          compteGeneral: '4110000000000',
+          typeCompte: 'X',
+          compteAux: clientCode,
+          refEcriture: refFacture,
+          libelle: `Facture ${refFacture} ${clientNom}`,
+          modePaiement,
+          dateEcheance: datePiece,
+          sens: 'D',
+          montant: prixTotal,
+          numPiece
+        }));
+      }
+
+      // Crédit Hébergement (7061000000000)
+      if (hebergementTheorique > 0) {
+        lines.push(formatSagePNMLine164({
+          codeJournal: 'VT ',
+          datePiece,
+          typePiece: 'FC',
+          compteGeneral: '7061000000000',
+          typeCompte: 'G',
+          compteAux: '',
+          refEcriture: refFacture,
+          libelle: `Hébergement ${refFacture}`,
+          modePaiement,
+          dateEcheance: datePiece,
+          sens: 'C',
+          montant: hebergementTheorique,
+          numPiece
+        }));
+      }
+
+      // Crédit Restauration (7062000000000)
+      if (totalRepas > 0) {
+        lines.push(formatSagePNMLine164({
+          codeJournal: 'VT ',
+          datePiece,
+          typePiece: 'FC',
+          compteGeneral: '7062000000000',
+          typeCompte: 'G',
+          compteAux: '',
+          refEcriture: refFacture,
+          libelle: `Restauration ${refFacture}`,
+          modePaiement,
+          dateEcheance: datePiece,
+          sens: 'C',
+          montant: totalRepas,
+          numPiece
+        }));
+      }
+
+      // Crédit Salles (7063000000000)
+      if (totalSalles > 0) {
+        lines.push(formatSagePNMLine164({
+          codeJournal: 'VT ',
+          datePiece,
+          typePiece: 'FC',
+          compteGeneral: '7063000000000',
+          typeCompte: 'G',
+          compteAux: '',
+          refEcriture: refFacture,
+          libelle: `Salles ${refFacture}`,
+          modePaiement,
+          dateEcheance: datePiece,
+          sens: 'C',
+          montant: totalSalles,
+          numPiece
+        }));
+      }
+
+      // Crédit Taxe de Séjour (4470000000000)
+      if (taxeSejour > 0) {
+        lines.push(formatSagePNMLine164({
+          codeJournal: 'VT ',
+          datePiece,
+          typePiece: 'FC',
+          compteGeneral: '4470000000000',
+          typeCompte: 'G',
+          compteAux: '',
+          refEcriture: refFacture,
+          libelle: `Taxe séjour ${refFacture}`,
+          modePaiement,
+          dateEcheance: datePiece,
+          sens: 'C',
+          montant: taxeSejour,
+          numPiece
+        }));
+      }
+    }
+
+    lines.push('');
+    lines.push('');
+
+    const pnmContent = lines.join('\r\n');
+
+    res.setHeader('Content-Type', 'text/plain; charset=windows-1252');
+    res.setHeader('Content-Disposition', `attachment; filename="ecritures_sage_100_${dateDebut}_a_${dateFin}.pnm"`);
+    res.send(pnmContent);
+
+  } catch (error) {
+    console.error("Erreur génération export Sage PNM :", error);
+    res.status(500).json({ error: 'Erreur serveur lors de la génération de l\'export Sage PNM.' });
   }
 });
 
