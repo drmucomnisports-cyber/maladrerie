@@ -1550,10 +1550,32 @@ const Admin = () => {
 
   const [isSendingTaxReport, setIsSendingTaxReport] = useState(false);
 
-  const handleSendMonthlyTaxReport = async () => {
-    if (!window.confirm("Confirmer l'envoi immédiat du rapport de taxe de séjour du mois précédent par e-mail à Valérie et Johanna ?")) {
+  const handleSendMonthlyTaxReport = async (customMonth, customYear) => {
+    const today = new Date();
+    let monthToUse = customMonth;
+    let yearToUse = customYear;
+    
+    if (monthToUse === undefined || monthToUse === null) {
+      let prevM = today.getMonth() - 1;
+      let prevY = today.getFullYear();
+      if (prevM < 0) {
+        prevM = 11;
+        prevY -= 1;
+      }
+      monthToUse = prevM;
+      yearToUse = prevY;
+    }
+
+    const monthNames = [
+      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+    ];
+    const monthLabel = monthNames[monthToUse] || `Mois ${monthToUse + 1}`;
+
+    if (!window.confirm(`Confirmer l'envoi immédiat du rapport de taxe de séjour (${monthLabel} ${yearToUse}) par e-mail à Valérie, Johanna et David ?`)) {
       return;
     }
+
     setIsSendingTaxReport(true);
     try {
       const res = await fetch(`${API_URL}/api/admin/finances/send-monthly-tax-report`, {
@@ -1561,18 +1583,19 @@ const Admin = () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({ month: monthToUse, year: yearToUse })
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`Rapport mensuel envoyé avec succès par e-mail à : ${data.to}\nMontant déclaré : ${data.totalTaxeSejour.toFixed(2)} € pour la période de ${data.month} ${data.year}.`);
+        alert(`✨ Rapport mensuel envoyé avec succès par e-mail !\n\n• Période : ${data.month} ${data.year}\n• Montant déclaré : ${data.totalTaxeSejour.toFixed(2)} €\n• Destinataires : ${data.to}`);
       } else {
         const err = await res.json();
-        alert(`Erreur : ${err.error || "Une erreur est survenue lors de l'envoi."}`);
+        alert(`❌ Erreur : ${err.error || "Une erreur est survenue lors de l'envoi."}`);
       }
     } catch (e) {
       console.error(e);
-      alert("Une erreur réseau est survenue.");
+      alert("❌ Une erreur réseau est survenue.");
     } finally {
       setIsSendingTaxReport(false);
     }
@@ -3648,7 +3671,7 @@ const Admin = () => {
         const taxesMensuelles = rList447.reduce((acc, item) => {
             const date = new Date(item.date);
             const monthYear = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-            if (!acc[monthYear]) acc[monthYear] = { total: 0, items: [] };
+            if (!acc[monthYear]) acc[monthYear] = { total: 0, items: [], monthIndex: date.getMonth(), yearNum: date.getFullYear() };
             acc[monthYear].total += item.montant;
             acc[monthYear].items.push(item);
             return acc;
@@ -3657,7 +3680,9 @@ const Admin = () => {
         const taxesMensuellesArray = Object.entries(taxesMensuelles).map(([label, data]) => ({
             label,
             total: data.total,
-            items: data.items
+            items: data.items,
+            monthIndex: data.monthIndex,
+            yearNum: data.yearNum
         }));
 
 
@@ -3808,10 +3833,24 @@ const Admin = () => {
                             <div 
                                 key={idx} 
                                 onClick={() => openModal("447", `Taxe de Séjour - ${t.label}`, t.total, t.items)}
-                                className="flex justify-between items-center p-4 border border-amber-200 rounded-xl bg-white shadow-sm cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md hover:bg-amber-50"
+                                className="flex justify-between items-center p-4 border border-amber-200 rounded-xl bg-white shadow-sm cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md hover:bg-amber-50 group gap-2"
                             >
-                                <span className="text-xs font-bold text-amber-900 capitalize">{t.label}</span>
-                                <span className="text-base font-black text-amber-600">{t.total.toFixed(2)} €</span>
+                                <div>
+                                  <span className="text-xs font-bold text-amber-900 capitalize block">{t.label}</span>
+                                  <span className="text-base font-black text-amber-600">{t.total.toFixed(2)} €</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={isSendingTaxReport}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSendMonthlyTaxReport(t.monthIndex, t.yearNum);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-amber-100 text-amber-900 hover:bg-amber-600 hover:text-white rounded-lg transition-colors text-[11px] font-bold flex items-center gap-1 shrink-0"
+                                  title={`Envoyer le rapport de ${t.label} par e-mail`}
+                                >
+                                  <Mail size={13} /> Envoyer
+                                </button>
                             </div>
                         )) : <p className="text-sm text-amber-700 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
                         </div>
