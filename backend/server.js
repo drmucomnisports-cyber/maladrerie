@@ -5168,7 +5168,7 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
     const prevMonthLabel = monthNames[targetMonth];
     const currentYearLabel = targetYear;
 
-    const toEmails = 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr';
+    const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
 
     await sendMail({
       to: toEmails,
@@ -8793,7 +8793,7 @@ const executeMonthlyTaxReport = async () => {
     const prevMonthLabel = monthNames[prevMonth];
     const currentYearLabel = prevYear;
 
-    const toEmails = 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr';
+    const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
 
     await sendMail({
       to: toEmails,
