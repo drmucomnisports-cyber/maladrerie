@@ -1590,8 +1590,15 @@ const Admin = () => {
         const data = await res.json();
         alert(`✨ Rapport mensuel envoyé avec succès par e-mail !\n\n• Période : ${data.month} ${data.year}\n• Montant déclaré : ${data.totalTaxeSejour.toFixed(2)} €\n• Destinataires : ${data.to}`);
       } else {
-        const err = await res.json();
-        alert(`❌ Erreur : ${err.error || "Une erreur est survenue lors de l'envoi."}`);
+        let errorMsg = "Une erreur est survenue lors de l'envoi.";
+        try {
+          const err = await res.json();
+          if (err && err.error) errorMsg = err.error;
+        } catch (_) {
+          const text = await res.text();
+          if (text) errorMsg = text.substring(0, 200);
+        }
+        alert(`❌ Erreur (${res.status}) : ${errorMsg}`);
       }
     } catch (e) {
       console.error(e);
