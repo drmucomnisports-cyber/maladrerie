@@ -2644,9 +2644,11 @@ const Admin = () => {
                           </div>
                         </td>
                         <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                            }`}>
-                            {res.statut === 'DEVIS_EN_ATTENTE' ? 'En attente' : 'Expiré'}
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                            res.statut === 'DEVIS_EN_ATTENTE' || res.statut === 'DEVIS' ? 'bg-amber-100 text-amber-700' :
+                            res.statut === 'DEVIS_ANNULE' ? 'bg-slate-200 text-slate-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {res.statut === 'DEVIS_EN_ATTENTE' || res.statut === 'DEVIS' ? 'En attente' : res.statut === 'DEVIS_ANNULE' ? 'Annulé (Concurrence)' : 'Expiré'}
                           </span>
                         </td>
                         <td className="p-4 text-right">
@@ -3142,10 +3144,11 @@ const Admin = () => {
                         </div>
                         <span className={`text-xs px-2 py-1 rounded-md uppercase font-bold ${
                           res.statut === 'RESERVE' ? 'bg-green-100 text-green-700' :
-                          res.statut === 'DEVIS_EN_ATTENTE' ? 'bg-amber-100 text-amber-700' :
+                          res.statut === 'DEVIS_EN_ATTENTE' || res.statut === 'DEVIS' ? 'bg-amber-100 text-amber-700' :
+                          res.statut === 'DEVIS_ANNULE' ? 'bg-slate-200 text-slate-700' :
                           res.statut === 'DEVIS_EXPIRE' ? 'bg-red-100 text-red-700' :
                           'bg-slate-100 text-slate-600'
-                        }`}>{res.statut}</span>
+                        }`}>{res.statut === 'DEVIS_ANNULE' ? 'Annulé (Concurrence)' : res.statut}</span>
                       </div>
 
                       {/* Timeline */}

@@ -214,6 +214,7 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
         // Désactivé : remplacé par l'envoi hebdomadaire groupé (cron cuisine du jeudi)
         // await sendCuisineEmailIfNeeded(reservationId);
         await sendPaymentConfirmationEmails(reservation, 'acompte', session.amount_total / 100, balancePaymentLink);
+        await cancelOverlappingDevis(reservation);
         
         if (reservation.codePromo) {
           try {
@@ -574,6 +575,72 @@ const sendMail = async (options) => {
     console.log(`Email envoyé via SMTP avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
   } catch (smtpError) {
     console.error("Erreur lors de l'envoi de l'email via SMTP (échec total):", smtpError.message || smtpError);
+  }
+};
+
+// Annule automatiquement les devis en concurrence (DEVIS, DEVIS_EN_ATTENTE) lorsqu'une réservation est confirmée
+const cancelOverlappingDevis = async (confirmedRes) => {
+  if (!confirmedRes || !confirmedRes.dateDebut || !confirmedRes.dateFin) return;
+
+  try {
+    const startDate = new Date(confirmedRes.dateDebut);
+    const endDate = new Date(confirmedRes.dateFin);
+    const confirmedRooms = Array.isArray(confirmedRes.chambres) ? confirmedRes.chambres : [];
+
+    const overlappingDevis = await prisma.reservation.findMany({
+      where: {
+        id: { not: confirmedRes.id },
+        statut: { in: ['DEVIS', 'DEVIS_EN_ATTENTE'] },
+        dateDebut: { lt: endDate },
+        dateFin: { gt: startDate }
+      },
+      include: { client: true }
+    });
+
+    for (const devis of overlappingDevis) {
+      const devisRooms = Array.isArray(devis.chambres) ? devis.chambres : [];
+      const hasRoomOverlap = devisRooms.some(r => confirmedRooms.includes(r)) || (devisRooms.length === 0 && confirmedRooms.length === 0);
+
+      if (hasRoomOverlap) {
+        await prisma.reservation.update({
+          where: { id: devis.id },
+          data: { statut: 'DEVIS_ANNULE' }
+        });
+
+        if (devis.client && devis.client.email) {
+          const clientNom = devis.client.nom || 'Client';
+          const numDevisStr = devis.numeroDevis ? `N° ${devis.numeroDevis}` : '';
+          const dateStartStr = new Date(devis.dateDebut).toLocaleDateString('fr-FR');
+          const dateEndStr = new Date(devis.dateFin).toLocaleDateString('fr-FR');
+
+          await sendMail({
+            to: devis.client.email,
+            subject: `[Gîte de la Maladrerie] Information concernant votre devis ${numDevisStr}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+                <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+                  <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">Gîte de la Maladrerie</span>
+                  <h2 style="color: #ffffff; margin: 8px 0 0 0; font-size: 18px; font-weight: 800;">Information concernant votre devis</h2>
+                </div>
+                <div style="padding: 24px; font-size: 14px; color: #334155; line-height: 1.6;">
+                  <p>Bonjour ${clientNom},</p>
+                  <p>Nous vous informons que les hébergements et dates correspondant à votre devis ${numDevisStr} (du <strong>${dateStartStr}</strong> au <strong>${dateEndStr}</strong>) viennent d'être réservés et confirmés par un autre client.</p>
+                  <p>Par conséquent, votre proposition de devis a été automatiquement annulée.</p>
+                  <p>Si vous souhaitez positionner votre séjour sur d'autres dates disponibles ou ajuster votre demande, notre équipe est à votre entière disposition :</p>
+                  <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                    <p style="margin: 4px 0; font-size: 13px;"><strong>• Philippe Morereau :</strong> 07 52 62 79 62</p>
+                    <p style="margin: 4px 0; font-size: 13px;"><strong>• David Roujet :</strong> 06 67 99 36 81</p>
+                  </div>
+                  <p style="margin-top: 24px;">Bien cordialement,<br/><strong>L'équipe du Gîte de la Maladrerie</strong></p>
+                </div>
+              </div>
+            `
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Erreur lors de l'annulation des devis concurrents:", err);
   }
 };
 
@@ -4158,6 +4225,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           valideLe: new Date()
         }
       });
+      await cancelOverlappingDevis(devis);
 
       // Envoyer l'email d'intention de virement au client
       const adminEmailForSignature = devis.validePar || 'dr.mucomnisports@gmail.com';
@@ -4309,6 +4377,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
           valideLe: new Date()
         }
       });
+      await cancelOverlappingDevis(devis);
     }
 
     // Envoyer un e-mail à l'admin créateur du devis pour l'alerter, ainsi qu'aux admins abonnés
@@ -6004,6 +6073,7 @@ app.post('/api/admin/reservations/:id/convert-devis', checkAuth, async (req, res
         valideLe: new Date()
       }
     });
+    await cancelOverlappingDevis(reservation);
     res.json({ success: true, reservation });
   } catch (error) {
     console.error("Erreur conversion devis:", error);
