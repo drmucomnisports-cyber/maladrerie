@@ -373,8 +373,8 @@ const getMissionDetail = (m, dateDebut, dateFin) => {
   return `${details} <br/><span style="color: #666; font-size: 13px;">(Rémunération : ${m.montant.toFixed(2)} €)</span>`;
 };
 
-const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5, 7: 5 };
-const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Chambre 4", 5: "Chambre 5", 6: "Chambre 6", 7: "Chambre 7" };
+const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5, 7: 5, 8: 5 };
+const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Chambre 4", 5: "Chambre 5", 6: "Chambre 6", 7: "Chambre 7", 8: "Chambre 8" };
 
 const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, options, promoCode, repas, salles) => {
   const start = new Date(dateDebut);
@@ -3940,8 +3940,8 @@ app.post('/api/devis/public-request', async (req, res) => {
       return res.status(400).json({ error: "Veuillez renseigner tous les champs obligatoires (nom, email, téléphone, dates)." });
     }
 
-    // Exclure la chambre 7 si soumise par un client non-admin
-    const sanitizedChambres = (chambres || []).filter(c => c !== 7);
+    // Exclure les chambres admin (7 et 8) si soumises par un client non-admin
+    const sanitizedChambres = (chambres || []).filter(c => c !== 7 && c !== 8);
 
     const fullNom = prenom ? `${prenom} ${nom}`.trim() : nom;
     let client = await prisma.client.findFirst({
@@ -5027,7 +5027,7 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5, 7: 5 };
+    const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5, 7: 5, 8: 5 };
     
     // Trier temporairement par ordre chronologique de début de séjour (croissant) 
     // pour garantir une attribution cohérente lors des mises à niveau

@@ -97,7 +97,8 @@ const CHAMBRES_NAMES = {
   4: "Chambre 4",
   5: "Chambre 5",
   6: "Chambre 6",
-  7: "Chambre 7"
+  7: "Chambre 7",
+  8: "Chambre 8"
 };
 
 const formatAdminName = (validePar) => {

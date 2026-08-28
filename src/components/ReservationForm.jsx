@@ -11,7 +11,8 @@ const CHAMBRES_INFO = {
   4: { num: 4, name: 'Grande chambre', lits: 7, etage: '2e étage' },
   5: { num: 5, name: 'Grande chambre', lits: 7, etage: '2e étage' },
   6: { num: 6, name: 'Chambre standard', lits: 5, etage: '2e étage' },
-  7: { num: 7, name: 'Chambre Admin', lits: 5, etage: '2e étage (Admin)', adminOnly: true }
+  7: { num: 7, name: 'Chambre Admin 7', lits: 5, etage: '2e étage (Admin)', adminOnly: true },
+  8: { num: 8, name: 'Chambre Admin 8', lits: 5, etage: '2e étage (Admin)', adminOnly: true }
 };
 
 const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPublicDevis = false, onCreated = () => {}, adminUser = null, existingReservation = null }) => {
@@ -1091,7 +1092,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       <div className="pt-4 border-t border-slate-100">
         <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-4 block">Sélection des Chambres</label>
         <div className="space-y-3">
-          {(isAdmin ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5, 6]).map(num => {
+          {(isAdmin ? [1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6]).map(num => {
             const info = CHAMBRES_INFO[num];
             const isChecked = formData.chambres.includes(num);
             const unavailableEvent = unavailableRoomsMap[num];
