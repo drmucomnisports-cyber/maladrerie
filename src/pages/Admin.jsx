@@ -4580,7 +4580,7 @@ const Admin = () => {
             </div>
             <div className="p-6">
               <ReservationForm
-                events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres }))}
+                events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres, statut: r.statut }))}
                 isAdmin={true}
                 isDevis={activeTab === 'devis'}
                 onCreated={() => { setShowAddModal(false); fetchReservations(); }}
@@ -4622,7 +4622,7 @@ const Admin = () => {
             </div>
             <div className="p-6">
               <ReservationForm
-                events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres }))}
+                events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres, statut: r.statut }))}
                 isAdmin={true}
                 isDevis={editingReservation.statut?.includes('DEVIS')}
                 existingReservation={editingReservation}
