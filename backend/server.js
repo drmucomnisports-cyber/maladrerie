@@ -5115,17 +5115,30 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
   const { month, year } = req.body;
   try {
     const today = new Date();
-    
-    // Déterminer le mois cible
-    let targetMonth = (month !== undefined && month !== null) ? parseInt(month) : today.getMonth() - 1;
-    let targetYear = (year !== undefined && year !== null) ? parseInt(year) : today.getFullYear();
-    if (targetMonth < 0) {
-      targetMonth = 11;
-      targetYear -= 1;
-    }
+    let targetYear = (year !== undefined && year !== null && year !== '') ? parseInt(year) : today.getFullYear();
+    const isAll = (month === 'ALL' || month === 'all' || month === 'TOTALITY');
 
-    const prevMonthStart = new Date(targetYear, targetMonth, 1);
-    const prevMonthEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
+    let prevMonthStart, prevMonthEnd, prevMonthLabel;
+
+    if (isAll) {
+      prevMonthStart = new Date(targetYear, 0, 1);
+      prevMonthEnd = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+      prevMonthLabel = `Toutes les périodes (Année ${targetYear})`;
+    } else {
+      let targetMonth = (month !== undefined && month !== null && month !== '') ? parseInt(month) : today.getMonth() - 1;
+      if (targetMonth < 0) {
+        targetMonth = 11;
+        targetYear -= 1;
+      }
+      prevMonthStart = new Date(targetYear, targetMonth, 1);
+      prevMonthEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
+
+      const monthNames = [
+        "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+        "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+      ];
+      prevMonthLabel = `${monthNames[targetMonth]} ${targetYear}`;
+    }
 
     const reservations = await prisma.reservation.findMany({
       where: {
@@ -5166,18 +5179,11 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
 
     totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
 
-    const monthNames = [
-      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
-    ];
-    const prevMonthLabel = monthNames[targetMonth];
-    const currentYearLabel = targetYear;
-
     const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
 
     await sendMail({
       to: toEmails,
-      subject: `📊 [TAXE DE SÉJOUR] Déclaration mensuelle - ${prevMonthLabel} ${currentYearLabel}`,
+      subject: `📊 [TAXE DE SÉJOUR] Déclaration - ${prevMonthLabel}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
           <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
@@ -5187,14 +5193,14 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
           <div style="padding: 24px;">
             <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">Bonjour,</p>
             <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-              Voici le récapitulatif de la taxe de séjour collectée pour les séjours ayant débuté durant le mois de <strong>${prevMonthLabel} ${currentYearLabel}</strong> :
+              Voici le récapitulatif de la taxe de séjour collectée pour la période <strong>${prevMonthLabel}</strong> :
             </p>
             <div style="margin: 24px 0; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; text-align: center;">
               <span style="color: #166534; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px;">Montant Total à Déclarer</span>
               <span style="font-size: 32px; font-weight: 900; color: #15803d;">${totalTaxeSejour.toFixed(2)} €</span>
             </div>
             <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
-              <h4 style="margin: 0 0 12px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails de la période (${prevMonthLabel} ${currentYearLabel}) :</h4>
+              <h4 style="margin: 0 0 12px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails de la période (${prevMonthLabel}) :</h4>
               <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
                 <tr>
                   <td width="50%" style="padding: 6px 0; color: #64748b;">Nombre de réservations :</td>
@@ -5224,7 +5230,7 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
       `
     });
 
-    res.json({ success: true, to: toEmails, month: prevMonthLabel, year: currentYearLabel, totalTaxeSejour });
+    res.json({ success: true, to: toEmails, month: prevMonthLabel, year: targetYear, totalTaxeSejour });
   } catch (error) {
     console.error("Erreur envoi manuel rapport taxe:", error);
     res.status(500).json({ error: "Erreur lors de l'envoi du rapport de taxe de séjour." });

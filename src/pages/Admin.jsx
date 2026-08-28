@@ -241,6 +241,9 @@ const Admin = () => {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showFinanceModal, setShowFinanceModal] = useState(false);
   const [financeModalData, setFinanceModalData] = useState({ title: '', code: '', total: 0, items: [] });
+  const [showTaxReportModal, setShowTaxReportModal] = useState(false);
+  const [taxReportSelectedMonth, setTaxReportSelectedMonth] = useState('ALL');
+  const [taxReportSelectedYear, setTaxReportSelectedYear] = useState(new Date().getFullYear().toString());
   const [editingExpense, setEditingExpense] = useState(null);
   const [expenseForm, setExpenseForm] = useState({
     label: '',
@@ -3818,7 +3821,7 @@ const Admin = () => {
                         <button
                           type="button"
                           disabled={isSendingTaxReport}
-                          onClick={handleSendMonthlyTaxReport}
+                          onClick={() => setShowTaxReportModal(true)}
                           className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
                         >
                           {isSendingTaxReport ? (
@@ -6282,14 +6285,24 @@ const Admin = () => {
                         <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
                             🏛️ Informations pour la Déclaration Extranet
                         </span>
-                        <a 
-                            href="https://taxe.3douest.com/extranet/accueil.php" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all shadow-md inline-block"
-                        >
-                            Accéder au site de déclaration
-                        </a>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                disabled={isSendingTaxReport}
+                                onClick={() => handleSendMonthlyTaxReport(financeModalData.monthIndex, financeModalData.yearNum)}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                            >
+                                <Mail size={13} /> Envoyer le rapport par e-mail
+                            </button>
+                            <a 
+                                href="https://taxe.3douest.com/extranet/accueil.php" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all shadow-md inline-block"
+                            >
+                                Accéder au site de déclaration
+                            </a>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -6415,6 +6428,102 @@ const Admin = () => {
           </div>
         );
       })()}
+
+      {/* Modale Choix d'Envoi du Rapport de Taxe de Séjour */}
+      {showTaxReportModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl border border-slate-100 relative animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              type="button" 
+              onClick={() => setShowTaxReportModal(false)} 
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 p-2 bg-slate-100 rounded-full transition-all"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <span className="p-3 bg-amber-100 text-amber-800 rounded-2xl text-2xl font-black">🏛️</span>
+              <div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Rapport Taxe de Séjour</h3>
+                <p className="text-xs text-slate-500 font-medium">Sélectionnez la période à envoyer par e-mail</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 my-6">
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1.5">Période à déclarer</label>
+                <select
+                  value={taxReportSelectedMonth}
+                  onChange={(e) => setTaxReportSelectedMonth(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-muc-blue transition-all"
+                >
+                  <option value="ALL">📊 TOUTES LES PÉRIODES / TOTALITÉ (Année complète)</option>
+                  <option value="0">📅 Janvier</option>
+                  <option value="1">📅 Février</option>
+                  <option value="2">📅 Mars</option>
+                  <option value="3">📅 Avril</option>
+                  <option value="4">📅 Mai</option>
+                  <option value="5">📅 Juin</option>
+                  <option value="6">📅 Juillet</option>
+                  <option value="7">📅 Août</option>
+                  <option value="8">📅 Septembre</option>
+                  <option value="9">📅 Octobre</option>
+                  <option value="10">📅 Novembre</option>
+                  <option value="11">📅 Décembre</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1.5">Année</label>
+                <select
+                  value={taxReportSelectedYear}
+                  onChange={(e) => setTaxReportSelectedYear(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-muc-blue transition-all"
+                >
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                </select>
+              </div>
+
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                  <span>📬 Destinataires de l'e-mail :</span>
+                </div>
+                <div className="pl-4 font-mono text-[11px] text-amber-800">
+                  • valerie.hostein@mucomnisports.fr<br/>
+                  • johanna.journet@mucomnisports.fr<br/>
+                  • david.roujet@mucomnisports.fr
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowTaxReportModal(false)}
+                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={isSendingTaxReport}
+                onClick={async () => {
+                  setShowTaxReportModal(false);
+                  await handleSendMonthlyTaxReport(
+                    taxReportSelectedMonth === 'ALL' ? 'ALL' : parseInt(taxReportSelectedMonth),
+                    parseInt(taxReportSelectedYear)
+                  );
+                }}
+                className="flex-1 py-3 text-sm font-black text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                {isSendingTaxReport ? 'Envoi en cours...' : '🚀 Envoyer le rapport'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Modal Fiches de Police */}
       {showFicheModal && selectedFicheReservation && (
