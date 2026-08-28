@@ -205,6 +205,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
   }, [formData.dateDebut, formData.dateFin]);
 
   const [unavailableRoomsMap, setUnavailableRoomsMap] = useState({});
+  const [devisRoomsMap, setDevisRoomsMap] = useState({});
 
   // Check availability when dates change
   useEffect(() => {
@@ -213,6 +214,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       const end = new Date(formData.dateFin);
       
       const unavailableMap = {};
+      const devisMap = {};
+
       events.forEach(event => {
         if (existingReservation && (event.id === existingReservation.id || event.id === `res-${existingReservation.id}`)) return;
         
@@ -222,8 +225,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         if (start < evEnd && end > evStart) {
            if (event.chambres && Array.isArray(event.chambres)) {
              event.chambres.forEach(ch => {
-               // Prioritize RESERVE over DEVIS_EN_ATTENTE
-               if (!unavailableMap[ch] || unavailableMap[ch].statut === 'DEVIS_EN_ATTENTE') {
+               if (event.statut === 'DEVIS_EN_ATTENTE' || event.statut === 'DEVIS') {
+                 devisMap[ch] = event;
+               } else {
+                 // Only confirmed/reserved bookings mark the room as strictly unavailable
                  unavailableMap[ch] = event;
                }
              });
@@ -232,8 +237,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       });
 
       setUnavailableRoomsMap(unavailableMap);
+      setDevisRoomsMap(devisMap);
 
-      // Remove selected rooms that became unavailable
+      // Remove selected rooms that became strictly unavailable (confirmed bookings)
       setFormData(prev => {
         const validChambres = prev.chambres.filter(ch => !unavailableMap[ch]);
         if (validChambres.length === prev.chambres.length) return prev; // no change
@@ -249,8 +255,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       });
     } else {
       setUnavailableRoomsMap({});
+      setDevisRoomsMap({});
     }
-  }, [formData.dateDebut, formData.dateFin, events]);
+  }, [formData.dateDebut, formData.dateFin, events, existingReservation]);
 
   const isVacancesScolairesZoneC = (date) => {
     const time = date.getTime();
@@ -1096,21 +1103,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
             const info = CHAMBRES_INFO[num];
             const isChecked = formData.chambres.includes(num);
             const unavailableEvent = unavailableRoomsMap[num];
+            const devisEvent = devisRoomsMap[num];
             const isUnavailable = !!unavailableEvent;
             const isOriginal = existingReservation?.chambres?.includes(num);
 
-            let unavailableText = "(Indisponible)";
-            if (unavailableEvent?.statut === 'DEVIS_EN_ATTENTE') {
-              let hoursLeft = 48;
-              if (unavailableEvent.expireLe) {
-                const diffMs = new Date(unavailableEvent.expireLe) - new Date();
-                hoursLeft = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
-              }
-              unavailableText = `(En attente de validation du devis - expire dans ${hoursLeft}h)`;
-            }
-
             return (
-              <div key={num} className={`p-4 rounded-xl border-2 transition-all ${isUnavailable ? 'opacity-50 bg-slate-100 border-slate-200 grayscale cursor-not-allowed' : isChecked ? (isOriginal ? 'border-muc-blue bg-muc-blue/5' : 'border-muc-yellow bg-muc-yellow/5') : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}>
+              <div key={num} className={`p-4 rounded-xl border-2 transition-all ${isUnavailable ? 'opacity-50 bg-slate-100 border-slate-200 grayscale cursor-not-allowed' : isChecked ? (isOriginal ? 'border-muc-blue bg-muc-blue/5' : 'border-muc-yellow bg-muc-yellow/5') : devisEvent ? 'border-amber-200 bg-amber-50/50 hover:border-amber-300' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}>
                 <label className={`flex items-center gap-3 w-full ${isUnavailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input type="checkbox" name="chambres" value={num} checked={isChecked} onChange={handleChange} disabled={isUnavailable} className="hidden" />
                   <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${isChecked ? (isOriginal ? 'bg-muc-blue border-muc-blue' : 'bg-muc-yellow border-muc-yellow') : 'bg-white border-slate-300'}`}>
@@ -1118,7 +1116,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
                   </div>
                   <div className="flex-1">
                     <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">
-                        Ch. {num} - {info.name} {isUnavailable && <span className="text-red-500 text-[10px] ml-2 font-bold">{unavailableText}</span>}
+                        Ch. {num} - {info.name} 
+                        {isUnavailable && <span className="text-red-500 text-[10px] ml-2 font-bold">(Déjà réservé)</span>}
+                        {!isUnavailable && devisEvent && <span className="text-amber-600 text-[10px] ml-2 font-bold">(Devis en cours - Disponible)</span>}
                     </span>
                     <span className="text-xs font-medium text-slate-500">{info.lits} lits • {info.etage}</span>
                   </div>
