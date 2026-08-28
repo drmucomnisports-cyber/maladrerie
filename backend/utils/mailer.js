@@ -53,17 +53,18 @@ const sendMail = async (options) => {
     }
   }
 
-  // Repli : Envoi SMTP classique (sécurisé avec nodemailer)
+  // Repli : Envoi SMTP classique (sécurisé avec nodemailer sur port 465 SSL)
   try {
-    const port = parseInt(process.env.SMTP_PORT || '465');
+    const rawPort = process.env.SMTP_PORT;
+    const port = (rawPort && rawPort !== '587') ? parseInt(rawPort) : 465;
     const isSecure = port === 465;
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
       port: port,
       secure: isSecure,
-      connectionTimeout: 8000,
-      socketTimeout: 8000,
+      connectionTimeout: 6000,
+      socketTimeout: 6000,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
