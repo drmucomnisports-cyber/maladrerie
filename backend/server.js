@@ -501,6 +501,11 @@ const sendMail = async (options) => {
   const useApi = brevoKey && brevoKey.startsWith('xkeysib-');
   const defaultSender = process.env.SMTP_SENDER || process.env.BREVO_SENDER || 'david.roujet@mucomnisports.fr';
 
+  let safeSender = options.from || defaultSender;
+  if (!safeSender || !safeSender.toLowerCase().endsWith('@mucomnisports.fr')) {
+    safeSender = 'david.roujet@mucomnisports.fr';
+  }
+
   if (useApi) {
     try {
       const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
@@ -510,7 +515,7 @@ const sendMail = async (options) => {
         htmlContent: options.html,
         sender: { 
           name: options.fromName || "Gîte de la Maladrerie - MUC", 
-          email: options.from || defaultSender 
+          email: safeSender 
         },
         to: toEmails,
         headers: {
@@ -555,7 +560,7 @@ const sendMail = async (options) => {
     });
 
     const mailOptions = {
-      from: `"${options.fromName || 'Gîte de la Maladrerie - MUC'}" <${options.from || defaultSender}>`,
+      from: `"${options.fromName || 'Gîte de la Maladrerie - MUC'}" <${safeSender}>`,
       to: options.to,
       subject: options.subject,
       html: options.html
@@ -4229,7 +4234,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       await cancelOverlappingDevis(devis);
 
       // Envoyer l'email d'intention de virement au client
-      const adminEmailForSignature = devis.validePar || 'dr.mucomnisports@gmail.com';
+      const adminEmailForSignature = devis.validePar || 'david.roujet@mucomnisports.fr';
       const adminSignatureHTML = await getAdminSignatureHTML(adminEmailForSignature);
       await sendMail({
         to: devis.client.email,
@@ -6305,7 +6310,7 @@ app.post('/api/payment/virement/:token', async (req, res) => {
     };
 
     // Send email to client
-    const adminEmail = reservation.validePar || 'dr.mucomnisports@gmail.com';
+    const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     const dateStr = new Date(reservation.dateDebut).toLocaleDateString('fr-FR') + " au " + new Date(reservation.dateFin).toLocaleDateString('fr-FR');
 
@@ -6347,7 +6352,7 @@ app.post('/api/payment/virement/:token', async (req, res) => {
     });
 
     // Send email to admin
-    const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['dr.mucomnisports@gmail.com']);
+    const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['david.roujet@mucomnisports.fr']);
     const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr`;
     await sendMail({
       to: recipientEmails,
@@ -6446,7 +6451,7 @@ app.get('/api/payment/pay-on-arrival/:token', async (req, res) => {
 
     // Envoyer une notification e-mail à l'admin pour l'avertir
     try {
-      const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['dr.mucomnisports@gmail.com']);
+      const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['david.roujet@mucomnisports.fr']);
       const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr`;
       await sendMail({
         to: recipientEmails,
@@ -9239,7 +9244,7 @@ const executeWeeklyCuisineEmail = async () => {
           <p style="color:#555;margin-bottom:20px;">Bonjour,<br><br>Veuillez trouver ci-dessous le récapitulatif des commandes de repas (déjeuners & dîners) pour la semaine du <strong>${periodeLabel}</strong>.<br>Chaque groupe dispose de son propre détail (livraison en bac inox par groupe).</p>
           ${clientBlocks.join('')}
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-          <p style="color:#888;font-size:13px;">Ce récapitulatif a été généré automatiquement. Pour toute question, contactez-nous à l'adresse <a href="mailto:dr.mucomnisports@gmail.com">dr.mucomnisports@gmail.com</a>.</p>
+          <p style="color:#888;font-size:13px;">Ce récapitulatif a été généré automatiquement. Pour toute question, contactez-nous à l'adresse <a href="mailto:david.roujet@mucomnisports.fr">david.roujet@mucomnisports.fr</a>.</p>
         </div>
       </div>
     `;
@@ -9455,7 +9460,7 @@ app.post('/api/admin/reservations/:id/send-police-email', checkAuth, async (req,
     const frontendUrl = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
     const link = `${frontendUrl}/sign-police?token=${token}`;
     
-    const adminSignatureHTML = await getAdminSignatureHTML(req.user.email || 'dr.mucomnisports@gmail.com');
+    const adminSignatureHTML = await getAdminSignatureHTML(req.user?.email || 'david.roujet@mucomnisports.fr');
     
     await sendMail({
       to: reservation.client.email,

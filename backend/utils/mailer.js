@@ -18,6 +18,11 @@ const sendMail = async (options) => {
   const useApi = brevo !== null;
   const defaultSender = process.env.SMTP_SENDER || process.env.BREVO_SENDER || 'david.roujet@mucomnisports.fr';
 
+  let safeSender = options.from || defaultSender;
+  if (!safeSender || !safeSender.toLowerCase().endsWith('@mucomnisports.fr')) {
+    safeSender = 'david.roujet@mucomnisports.fr';
+  }
+
   if (useApi) {
     try {
       const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
@@ -27,7 +32,7 @@ const sendMail = async (options) => {
         htmlContent: options.html,
         sender: { 
           name: options.fromName || "Gîte de la Maladrerie - MUC", 
-          email: options.from || defaultSender 
+          email: safeSender 
         },
         to: toEmails,
         headers: {
@@ -72,7 +77,7 @@ const sendMail = async (options) => {
     });
 
     const mailOptions = {
-      from: `"${options.fromName || 'Gîte de la Maladrerie - MUC'}" <${options.from || defaultSender}>`,
+      from: `"${options.fromName || 'Gîte de la Maladrerie - MUC'}" <${safeSender}>`,
       to: options.to,
       subject: options.subject,
       html: options.html
