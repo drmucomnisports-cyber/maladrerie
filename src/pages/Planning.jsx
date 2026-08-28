@@ -226,12 +226,13 @@ const Planning = () => {
           {/* Formulaire */}
           <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl h-fit sticky top-32 border-t-8 border-muc-yellow" data-reveal="right">
             <h2 className="text-3xl font-black text-muc-blue mb-8 uppercase tracking-tight">
-              {isEditMode ? 'Modifier la réservation' : isDevisMode ? 'Générer un Devis' : 'Réservation'}
+              {isEditMode ? 'Modifier la réservation' : isDevisMode ? 'Demande de Devis Gratuit' : 'Réservation'}
             </h2>
             <ReservationForm 
               events={events} 
               isAdmin={false} 
-              isDevis={isDevisMode}
+              isDevis={false}
+              isPublicDevis={isDevisMode}
               existingReservation={isEditMode ? editReservation : null}
               onCreated={fetchReservations} 
             />

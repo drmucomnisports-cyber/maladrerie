@@ -10,10 +10,11 @@ const CHAMBRES_INFO = {
   3: { num: 3, name: 'Chambre standard', lits: 6, etage: '1er étage' },
   4: { num: 4, name: 'Grande chambre', lits: 7, etage: '2e étage' },
   5: { num: 5, name: 'Grande chambre', lits: 7, etage: '2e étage' },
-  6: { num: 6, name: 'Chambre standard', lits: 5, etage: '2e étage' }
+  6: { num: 6, name: 'Chambre standard', lits: 5, etage: '2e étage' },
+  7: { num: 7, name: 'Chambre Admin', lits: 5, etage: '2e étage (Admin)', adminOnly: true }
 };
 
-const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCreated = () => {}, adminUser = null, existingReservation = null }) => {
+const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPublicDevis = false, onCreated = () => {}, adminUser = null, existingReservation = null }) => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -901,7 +902,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       let url = `${API_URL}/api/reservations`;
       let method = 'POST';
 
-      if (existingReservation) {
+      if (isPublicDevis) {
+        url = `${API_URL}/api/devis/public-request`;
+        method = 'POST';
+      } else if (existingReservation) {
         if (isDevis) {
           url = `${API_URL}/api/admin/devis/${existingReservation.id}`;
         } else {
@@ -915,7 +919,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       }
 
       const headers = { 'Content-Type': 'application/json' };
-      if (isAdmin || isDevis || existingReservation) {
+      if (!isPublicDevis && (isAdmin || isDevis || existingReservation)) {
         const token = localStorage.getItem('adminToken');
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -932,7 +936,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
         const data = await res.json();
         const roomNames = formData.chambres.map(id => CHAMBRES_INFO[id]?.name || `Chambre ${id}`).join(', ');
         let message = '';
-        if (existingReservation) {
+        if (isPublicDevis) {
+          message = `✨ Votre demande de devis n° ${data.numeroDevis || ''} a bien été enregistrée et transmise à notre équipe !\nUn accusé de réception vous a été envoyé par e-mail à ${formData.email}. Philippe et David vous recontacteront dans les plus brefs délais.`;
+        } else if (existingReservation) {
           if (isDevis) {
             if (formData.sendEmail !== false) {
               message = `Le devis a été mis à jour et envoyé à ${formData.email} avec succès.`;
@@ -1085,7 +1091,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, onCrea
       <div className="pt-4 border-t border-slate-100">
         <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-4 block">Sélection des Chambres</label>
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5, 6].map(num => {
+          {(isAdmin ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5, 6]).map(num => {
             const info = CHAMBRES_INFO[num];
             const isChecked = formData.chambres.includes(num);
             const unavailableEvent = unavailableRoomsMap[num];

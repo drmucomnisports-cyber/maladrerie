@@ -373,8 +373,8 @@ const getMissionDetail = (m, dateDebut, dateFin) => {
   return `${details} <br/><span style="color: #666; font-size: 13px;">(Rémunération : ${m.montant.toFixed(2)} €)</span>`;
 };
 
-const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5 };
-const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Chambre 4", 5: "Chambre 5", 6: "Chambre 6" };
+const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5, 7: 5 };
+const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Chambre 4", 5: "Chambre 5", 6: "Chambre 6", 7: "Chambre 7" };
 
 const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, options, promoCode, repas, salles) => {
   const start = new Date(dateDebut);
@@ -3913,6 +3913,159 @@ app.get('/api/devis/info/:token', async (req, res) => {
   }
 });
 
+// Demande de devis publique par les clients (Formulaire en ligne)
+app.post('/api/devis/public-request', async (req, res) => {
+  try {
+    const {
+      nom,
+      prenom,
+      email,
+      telephone,
+      structure,
+      dateDebut,
+      dateFin,
+      devisAdultes,
+      devisMineurs,
+      chambres,
+      chambresDetails,
+      options,
+      repas,
+      modeRestauration,
+      repasGlobal,
+      salles,
+      remarques
+    } = req.body;
+
+    if (!nom || !email || !telephone || !dateDebut || !dateFin) {
+      return res.status(400).json({ error: "Veuillez renseigner tous les champs obligatoires (nom, email, téléphone, dates)." });
+    }
+
+    // Exclure la chambre 7 si soumise par un client non-admin
+    const sanitizedChambres = (chambres || []).filter(c => c !== 7);
+
+    const fullNom = prenom ? `${prenom} ${nom}`.trim() : nom;
+    let client = await prisma.client.findFirst({
+      where: { email: email.trim().toLowerCase() }
+    });
+
+    if (!client) {
+      client = await prisma.client.create({
+        data: {
+          nom: fullNom,
+          email: email.trim().toLowerCase(),
+          telephone: telephone.trim()
+        }
+      });
+    }
+
+    const todayStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
+    const countToday = await prisma.reservation.count({
+      where: { numeroDevis: { startsWith: `DEV-${todayStr}` } }
+    });
+    const numeroDevis = `DEV-${todayStr}-${String(countToday + 1).padStart(3, '0')}`;
+
+    const tempRes = {
+      dateDebut: new Date(dateDebut),
+      dateFin: new Date(dateFin),
+      chambres: sanitizedChambres,
+      chambresDetails: chambresDetails || {},
+      options: options || {},
+      repas: repas || {},
+      salles: salles || {},
+      modeRestauration: modeRestauration || 'global',
+      repasGlobal: repasGlobal || {}
+    };
+    const detailsFinanciers = calculerDetailsFinanciersReservation(tempRes);
+
+    const expireLe = new Date();
+    expireLe.setDate(expireLe.getDate() + 15);
+
+    const devis = await prisma.reservation.create({
+      data: {
+        clientId: client.id,
+        numeroDevis,
+        statut: 'DEVIS',
+        structure: structure || null,
+        dateDebut: new Date(dateDebut),
+        dateFin: new Date(dateFin),
+        chambres: sanitizedChambres,
+        chambresDetails: chambresDetails || {},
+        options: options || {},
+        repas: repas || {},
+        salles: salles || {},
+        modeRestauration: modeRestauration || 'global',
+        repasGlobal: repasGlobal || {},
+        remarques: remarques || null,
+        prixTotal: detailsFinanciers.totalTTC,
+        acomptePaid: false,
+        expireLe
+      }
+    });
+
+    // Envoi de la notification e-mail d'alerte à Philippe Morereau et David Roujet
+    const notificationEmails = 'philippe.morereau@mucomnisports.fr, david.roujet@mucomnisports.fr';
+
+    await sendMail({
+      to: notificationEmails,
+      subject: `🚨 [DEMANDE DE DEVIS CLIENT] N° ${numeroDevis} - ${fullNom}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+          <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+            <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">Gîte de la Maladrerie</span>
+            <h2 style="color: #ffffff; margin: 8px 0 0 0; font-size: 18px; font-weight: 800;">🚨 Nouvelle Demande de Devis Client</h2>
+          </div>
+          <div style="padding: 24px;">
+            <p style="font-size: 14px; color: #334155;">Une nouvelle demande de devis en ligne vient d'être créée sur le site :</p>
+            
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <h4 style="margin: 0 0 10px 0; color: #004B93; font-size: 13px; text-transform: uppercase;">Contact Client :</h4>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Nom :</strong> ${fullNom}</p>
+              ${structure ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Structure :</strong> ${structure}</p>` : ''}
+              <p style="margin: 4px 0; font-size: 13px;"><strong>E-mail :</strong> <a href="mailto:${email}">${email}</a></p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Téléphone :</strong> ${telephone}</p>
+            </div>
+
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <h4 style="margin: 0 0 10px 0; color: #004B93; font-size: 13px; text-transform: uppercase;">Détails de la demande :</h4>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Référence :</strong> ${numeroDevis}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Dates :</strong> Du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Chambres :</strong> ${sanitizedChambres.length > 0 ? sanitizedChambres.join(', ') : 'Aucune'}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Estimation Tarifaire :</strong> ${detailsFinanciers.totalTTC.toFixed(2)} €</p>
+            </div>
+
+            <p style="font-size: 13px; color: #475569;">Connectez-vous à l'Espace Admin pour consulter, ajuster et valider ce devis.</p>
+          </div>
+        </div>
+      `
+    });
+
+    // Envoi de l'accusé de réception au client
+    await sendMail({
+      to: email,
+      subject: `Accusé de réception - Votre demande de devis N° ${numeroDevis}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+          <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+            <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">Gîte de la Maladrerie</span>
+            <h2 style="color: #ffffff; margin: 8px 0 0 0; font-size: 18px; font-weight: 800;">Demande de Devis Reçue</h2>
+          </div>
+          <div style="padding: 24px; font-size: 14px; color: #334155; line-height: 1.6;">
+            <p>Bonjour ${fullNom},</p>
+            <p>Nous avons bien reçu votre demande de devis n° <strong>${numeroDevis}</strong> pour votre séjour du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}.</p>
+            <p>Notre équipe examine votre demande et reviendra vers vous très rapidement avec la proposition chiffrée détaillée.</p>
+            <p style="margin-top: 24px;">Cordialement,<br/><strong>L'équipe du Gîte de la Maladrerie</strong></p>
+          </div>
+        </div>
+      `
+    });
+
+    res.json({ success: true, devisId: devis.id, numeroDevis });
+  } catch (error) {
+    console.error("Erreur demande devis publique:", error);
+    res.status(500).json({ error: "Une erreur est survenue lors de l'enregistrement de votre demande de devis." });
+  }
+});
+
 // Valider un devis avec saisie des occupants (Client - POST)
 app.post('/api/devis/validate/:token', async (req, res) => {
   const { token } = req.params;
@@ -4874,7 +5027,7 @@ app.get('/api/admin/reservations', checkAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5 };
+    const CHAMBRES_CAPACITE = { 1: 5, 2: 6, 3: 6, 4: 7, 5: 7, 6: 5, 7: 5 };
     
     // Trier temporairement par ordre chronologique de début de séjour (croissant) 
     // pour garantir une attribution cohérente lors des mises à niveau

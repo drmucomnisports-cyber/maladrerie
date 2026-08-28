@@ -103,17 +103,21 @@ const Home = () => {
         </div>
 
         {/* Menu Droite */}
-        <div className="hidden lg:flex gap-8 text-[13px] font-black uppercase tracking-wider text-slate-700 flex-1 items-center">
+        <div className="hidden lg:flex gap-6 text-[13px] font-black uppercase tracking-wider text-slate-700 flex-1 items-center justify-end">
           <a href="#activites" onClick={(e) => handleScroll(e, 'activites')} className="hover:text-muc-blue transition-colors">Activités</a>
           <a href="#infos" onClick={(e) => handleScroll(e, 'infos')} className="hover:text-muc-blue transition-colors">Infos</a>
-          <Link to="/planning" className="bg-muc-yellow text-muc-blue px-6 py-2 rounded-lg text-sm font-black hover:bg-[#E5A600] transition-all ml-4 shadow-sm">
+          <Link to="/planning?mode=devis" className="bg-slate-100 text-slate-800 border border-slate-300 px-4 py-2 rounded-lg text-xs font-black hover:bg-slate-200 transition-all shadow-sm">
+            DEMANDER UN DEVIS
+          </Link>
+          <Link to="/planning" className="bg-muc-yellow text-muc-blue px-5 py-2 rounded-lg text-xs font-black hover:bg-[#E5A600] transition-all shadow-sm">
             RÉSERVER
           </Link>
         </div>
 
         {/* Mobile menu toggle simplified */}
-        <div className="lg:hidden flex-1 flex justify-end">
-           <Link to="/planning" className="bg-muc-yellow text-muc-blue px-4 py-2 rounded-lg text-xs font-black">RÉSERVER</Link>
+        <div className="lg:hidden flex-1 flex justify-end gap-2">
+           <Link to="/planning?mode=devis" className="bg-slate-100 text-slate-800 px-3 py-1.5 rounded-lg text-[11px] font-black">DEVIS</Link>
+           <Link to="/planning" className="bg-muc-yellow text-muc-blue px-3 py-1.5 rounded-lg text-[11px] font-black">RÉSERVER</Link>
         </div>
       </nav>
 
@@ -135,6 +139,14 @@ const Home = () => {
           <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto font-medium leading-relaxed drop-shadow-md">
             Centre d'hébergement & Base de sports de pleine nature.
           </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <Link to="/planning" className="bg-muc-yellow text-muc-blue px-8 py-3.5 rounded-xl font-black text-sm uppercase tracking-wider hover:bg-[#E5A600] transition-all shadow-xl hover:-translate-y-0.5">
+              Réserver un séjour
+            </Link>
+            <Link to="/planning?mode=devis" className="bg-white/20 backdrop-blur-md text-white border-2 border-white/40 px-8 py-3.5 rounded-xl font-black text-sm uppercase tracking-wider hover:bg-white hover:text-muc-blue transition-all shadow-xl hover:-translate-y-0.5">
+              Demander un devis
+            </Link>
+          </div>
         </div>
       </section>
 
