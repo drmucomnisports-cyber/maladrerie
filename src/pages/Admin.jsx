@@ -6296,9 +6296,14 @@ const Admin = () => {
               {financeModalData.code === "447" && (
                 <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-5 mb-6">
                     <div className="flex justify-between items-center mb-4 border-b border-amber-200 pb-3 flex-wrap gap-2">
-                        <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
-                            🏛️ Informations pour la Déclaration Extranet
-                        </span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
+                                🏛️ Informations pour la Déclaration 3D Ouest
+                            </span>
+                            <span className="bg-amber-200/80 text-amber-900 text-xs font-black px-2.5 py-0.5 rounded-md uppercase">
+                                (1) Mois : {financeModalData.title.replace('Taxe de Séjour - ', '')}
+                            </span>
+                        </div>
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
