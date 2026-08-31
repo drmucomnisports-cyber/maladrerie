@@ -7092,6 +7092,31 @@ app.post('/api/admin/reservations/:id/accept-modification', checkAuth, async (re
     const proposedAcompte = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
     const proposedSolde = Math.round((newTotal - proposedAcompte) * 100) / 100;
 
+    let updatedAcompte = proposedAcompte;
+    let updatedSolde = proposedSolde;
+    let updatedStatutPaiement = reservation.statutPaiement;
+
+    if (reservation.statutPaiement === 'ACOMPTE_PAYE') {
+      const alreadyPaidAcompte = reservation.montantAcompte || Math.round((reservation.prixTotal || 0) * 0.3 * 100) / 100;
+      updatedAcompte = alreadyPaidAcompte;
+      updatedSolde = Math.max(0, Math.round((newTotal - alreadyPaidAcompte) * 100) / 100);
+      if (newTotal <= alreadyPaidAcompte) {
+        updatedStatutPaiement = 'PAYE';
+        updatedSolde = 0;
+      }
+    } else if (reservation.statutPaiement === 'PAYE' || reservation.statutPaiement === 'SOLDE_PAYE') {
+      const amountAlreadyPaid = reservation.prixTotal || ((reservation.montantAcompte || 0) + (reservation.montantSolde || 0));
+      if (newTotal > amountAlreadyPaid) {
+        updatedStatutPaiement = 'ACOMPTE_PAYE';
+        updatedAcompte = amountAlreadyPaid;
+        updatedSolde = Math.round((newTotal - amountAlreadyPaid) * 100) / 100;
+      } else {
+        updatedStatutPaiement = 'PAYE';
+        updatedAcompte = newTotal;
+        updatedSolde = 0;
+      }
+    }
+
     const updatedReservation = await prisma.reservation.update({
       where: { id: reservation.id },
       data: {
@@ -7103,8 +7128,9 @@ app.post('/api/admin/reservations/:id/accept-modification', checkAuth, async (re
         repas: proposed.repas,
         salles: proposed.salles,
         prixTotal: newTotal,
-        montantAcompte: reservation.statutPaiement === 'PAYE' ? 0 : proposedAcompte,
-        montantSolde: reservation.statutPaiement === 'PAYE' ? newTotal : proposedSolde,
+        montantAcompte: updatedAcompte,
+        montantSolde: updatedSolde,
+        statutPaiement: updatedStatutPaiement,
         modificationProposed: null
       },
       include: { client: true }
@@ -7140,7 +7166,7 @@ app.post('/api/admin/reservations/:id/accept-modification', checkAuth, async (re
 
     const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
-    const modificationLinkHTML = getModificationLinkHTML(reservation.tokenModification);
+    const modificationLinkHTML = await getModificationLinkHTML(reservation.tokenModification || reservation.id);
 
     await sendMail({
       to: reservation.client.email,
@@ -7724,20 +7750,22 @@ app.put('/api/admin/reservations/:id/full', checkAuth, async (req, res) => {
         newAcompte = Math.round(newPrixTotal * 0.3 * 100) / 100;
         newSolde = Math.round(newPrixTotal * 0.7 * 100) / 100;
       } else if (oldRes.statutPaiement === 'ACOMPTE_PAYE') {
-        newSolde = Math.max(0, newPrixTotal - (oldRes.montantAcompte || 0));
-      } else if (oldRes.statutPaiement === 'SOLDE_PAYE') {
-        if (newPrixTotal > (oldRes.montantSolde || 0)) {
-          newAcompte = Math.round((newPrixTotal - (oldRes.montantSolde || 0)) * 100) / 100;
-        } else {
-          newAcompte = 0;
+        const paidAcompte = oldRes.montantAcompte || Math.round((oldRes.prixTotal || 0) * 0.3 * 100) / 100;
+        newAcompte = paidAcompte;
+        newSolde = Math.max(0, Math.round((newPrixTotal - paidAcompte) * 100) / 100);
+        if (newPrixTotal <= paidAcompte) {
           newStatutPaiement = 'PAYE';
+          newSolde = 0;
         }
-      } else if (oldRes.statutPaiement === 'PAYE') {
-        if (newPrixTotal > oldRes.prixTotal) {
+      } else if (oldRes.statutPaiement === 'SOLDE_PAYE' || oldRes.statutPaiement === 'PAYE') {
+        const amountAlreadyPaid = oldRes.prixTotal || ((oldRes.montantAcompte || 0) + (oldRes.montantSolde || 0));
+        if (newPrixTotal > amountAlreadyPaid) {
           newStatutPaiement = 'ACOMPTE_PAYE';
-          newAcompte = oldRes.prixTotal; 
-          newSolde = newPrixTotal - oldRes.prixTotal;
+          newAcompte = amountAlreadyPaid;
+          newSolde = Math.round((newPrixTotal - amountAlreadyPaid) * 100) / 100;
         } else {
+          newStatutPaiement = 'PAYE';
+          newAcompte = newPrixTotal;
           newSolde = 0;
         }
       }
