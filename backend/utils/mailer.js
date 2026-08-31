@@ -18,14 +18,19 @@ const sendMail = async (options) => {
   const useApi = brevo !== null;
   const defaultSender = process.env.SMTP_SENDER || process.env.BREVO_SENDER || 'david.roujet@mucomnisports.fr';
 
-  let safeSender = options.from || defaultSender;
+  const cleanAddress = (addr) => String(addr || '').replace(/dr\.mucomnisports@gmail\.com/gi, 'david.roujet@mucomnisports.fr').trim();
+
+  let safeSender = cleanAddress(options.from || defaultSender);
   if (!safeSender || !safeSender.toLowerCase().endsWith('@mucomnisports.fr')) {
     safeSender = 'david.roujet@mucomnisports.fr';
   }
 
+  const cleanTo = cleanAddress(options.to);
+  const cleanCc = options.cc ? cleanAddress(options.cc) : null;
+
   if (useApi) {
     try {
-      const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
+      const toEmails = cleanTo.split(',').map(email => ({ email: cleanAddress(email) }));
       
       const emailPayload = {
         subject: options.subject,
@@ -45,12 +50,12 @@ const sendMail = async (options) => {
         })) : undefined
       };
 
-      if (options.cc) {
-        emailPayload.cc = options.cc.split(',').map(email => ({ email: email.trim() }));
+      if (cleanCc) {
+        emailPayload.cc = cleanCc.split(',').map(email => ({ email: cleanAddress(email) }));
       }
 
       await brevo.transactionalEmails.sendTransacEmail(emailPayload);
-      console.log(`Email envoyé via API Brevo avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
+      console.log(`Email envoyé via API Brevo avec succès à : ${cleanTo}${cleanCc ? ' (CC: ' + cleanCc + ')' : ''}`);
       return;
     } catch (error) {
       console.error("Erreur lors de l'envoi de l'email via API Brevo:", error.message || error);
@@ -78,13 +83,13 @@ const sendMail = async (options) => {
 
     const mailOptions = {
       from: `"${options.fromName || 'Gîte de la Maladrerie - MUC'}" <${safeSender}>`,
-      to: options.to,
+      to: cleanTo,
       subject: options.subject,
       html: options.html
     };
 
-    if (options.cc) {
-      mailOptions.cc = options.cc;
+    if (cleanCc) {
+      mailOptions.cc = cleanCc;
     }
 
     if (options.attachments) {
