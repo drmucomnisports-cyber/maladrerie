@@ -5296,13 +5296,15 @@ app.post('/api/admin/reservations/:id/missions', checkAuth, async (req, res) => 
 function calculerDetailsFinanciersReservation(res) {
     let taxeSejour = 0;
     let totalSalles = 0;
+    let nbAdultes = 0;
+    let nbOccupants = 0;
+    let nuits = 0;
+
     if (res.dateDebut && res.dateFin) {
         const start = new Date(res.dateDebut);
         const end = new Date(res.dateFin);
-        const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+        nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
         if (nuits > 0) {
-            let nbAdultes = 0;
-            let nbOccupants = 0;
             if (res.occupants && res.occupants.length > 0) {
                 nbAdultes = res.occupants.filter(o => o.estAdulte).length;
                 nbOccupants = res.occupants.length;
@@ -5331,9 +5333,16 @@ function calculerDetailsFinanciersReservation(res) {
         }
     }
     
+    const nbMineurs = Math.max(0, nbOccupants - nbAdultes);
+
     return {
         taxeSejour: Math.round(taxeSejour * 100) / 100,
-        totalSalles: Math.round(totalSalles * 100) / 100
+        totalSalles: Math.round(totalSalles * 100) / 100,
+        nbAdultes,
+        nbMineurs,
+        nuits,
+        nuiteesAssujetties: nbAdultes * nuits,
+        nuiteesExonerees: nbMineurs * nuits
     };
 }
 
@@ -5380,29 +5389,17 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
     });
 
     let totalTaxeSejour = 0;
-    let nbAdultesTotal = 0;
-    let nbNuitsTotal = 0;
+    let totalUnitesLouees = reservations.length;
+    let totalChambresLouees = 0;
+    let totalNuiteesAssujetties = 0;
+    let totalNuiteesExonerees = 0;
 
     reservations.forEach(r => {
-      const { taxeSejour } = calculerDetailsFinanciersReservation(r);
+      const { taxeSejour, nbAdultes, nbMineurs, nuits } = calculerDetailsFinanciersReservation(r);
       totalTaxeSejour += taxeSejour;
-
-      if (r.dateDebut && r.dateFin) {
-        const start = new Date(r.dateDebut);
-        const end = new Date(r.dateFin);
-        const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-        nbNuitsTotal += nuits;
-
-        let nbAdultes = 0;
-        if (r.occupants && r.occupants.length > 0) {
-          nbAdultes = r.occupants.filter(o => o.estAdulte).length;
-        } else if (r.chambresDetails && typeof r.chambresDetails === 'object') {
-          Object.values(r.chambresDetails).forEach(room => {
-            nbAdultes += parseInt(room.adultes || 0);
-          });
-        }
-        nbAdultesTotal += nbAdultes;
-      }
+      totalChambresLouees += (r.chambres ? r.chambres.length : 0);
+      totalNuiteesAssujetties += (nbAdultes * nuits);
+      totalNuiteesExonerees += (nbMineurs * nuits);
     });
 
     totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
@@ -5411,48 +5408,58 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
 
     await sendMail({
       to: toEmails,
-      subject: `📊 [TAXE DE SÉJOUR] Déclaration - ${prevMonthLabel}`,
+      subject: `📊 [TAXE DE SÉJOUR] Rapport de Déclaration 3D Ouest - ${prevMonthLabel}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
+        <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 0; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
           <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
-            <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
-            <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">📊 Taxe de Séjour à Déclarer</h2>
+            <span style="color: #FFD700; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie - MUC Omnisports</span>
+            <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase;">📊 Déclaration Taxe de Séjour (3D Ouest)</h2>
           </div>
+
           <div style="padding: 24px;">
-            <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">Bonjour,</p>
-            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-              Voici le récapitulatif de la taxe de séjour collectée pour la période <strong>${prevMonthLabel}</strong> :
+            <p style="font-size: 14px; color: #334155; margin-top: 0;">Bonjour Valérie, Johanna,</p>
+            <p style="font-size: 14px; color: #334155; line-height: 1.5;">
+              Voici les <strong>chiffres exacts pré-calculés à saisir dans les cases du formulaire 3D Ouest</strong> pour la période <strong>${prevMonthLabel}</strong> :
             </p>
-            <div style="margin: 24px 0; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; text-align: center;">
-              <span style="color: #166534; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px;">Montant Total à Déclarer</span>
-              <span style="font-size: 32px; font-weight: 900; color: #15803d;">${totalTaxeSejour.toFixed(2)} €</span>
-            </div>
-            <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
-              <h4 style="margin: 0 0 12px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails de la période (${prevMonthLabel}) :</h4>
-              <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
-                <tr>
-                  <td width="50%" style="padding: 6px 0; color: #64748b;">Nombre de réservations :</td>
-                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${reservations.length}</td>
+
+            <div style="margin: 20px 0; background-color: #f8fafc; border: 2px solid #004B93; border-radius: 10px; padding: 20px;">
+              <h3 style="margin: 0 0 14px 0; color: #004B93; font-size: 13px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
+                📝 REPERES DE SAISIE PORTAIL 3D OUEST (${prevMonthLabel})
+              </h3>
+
+              <table width="100%" cellpadding="10" cellspacing="0" style="font-size: 13px; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                  <td style="color: #475569; font-weight: bold;">(1) Mois de déclaration :</td>
+                  <td style="font-weight: 900; color: #004B93; font-size: 15px; text-align: right;">${prevMonthLabel}</td>
                 </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b;">Adultes cumulés :</td>
-                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${nbAdultesTotal}</td>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="color: #475569; font-weight: bold;">(2) Nb d'unités louées (Nombre de séjours meublé) :</td>
+                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalUnitesLouees} <span style="font-size:11px; font-weight:normal; color:#64748b;">(${totalChambresLouees} chambres)</span></td>
                 </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b;">Nuits cumulées :</td>
-                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${nbNuitsTotal}</td>
+                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                  <td style="color: #475569; font-weight: bold;">(3) Nb total de nuitées assujetties (Adultes x Nuits) :</td>
+                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesAssujetties}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="color: #475569; font-weight: bold;">(4) Nb total de nuitées exonérées (Mineurs &lt; 18 ans x Nuits) :</td>
+                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesExonerees}</td>
+                </tr>
+                <tr style="background-color: #f0fdf4;">
+                  <td style="color: #166534; font-weight: 900; font-size: 14px;">(5) Montant total collecté à déclarer (€) :</td>
+                  <td style="font-weight: 900; color: #15803d; font-size: 22px; text-align: right;">${totalTaxeSejour.toFixed(2)} €</td>
                 </tr>
               </table>
             </div>
-            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 24px;">
-              Veuillez déclarer ce montant sur la plateforme extranet officielle de la taxe de séjour en cliquant sur le bouton vert ci-dessous :
-            </p>
+
             <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
-              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">Accéder à la plateforme de déclaration</a>
+              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">
+                Accéder au Portail de Déclaration (3D Ouest)
+              </a>
             </p>
           </div>
-          <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
-            Cet e-mail a été renvoyé manuellement par un administrateur depuis le Tableau de Bord Financier.
+
+          <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+            Rapport généré et transmis manuellement par un administrateur depuis l'Espace Admin.
           </div>
         </div>
       `
@@ -9026,30 +9033,17 @@ const executeMonthlyTaxReport = async () => {
     });
 
     let totalTaxeSejour = 0;
-    let nbAdultesTotal = 0;
-    let nbNuitsTotal = 0;
+    let totalUnitesLouees = reservations.length;
+    let totalChambresLouees = 0;
+    let totalNuiteesAssujetties = 0;
+    let totalNuiteesExonerees = 0;
 
     reservations.forEach(r => {
-      const { taxeSejour } = calculerDetailsFinanciersReservation(r);
+      const { taxeSejour, nbAdultes, nbMineurs, nuits } = calculerDetailsFinanciersReservation(r);
       totalTaxeSejour += taxeSejour;
-
-      // Calcul des détails pour affichage informatif
-      if (r.dateDebut && r.dateFin) {
-        const start = new Date(r.dateDebut);
-        const end = new Date(r.dateFin);
-        const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-        nbNuitsTotal += nuits;
-
-        let nbAdultes = 0;
-        if (r.occupants && r.occupants.length > 0) {
-          nbAdultes = r.occupants.filter(o => o.estAdulte).length;
-        } else if (r.chambresDetails && typeof r.chambresDetails === 'object') {
-          Object.values(r.chambresDetails).forEach(room => {
-            nbAdultes += parseInt(room.adultes || 0);
-          });
-        }
-        nbAdultesTotal += nbAdultes;
-      }
+      totalChambresLouees += (r.chambres ? r.chambres.length : 0);
+      totalNuiteesAssujetties += (nbAdultes * nuits);
+      totalNuiteesExonerees += (nbMineurs * nuits);
     });
 
     totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
@@ -9058,64 +9052,64 @@ const executeMonthlyTaxReport = async () => {
       "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
       "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
     ];
-    const prevMonthLabel = monthNames[prevMonth];
-    const currentYearLabel = prevYear;
+    const prevMonthLabel = `${monthNames[prevMonth]} ${prevYear}`;
 
     const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
 
     await sendMail({
       to: toEmails,
-      subject: `📊 [TAXE DE SÉJOUR] Déclaration mensuelle - ${prevMonthLabel} ${currentYearLabel}`,
+      subject: `📊 [TAXE DE SÉJOUR] Déclaration Mensuelle 3D Ouest - ${prevMonthLabel}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
-          <!-- Header -->
+        <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 0; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
           <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
-            <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
-            <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">📊 Taxe de Séjour à Déclarer</h2>
+            <span style="color: #FFD700; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie - MUC Omnisports</span>
+            <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase;">📊 Déclaration Taxe de Séjour (3D Ouest)</h2>
           </div>
-          
+
           <div style="padding: 24px;">
-            <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">
-              Bonjour,
-            </p>
-            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-              Voici le récapitulatif de la taxe de séjour collectée pour les séjours ayant débuté durant le mois de <strong>${prevMonthLabel} ${currentYearLabel}</strong> :
+            <p style="font-size: 14px; color: #334155; margin-top: 0;">Bonjour Valérie, Johanna,</p>
+            <p style="font-size: 14px; color: #334155; line-height: 1.5;">
+              Voici les <strong>chiffres exacts pré-calculés à saisir dans les cases du formulaire 3D Ouest</strong> pour la période <strong>${prevMonthLabel}</strong> :
             </p>
 
-            <div style="margin: 24px 0; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; text-align: center;">
-              <span style="color: #166534; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px;">Montant Total à Déclarer</span>
-              <span style="font-size: 32px; font-weight: 900; color: #15803d;">${totalTaxeSejour.toFixed(2)} €</span>
-            </div>
+            <div style="margin: 20px 0; background-color: #f8fafc; border: 2px solid #004B93; border-radius: 10px; padding: 20px;">
+              <h3 style="margin: 0 0 14px 0; color: #004B93; font-size: 13px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
+                📝 REPERES DE SAISIE PORTAIL 3D OUEST (${prevMonthLabel})
+              </h3>
 
-            <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
-              <h4 style="margin: 0 0 12px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails de la période (${prevMonthLabel} ${currentYearLabel}) :</h4>
-              <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
-                <tr>
-                  <td width="50%" style="padding: 6px 0; color: #64748b;">Nombre de réservations :</td>
-                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${reservations.length}</td>
+              <table width="100%" cellpadding="10" cellspacing="0" style="font-size: 13px; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                  <td style="color: #475569; font-weight: bold;">(1) Mois de déclaration :</td>
+                  <td style="font-weight: 900; color: #004B93; font-size: 15px; text-align: right;">${prevMonthLabel}</td>
                 </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b;">Adultes cumulés :</td>
-                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${nbAdultesTotal}</td>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="color: #475569; font-weight: bold;">(2) Nb d'unités louées (Nombre de séjours meublé) :</td>
+                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalUnitesLouees} <span style="font-size:11px; font-weight:normal; color:#64748b;">(${totalChambresLouees} chambres)</span></td>
                 </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b;">Nuits cumulées :</td>
-                  <td style="padding: 6px 0; font-weight: bold; text-align: right;">${nbNuitsTotal}</td>
+                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                  <td style="color: #475569; font-weight: bold;">(3) Nb total de nuitées assujetties (Adultes x Nuits) :</td>
+                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesAssujetties}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="color: #475569; font-weight: bold;">(4) Nb total de nuitées exonérées (Mineurs &lt; 18 ans x Nuits) :</td>
+                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesExonerees}</td>
+                </tr>
+                <tr style="background-color: #f0fdf4;">
+                  <td style="color: #166534; font-weight: 900; font-size: 14px;">(5) Montant total collecté à déclarer (€) :</td>
+                  <td style="font-weight: 900; color: #15803d; font-size: 22px; text-align: right;">${totalTaxeSejour.toFixed(2)} €</td>
                 </tr>
               </table>
             </div>
 
-            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 24px;">
-              Veuillez déclarer ce montant sur la plateforme extranet officielle de la taxe de séjour en cliquant sur le bouton vert ci-dessous :
-            </p>
-            
             <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
-              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">Accéder à la plateforme de déclaration</a>
+              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">
+                Accéder au Portail de Déclaration (3D Ouest)
+              </a>
             </p>
           </div>
-          
-          <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
-            Cet e-mail automatique est envoyé par le système de réservation du Gîte de la Maladrerie.
+
+          <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+            Cet e-mail automatique est envoyé le 1er jour de chaque mois par le système.
           </div>
         </div>
       `
