@@ -9919,7 +9919,7 @@ app.get('/api/documents/:filename', (req, res) => {
   res.download(filePath, actualFilename);
 });
 
-// --- ENDPOINT ICS/ICAL POUR SYNCHRONISATION AGENDA OUTLOOK ---
+// --- ENDPOINT ICS/ICAL POUR SYNCHRONISATION AGENDA OUTLOOK, GOOGLE & MAC ---
 app.get(['/api/calendar/ical', '/api/calendar/ical/:tokenParam'], async (req, res) => {
   const token = req.params.tokenParam || req.query.token;
   const expectedToken = process.env.CALENDAR_TOKEN || 'MUC_MALADRERIE_SYNC';
@@ -9937,6 +9937,14 @@ app.get(['/api/calendar/ical', '/api/calendar/ical/:tokenParam'], async (req, re
       }
     });
 
+    const escapeICal = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    };
+
     let icalContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -9944,33 +9952,27 @@ app.get(['/api/calendar/ical', '/api/calendar/ical/:tokenParam'], async (req, re
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'X-WR-CALNAME:Gîte de la Maladrerie - Réservations',
-      'X-WR-TIMEZONE:Europe/Paris'
+      'X-WR-TIMEZONE:Europe/Paris',
+      'X-PUBLISHED-TTL:PT15M',
+      'REFRESH-INTERVAL;VALUE=DURATION:PT15M'
     ];
 
     reservations.forEach(r => {
       const start = new Date(r.dateDebut);
       const end = new Date(r.dateFin);
-
-      // Format YYYYMMDD
-      const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}${month}${day}`;
-      };
+      // RFC 5545: VALUE=DATE DTEND est exclusif -> ajouter 1 jour pour que le dernier jour apparaisse sur l'agenda
+      const endExclusive = new Date(end.getTime() + 86400000);
 
       const uid = `reservation-${r.id}@gite-la-maladrerie.fr`;
       
-      // Nettoyage et formatage du résumé
-      const safeNom = r.client.nom.replace(/[,;]/g, ' ');
-      const safeStructure = r.structure ? ` (${r.structure.replace(/[,;]/g, ' ')})` : '';
-      const summary = `Gîte : Résa #${r.id} - ${safeNom}${safeStructure}`;
+      const safeNom = r.client?.nom || 'Client';
+      const safeStructure = r.structure ? ` (${r.structure})` : '';
+      const summary = escapeICal(`Gîte : Résa #${r.id} - ${safeNom}${safeStructure}`);
       
-      // Description détaillée
       let descLines = [
         `Client : ${safeNom}`,
-        `Téléphone : ${r.client.telephone}`,
-        `Email : ${r.client.email}`,
+        `Téléphone : ${r.client?.telephone || 'Non renseigné'}`,
+        `Email : ${r.client?.email || 'Non renseigné'}`,
         r.structure ? `Structure : ${r.structure}` : null,
         `Chambres : ${(r.chambres || []).join(', ')}`,
         `Montant total : ${r.prixTotal ? `${r.prixTotal.toFixed(2)} €` : 'Non calculé'}`,
@@ -9978,13 +9980,13 @@ app.get(['/api/calendar/ical', '/api/calendar/ical/:tokenParam'], async (req, re
         `Statut Caution : ${r.statutCaution}`
       ].filter(Boolean);
 
-      const description = descLines.join('\\n');
+      const description = escapeICal(descLines.join('\n'));
 
       icalContent.push('BEGIN:VEVENT');
       icalContent.push(`UID:${uid}`);
       icalContent.push(`DTSTAMP:${formatDate(new Date())}T120000Z`);
       icalContent.push(`DTSTART;VALUE=DATE:${formatDate(start)}`);
-      icalContent.push(`DTEND;VALUE=DATE:${formatDate(end)}`);
+      icalContent.push(`DTEND;VALUE=DATE:${formatDate(endExclusive)}`);
       icalContent.push(`SUMMARY:${summary}`);
       icalContent.push(`DESCRIPTION:${description}`);
       icalContent.push('END:VEVENT');
@@ -9993,7 +9995,9 @@ app.get(['/api/calendar/ical', '/api/calendar/ical/:tokenParam'], async (req, re
     icalContent.push('END:VCALENDAR');
 
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="reservations.ics"');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(icalContent.join('\r\n'));
   } catch (error) {
     console.error("Erreur génération iCal :", error);
@@ -10391,13 +10395,24 @@ app.get('/api/calendar/ical/intervenant/:emailParam', async (req, res) => {
       }
     });
 
+    const escapeICal = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    };
+
     let icalContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'PRODID:-//Gite de la Maladrerie//Staff Calendar Sync//FR',
       'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
       'X-WR-CALNAME:Gîte de la Maladrerie - Mes Missions',
-      'X-WR-TIMEZONE:Europe/Paris'
+      'X-WR-TIMEZONE:Europe/Paris',
+      'X-PUBLISHED-TTL:PT15M',
+      'REFRESH-INTERVAL;VALUE=DURATION:PT15M'
     ];
 
     missions.forEach(m => {
@@ -10405,15 +10420,8 @@ app.get('/api/calendar/ical/intervenant/:emailParam', async (req, res) => {
       const start = m.date ? new Date(m.date) : new Date(reservation.dateDebut);
       const end = m.date ? new Date(m.date) : new Date(reservation.dateFin);
 
-      const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}${month}${day}`;
-      };
-
       const uid = `mission-${m.id}@gite-la-maladrerie.fr`;
-      const summary = `📌 MA MISSION : ${m.typeMission}`;
+      const summary = escapeICal(`📌 MISSION : ${m.typeMission}`);
       
       const clientName = reservation.client?.nom || 'Inconnu';
       let descLines = [
@@ -10426,20 +10434,22 @@ app.get('/api/calendar/ical/intervenant/:emailParam', async (req, res) => {
         `Statut Mission : ${m.statut}`
       ].filter(Boolean);
 
-      const description = descLines.join('\\n');
+      const description = escapeICal(descLines.join('\n'));
 
       icalContent.push('BEGIN:VEVENT');
       icalContent.push(`UID:${uid}`);
       icalContent.push(`DTSTAMP:${formatDate(new Date())}T120000Z`);
+
       if (m.date) {
         icalContent.push(`DTSTART;VALUE=DATE:${formatDate(start)}`);
-        const nextDay = new Date(start);
-        nextDay.setDate(start.getDate() + 1);
+        const nextDay = new Date(start.getTime() + 86400000);
         icalContent.push(`DTEND;VALUE=DATE:${formatDate(nextDay)}`);
       } else {
         icalContent.push(`DTSTART;VALUE=DATE:${formatDate(start)}`);
-        icalContent.push(`DTEND;VALUE=DATE:${formatDate(end)}`);
+        const endExclusive = new Date(end.getTime() + 86400000);
+        icalContent.push(`DTEND;VALUE=DATE:${formatDate(endExclusive)}`);
       }
+
       icalContent.push(`SUMMARY:${summary}`);
       icalContent.push(`DESCRIPTION:${description}`);
       icalContent.push('END:VEVENT');
@@ -10448,7 +10458,9 @@ app.get('/api/calendar/ical/intervenant/:emailParam', async (req, res) => {
     icalContent.push('END:VCALENDAR');
 
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="missions-${intervenant.prenom}.ics"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(icalContent.join('\r\n'));
   } catch (error) {
     console.error("Erreur génération iCal intervenant :", error);

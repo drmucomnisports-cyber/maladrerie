@@ -6113,25 +6113,34 @@ const Admin = () => {
             <p className="text-xs text-slate-500 mb-4 leading-relaxed">
               Vous pouvez afficher en temps réel toutes les réservations validées du gîte directement sur votre agenda personnel (Outlook, Google Agenda ou Apple Calendrier) en vous abonnant à ce flux.
             </p>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-2">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Lien d'abonnement iCal :</label>
-              <div className="flex gap-2">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Lien d'abonnement iCal (Google, Outlook, Mac, iPhone) :</label>
+              <div className="flex flex-wrap gap-2">
                 <input 
                   type="text" 
                   readOnly 
                   value={`${API_URL}/api/calendar/ical/MUC_MALADRERIE_SYNC`}
-                  className="flex-1 bg-white p-2.5 border border-slate-200 rounded-lg text-xs font-mono select-all outline-none"
+                  className="flex-1 min-w-[240px] bg-white p-2.5 border border-slate-200 rounded-lg text-xs font-mono select-all outline-none"
                 />
                 <button 
                   onClick={() => {
                     navigator.clipboard.writeText(`${API_URL}/api/calendar/ical/MUC_MALADRERIE_SYNC`);
-                    alert("Lien d'abonnement copié !");
+                    alert("Lien d'abonnement iCal copié dans le presse-papiers !");
                   }}
                   className="bg-muc-blue text-white px-4 py-2 text-xs font-bold rounded-lg hover:bg-blue-800 transition-all shadow-sm"
                 >
-                  Copier
+                  Copier le lien
                 </button>
+                <a 
+                  href={`${API_URL.replace(/^https?:/, 'webcal:')}/api/calendar/ical/MUC_MALADRERIE_SYNC`}
+                  className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all shadow-sm inline-flex items-center gap-1.5"
+                >
+                  <Calendar size={14} /> Synchroniser en 1-clic (Apple / Outlook)
+                </a>
               </div>
+              <p className="text-[11px] text-slate-500 italic mt-1">
+                💡 <strong>Conseil d'abonnement :</strong> Sur Google Calendar, collez ce lien dans "Autres agendas ➔ S'abonner à un agenda ➔ À partir de l'URL". Sur Mac / iPhone / Outlook, cliquez sur le bouton vert "Synchroniser en 1-clic". L'agenda se mettra à jour automatiquement toutes les 15 minutes.
+              </p>
               <div className="mt-3 pt-3 border-t border-slate-200">
                 <p className="text-xs font-bold text-slate-700 mb-1">Comment l'ajouter dans Outlook ?</p>
                 <ol className="text-[11px] text-slate-500 list-decimal list-inside space-y-1">
