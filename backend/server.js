@@ -7867,7 +7867,15 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
       });
     }
 
-    const typePaiement = type || (reservation.statutPaiement === 'ACOMPTE_PAYE' ? 'solde' : 'totalite');
+    const isAcomptePaid = reservation.statutPaiement === 'ACOMPTE_PAYE';
+    const amountAlreadyPaid = isAcomptePaid ? (reservation.montantAcompte || Math.round((reservation.prixTotal || 0) * 0.3 * 100) / 100) : 0;
+    const remainingBalance = reservation.montantSolde ? reservation.montantSolde : Math.max(0, Math.round(((reservation.prixTotal || 0) - amountAlreadyPaid) * 100) / 100);
+
+    let typePaiement = type || (isAcomptePaid ? 'solde' : 'totalite');
+    if (isAcomptePaid && typePaiement === 'totalite') {
+      typePaiement = 'solde';
+    }
+
     const paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${typePaiement}`;
 
     const nbPersonnes = reservation.occupants ? reservation.occupants.length : 0;
@@ -7886,13 +7894,22 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
     }
 
     let typeLabel = "votre acompte / solde";
-    if (typePaiement === 'acompte') typeLabel = "l'acompte (30%)";
-    else if (typePaiement === 'solde') typeLabel = "le solde (70%)";
-    else if (typePaiement === 'totalite') typeLabel = "la totalité (100%)";
+    let montantAPayer = reservation.prixTotal || 0;
+
+    if (typePaiement === 'acompte') {
+      typeLabel = "l'acompte (30%)";
+      montantAPayer = reservation.montantAcompte || Math.round((reservation.prixTotal || 0) * 0.3 * 100) / 100;
+    } else if (typePaiement === 'solde') {
+      typeLabel = isAcomptePaid ? "le solde restant" : "le solde (70%)";
+      montantAPayer = remainingBalance;
+    } else {
+      typeLabel = "la totalité (100%)";
+      montantAPayer = reservation.prixTotal || 0;
+    }
 
     await sendMail({
       to: reservation.client.email,
-      subject: "Lien de paiement pour votre réservation - Gîte de La Maladrerie",
+      subject: `Lien de paiement pour votre séjour - Gîte de La Maladrerie`,
       html: `
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
           <tr>
@@ -7906,11 +7923,11 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
                 <tr>
                   <td style="padding: 40px; color: #333333; line-height: 1.6;">
                     <h2 style="color: #004B93; margin-top: 0;">Bonjour ${reservation.client.nom},</h2>
-                    <p>Voici le lien pour finaliser le règlement de ${typeLabel} de votre réservation.</p>
+                    <p>Voici le lien pour finaliser le règlement de ${typeLabel} de votre séjour au Gîte de La Maladrerie.</p>
                     
                     <table width="100%" cellpadding="10" cellspacing="0" border="0" style="background-color: #f9f9f9; border-radius: 8px; margin: 25px 0;">
                       <tr>
-                        <td width="40%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Dates</td>
+                        <td width="45%" style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Dates du séjour</td>
                         <td style="border-bottom: 1px solid #eeeeee;">Du ${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}</td>
                       </tr>
                       <tr>
@@ -7919,12 +7936,27 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
                       </tr>
                       <tr>
                         <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Chambres</td>
-                        <td style="border-bottom: 1px solid #eeeeee;">${reservation.chambres.join(', ')}</td>
+                        <td style="border-bottom: 1px solid #eeeeee;">${(reservation.chambres || []).join(', ')}</td>
                       </tr>
                       <tr>
-                        <td style="font-weight: bold;">Montant total</td>
-                        <td style="font-size: 18px; font-weight: bold; color: #004B93;">${reservation.prixTotal ? reservation.prixTotal.toFixed(2) + ' €' : 'Non défini'}</td>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee;">Montant total du séjour</td>
+                        <td style="font-size: 15px; font-weight: bold; color: #004B93; border-bottom: 1px solid #eeeeee;">${(reservation.prixTotal || 0).toFixed(2)} €</td>
                       </tr>
+                      ${isAcomptePaid ? `
+                      <tr>
+                        <td style="font-weight: bold; border-bottom: 1px solid #eeeeee; color: #166534;">Acompte déjà versé</td>
+                        <td style="font-size: 15px; font-weight: bold; color: #166534; border-bottom: 1px solid #eeeeee;">- ${amountAlreadyPaid.toFixed(2)} €</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: bold; color: #d97706;">Solde restant à régler</td>
+                        <td style="font-size: 20px; font-weight: 900; color: #d97706;">${montantAPayer.toFixed(2)} €</td>
+                      </tr>
+                      ` : `
+                      <tr>
+                        <td style="font-weight: bold; color: #004B93;">Montant à régler (${typeLabel})</td>
+                        <td style="font-size: 20px; font-weight: 900; color: #004B93;">${montantAPayer.toFixed(2)} €</td>
+                      </tr>
+                      `}
                     </table>
                     
                     ${occupantsHTML}
@@ -7932,7 +7964,7 @@ app.post('/api/admin/reservations/:id/send-payment-link', checkAuth, async (req,
                     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
                       <tr>
                         <td align="center">
-                          <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Procéder au règlement</a>
+                          <a href="${paymentLink}" style="background-color: #FDB913; color: #004B93; padding: 18px 35px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; display: inline-block;">Procéder au règlement (${montantAPayer.toFixed(2)} €)</a>
                         </td>
                       </tr>
                     </table>

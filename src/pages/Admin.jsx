@@ -4744,45 +4744,64 @@ const Admin = () => {
         </div>
       )}
       {/* Modale Menu Paiement */}
-      {paymentMenuResId && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPaymentMenuResId(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-muc-blue p-6 text-white flex justify-between items-center">
-              <h3 className="text-xl font-black uppercase tracking-tight">Demander un paiement</h3>
-              <button onClick={() => setPaymentMenuResId(null)} className="text-white/70 hover:text-white">&times;</button>
-            </div>
-            <div className="p-6 space-y-3">
-              <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'acompte'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-muc-yellow/10 border-2 border-slate-100 hover:border-muc-yellow rounded-xl transition-all group">
-                <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-muc-yellow flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
-                  <CreditCard size={20} />
+      {paymentMenuResId && (() => {
+        const targetRes = reservations.find(r => r.id === paymentMenuResId);
+        const isAcomptePaid = targetRes && targetRes.statutPaiement === 'ACOMPTE_PAYE';
+        const alreadyPaid = targetRes ? (targetRes.montantAcompte || Math.round((targetRes.prixTotal || 0) * 0.3 * 100) / 100) : 0;
+        const soldeRestant = targetRes ? (targetRes.montantSolde || Math.max(0, Math.round(((targetRes.prixTotal || 0) - alreadyPaid) * 100) / 100)) : 0;
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPaymentMenuResId(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-muc-blue p-6 text-white flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Demander un paiement</h3>
+                  {targetRes && <p className="text-xs opacity-80 mt-0.5">Réservation #{targetRes.id} - {targetRes.client?.nom}</p>}
                 </div>
-                <div className="text-left flex-1">
-                  <span className="block font-bold text-slate-800">Les arrhes (30%)</span>
-                  <span className="block text-xs text-slate-500">Envoyer le lien d'acompte</span>
-                </div>
-              </button>
-              <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'solde'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-muc-blue/10 border-2 border-slate-100 hover:border-muc-blue rounded-xl transition-all group">
-                <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-muc-blue flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
-                  <CreditCard size={20} />
-                </div>
-                <div className="text-left flex-1">
-                  <span className="block font-bold text-slate-800">Le solde</span>
-                  <span className="block text-xs text-slate-500">Envoyer le lien du solde</span>
-                </div>
-              </button>
-              <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'totalite'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-emerald-500/10 border-2 border-slate-100 hover:border-emerald-500 rounded-xl transition-all group">
-                <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-emerald-500 flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
-                  <CreditCard size={20} />
-                </div>
-                <div className="text-left flex-1">
-                  <span className="block font-bold text-slate-800">La totalité (100%)</span>
-                  <span className="block text-xs text-slate-500">Envoyer le lien du montant total</span>
-                </div>
-              </button>
+                <button onClick={() => setPaymentMenuResId(null)} className="text-white/70 hover:text-white text-2xl font-bold">&times;</button>
+              </div>
+              <div className="p-6 space-y-3">
+                {isAcomptePaid && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed font-medium">
+                    💡 <strong>Acompte déjà réglé :</strong> {alreadyPaid.toFixed(2)} €<br/>
+                    <strong>Solde restant à percevoir :</strong> <span className="font-black text-amber-700">{soldeRestant.toFixed(2)} €</span>
+                  </div>
+                )}
+                
+                <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'acompte'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-muc-yellow/10 border-2 border-slate-100 hover:border-muc-yellow rounded-xl transition-all group">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-muc-yellow flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
+                    <CreditCard size={20} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <span className="block font-bold text-slate-800">Les arrhes (30%)</span>
+                    <span className="block text-xs text-slate-500">Envoyer le lien d'acompte</span>
+                  </div>
+                </button>
+
+                <button onClick={() => { triggerPaymentAction(paymentMenuResId, 'solde'); setPaymentMenuResId(null); }} className={`w-full flex items-center gap-3 p-4 border-2 rounded-xl transition-all group ${isAcomptePaid ? 'bg-amber-500/10 border-amber-500 hover:bg-amber-500/20' : 'bg-slate-50 hover:bg-muc-blue/10 border-slate-100 hover:border-muc-blue'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isAcomptePaid ? 'bg-amber-500 text-white' : 'bg-slate-200 group-hover:bg-muc-blue text-slate-500 group-hover:text-white'}`}>
+                    <CreditCard size={20} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <span className="block font-bold text-slate-800">{isAcomptePaid ? `Le solde restant (${soldeRestant.toFixed(2)} €)` : 'Le solde (70%)'}</span>
+                    <span className="block text-xs text-slate-500">{isAcomptePaid ? 'Recommandé (déduit l\'acompte)' : 'Envoyer le lien du solde'}</span>
+                  </div>
+                </button>
+
+                <button onClick={() => { triggerPaymentAction(paymentMenuResId, isAcomptePaid ? 'solde' : 'totalite'); setPaymentMenuResId(null); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-emerald-500/10 border-2 border-slate-100 hover:border-emerald-500 rounded-xl transition-all group">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 group-hover:bg-emerald-500 flex items-center justify-center text-slate-500 group-hover:text-white transition-colors">
+                    <CreditCard size={20} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <span className="block font-bold text-slate-800">{isAcomptePaid ? `Solde restant (${soldeRestant.toFixed(2)} €)` : 'La totalité (100%)'}</span>
+                    <span className="block text-xs text-slate-500">{isAcomptePaid ? 'Acompte déjà déduit' : 'Envoyer le lien du montant total'}</span>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modale Paiement Manuel */}
       {showManualPaymentModal && manualPaymentRes && (
