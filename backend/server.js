@@ -879,7 +879,7 @@ const sendCuisineEmailIfNeeded = async (reservationId) => {
     });
     mealDetailsHTML += '</ul>';
 
-    const cuisineEmail = process.env.CUISINE_EMAIL || process.env.ADMIN_EMAIL || 'cuisine@millau.fr';
+    const cuisineEmail = process.env.CUISINE_EMAIL || 'cuisine@millau.fr';
     
     await sendMail({
       to: cuisineEmail,
@@ -9181,7 +9181,7 @@ app.get('/api/cron/tax-report', async (req, res) => {
 // Envoi chaque jeudi à 11h (Paris) du récapitulatif des déjeuners et dîners pour la semaine suivante
 // ==========================================
 
-const executeWeeklyCuisineEmail = async () => {
+const executeWeeklyCuisineEmail = async (targetEmail = null) => {
   try {
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -9303,7 +9303,7 @@ const executeWeeklyCuisineEmail = async () => {
       </div>
     `;
 
-    const cuisineEmail = process.env.CUISINE_EMAIL || process.env.ADMIN_EMAIL || 'cuisine@millau.fr';
+    const cuisineEmail = targetEmail || process.env.CUISINE_EMAIL || 'cuisine@millau.fr';
     const ccEmails = 'david.roujet@mucomnisports.fr,philippe.morereau@mucomnisports.fr';
 
     await sendMail({
@@ -9313,8 +9313,8 @@ const executeWeeklyCuisineEmail = async () => {
       html: htmlContent
     });
 
-    console.log(`[Cron Cuisine] Récapitulatif envoyé avec succès pour la semaine du ${periodeLabel} (${clientBlocks.length} groupe(s)).`);
-    return { sent: true, groups: clientBlocks.length, period: periodeLabel };
+    console.log(`[Cron Cuisine] Récapitulatif envoyé avec succès à ${cuisineEmail} pour la semaine du ${periodeLabel} (${clientBlocks.length} groupe(s)).`);
+    return { sent: true, recipient: cuisineEmail, groups: clientBlocks.length, period: periodeLabel };
 
   } catch (error) {
     console.error('[Cron Cuisine] Erreur:', error);
@@ -9335,8 +9335,9 @@ app.get('/api/cron/cuisine', async (req, res) => {
 // Endpoint manuel pour déclencher l'envoi Cuisine depuis l'Espace Admin
 app.post('/api/admin/cron/cuisine', checkAuth, async (req, res) => {
   try {
-    const result = await executeWeeklyCuisineEmail();
-    res.json({ success: true, message: "E-mail de commande cuisine envoyé avec succès.", ...result });
+    const { targetEmail } = req.body || {};
+    const result = await executeWeeklyCuisineEmail(targetEmail);
+    res.json({ success: true, message: `E-mail de commande cuisine envoyé avec succès à ${result.recipient || 'la cuisine centrale'}.`, ...result });
   } catch (error) {
     console.error('Erreur déclenchement manuel cuisine:', error);
     res.status(500).json({ error: error.message });

@@ -246,6 +246,9 @@ const Admin = () => {
   const [showTaxReportModal, setShowTaxReportModal] = useState(false);
   const [taxReportSelectedMonth, setTaxReportSelectedMonth] = useState('ALL');
   const [taxReportSelectedYear, setTaxReportSelectedYear] = useState(new Date().getFullYear().toString());
+  const [showCuisineModal, setShowCuisineModal] = useState(false);
+  const [cuisineTargetEmail, setCuisineTargetEmail] = useState('cuisine@millau.fr');
+  const [isSendingCuisine, setIsSendingCuisine] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [expenseForm, setExpenseForm] = useState({
     label: '',
@@ -1861,6 +1864,32 @@ const Admin = () => {
     } catch (error) {
       console.error("Erreur lors de la restauration du devis:", error);
       alert("Une erreur est survenue lors de la restauration.");
+    }
+  };
+
+  const handleSendCuisineEmail = async () => {
+    setIsSendingCuisine(true);
+    try {
+      const response = await fetch(`${API_URL}/api/admin/cron/cuisine`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ targetEmail: cuisineTargetEmail })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        showFeedback(data.message || "E-mail de commande cuisine envoyé avec succès !");
+        setShowCuisineModal(false);
+      } else {
+        showFeedback(data.error || "Erreur lors de l'envoi de l'e-mail cuisine.", "error");
+      }
+    } catch (err) {
+      console.error("Erreur d'envoi e-mail cuisine:", err);
+      showFeedback("Erreur de connexion lors de l'envoi.", "error");
+    } finally {
+      setIsSendingCuisine(false);
     }
   };
 
@@ -4803,6 +4832,70 @@ const Admin = () => {
         );
       })()}
 
+      {/* Modale Commandes Repas Cuisine Centrale */}
+      {showCuisineModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setShowCuisineModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-amber-600 p-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                  <UtensilsCrossed size={20} /> Commandes Cuisine Centrale
+                </h3>
+                <p className="text-xs opacity-90 mt-1">Récapitulatif des déjeuners & dîners de la semaine prochaine</p>
+              </div>
+              <button onClick={() => setShowCuisineModal(false)} className="text-white/80 hover:text-white text-2xl font-bold">&times;</button>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 leading-relaxed font-medium">
+                ℹ️ <strong>Envoi automatique :</strong> Un e-mail est expédié automatiquement chaque <strong>jeudi à 11h</strong> pour la semaine suivante.<br/>
+                Vous pouvez également déclencher l'envoi manuellement ci-dessous vers l'adresse de la Cuisine Centrale.
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-2">Adresse E-mail Destinataire (Cuisine Centrale)</label>
+                <input 
+                  type="email"
+                  value={cuisineTargetEmail}
+                  onChange={(e) => setCuisineTargetEmail(e.target.value)}
+                  placeholder="ex: cuisine@millau.fr"
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl font-medium text-slate-800 focus:border-amber-500 focus:outline-none transition-colors"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Une copie (CC) est automatiquement transmise à David & Philippe.</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCuisineModal(false)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold uppercase rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={isSendingCuisine || !cuisineTargetEmail}
+                  onClick={handleSendCuisineEmail}
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSendingCuisine ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} />
+                      Envoi en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} />
+                      Envoyer à la Cuisine
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modale Paiement Manuel */}
       {showManualPaymentModal && manualPaymentRes && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -5795,13 +5888,23 @@ const Admin = () => {
                 <h2 className="text-xl font-black text-muc-blue uppercase tracking-tight">Planning Équipe & Missions</h2>
                 <p className="text-xs text-slate-500 mt-1">Consultez en temps réel les réservations, disponibilités et missions assignées aux intervenants.</p>
               </div>
-              <button 
-                onClick={fetchPlanningEvents}
-                disabled={loadingPlanning}
-                className="px-4 py-2 bg-muc-blue text-white rounded-lg hover:bg-muc-blue/90 transition-all text-sm font-bold flex items-center gap-2 shadow-sm"
-              >
-                {loadingPlanning ? "Chargement..." : "Rafraîchir"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setShowCuisineModal(true)}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-all text-sm font-bold flex items-center gap-2 shadow-sm"
+                  title="Envoyer ou vérifier les commandes de repas pour la Cuisine Centrale"
+                >
+                  <UtensilsCrossed size={16} /> Commandes Repas Cuisine
+                </button>
+                <button 
+                  onClick={fetchPlanningEvents}
+                  disabled={loadingPlanning}
+                  className="px-4 py-2 bg-muc-blue text-white rounded-lg hover:bg-muc-blue/90 transition-all text-sm font-bold flex items-center gap-2 shadow-sm"
+                >
+                  {loadingPlanning ? "Chargement..." : "Rafraîchir"}
+                </button>
+              </div>
             </div>
 
             {loadingPlanning ? (
