@@ -292,6 +292,27 @@ const generateCautionSessionUrl = async (prisma, reservation) => {
   return null;
 };
 
+const getValidatingAdminDetails = async (prisma, validePar) => {
+  let admin = null;
+  if (validePar && typeof validePar === 'string' && validePar.includes('@')) {
+    try {
+      if (prisma && prisma.adminAccount) {
+        admin = await prisma.adminAccount.findUnique({
+          where: { email: validePar }
+        });
+      }
+    } catch (err) {
+      console.error("Erreur getValidatingAdminDetails mailer:", err);
+    }
+  }
+  const isGeneric = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
+  return {
+    nom: isGeneric ? 'David Roujet' : admin.nom,
+    email: admin ? admin.email : 'david.roujet@mucomnisports.fr',
+    telephone: admin && admin.telephone && admin.telephone.trim() !== '' ? admin.telephone : '06 67 99 36 81'
+  };
+};
+
 const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, amount, balancePaymentLink = '') => {
   try {
     const isCaution = paymentType.toLowerCase() === 'caution';
@@ -299,6 +320,7 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
     const isSolde = paymentType.toLowerCase() === 'solde' || paymentType.toLowerCase() === 'totalite';
 
     let typeLabel = '';
+    let headerSubtitle = '';
     let descriptionText = '';
     let cgvReference = '';
     const soldeRestant = (reservation.prixTotal || 0) - amount;
@@ -313,10 +335,12 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
 
     if (isCaution) {
       typeLabel = 'Dépôt de garantie (Caution)';
+      headerSubtitle = 'Confirmation du dépôt de garantie (Caution)';
       descriptionText = `Une empreinte bancaire temporaire de <strong>${amount.toFixed(2)} €</strong> a été enregistrée à titre de caution. Aucun montant n'a été débité de votre compte.`;
       cgvReference = `Conformément à l'Article 10 de nos CGV, cette caution est destinée à couvrir les éventuels dommages, manquements au règlement intérieur, ou frais de ménage. Elle sera automatiquement annulée/libérée dans un délai de 30 jours maximum après votre départ.`;
     } else if (isAcompte) {
       typeLabel = "Acompte (30%)";
+      headerSubtitle = "Confirmation d'acompte (30%)";
       descriptionText = `Le paiement de l'acompte de 30% d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Vos dates de séjour sont désormais réservées.`;
       cgvReference = `Le solde restant de votre séjour (70%) d'un montant de <strong>${soldeRestant.toFixed(2)} €</strong> devra être réglé au plus tard 7 jours avant votre arrivée.`;
       if (balancePaymentLink) {
@@ -326,14 +350,17 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
       }
     } else if (isSoldeComplet) {
       typeLabel = "Solde du séjour";
+      headerSubtitle = "Confirmation de règlement du solde";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Votre réservation est désormais entièrement payée !`;
       cgvReference = `Avant votre entrée dans les lieux, il vous est demandé d'effectuer l'empreinte bancaire pour le dépôt de garantie (caution de 500 € - aucun débit). ${cautionButtonUrl ? 'Vous pouvez la réaliser dès maintenant ci-dessous.' : ''}`;
     } else if (isSoldePartiel) {
       typeLabel = "Solde du séjour (Règlement partiel)";
+      headerSubtitle = "Confirmation de règlement partiel du solde";
       descriptionText = `Le paiement du solde de votre séjour d'un montant de <strong>${amount.toFixed(2)} €</strong> a été validé. Attention : l'acompte de <strong>${(reservation.montantAcompte || 0).toFixed(2)} €</strong> reste à régler.`;
       cgvReference = `Pour confirmer définitivement votre réservation, merci de procéder également au règlement de l'acompte de <strong>${(reservation.montantAcompte || 0).toFixed(2)} €</strong>.`;
     }
 
+    const adminDetails = await getValidatingAdminDetails(prisma, reservation.validePar);
     const dDebut = new Date(reservation.dateDebut).toLocaleDateString('fr-FR');
     const dFin = new Date(reservation.dateFin).toLocaleDateString('fr-FR');
 
@@ -360,7 +387,7 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
           <!-- En-tête -->
           <div style="background-color: #004B93; padding: 25px; text-align: center;">
             <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.5px;">Gîte de La Maladrerie</h1>
-            <p style="color: #93c5fd; margin: 5px 0 0 0; font-size: 14px;">Confirmation de ${typeLabel}</p>
+            <p style="color: #93c5fd; margin: 5px 0 0 0; font-size: 14px;">${headerSubtitle}</p>
           </div>
 
           <!-- Corps -->
@@ -446,9 +473,11 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
 
           <!-- Pied de page -->
           <div style="background-color: #f1f5f9; padding: 20px; text-align: center; color: #64748b; font-size: 12px;">
-            <p style="margin: 0 0 10px 0;"><strong>MUC Omnisports - Gîte de la Maladrerie</strong></p>
-            <p style="margin: 0 0 5px 0;">Complexe Sportif Albert Batteux, Rue de la Maladrerie, 34000 Montpellier</p>
-            <p style="margin: 0;"><a href="mailto:david.roujet@mucomnisports.fr" style="color: #004B93; text-decoration: none;">david.roujet@mucomnisports.fr</a> | 04 99 58 35 35</p>
+            <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>MUC Omnisports - Gîte de la Maladrerie</strong></p>
+            <p style="margin: 0 0 6px 0;">📍 Av. Louis Balsan, 12100 Millau</p>
+            <p style="margin: 0;">
+              ${adminDetails.nom ? `<strong>${adminDetails.nom}</strong> : ` : ''}<a href="mailto:${adminDetails.email}" style="color: #004B93; text-decoration: none;">${adminDetails.email}</a>${adminDetails.telephone ? ` | 📞 <a href="tel:${adminDetails.telephone.replace(/\s+/g, '')}" style="color: #004B93; text-decoration: none;">${adminDetails.telephone}</a>` : ''}
+            </p>
           </div>
         </div>
       `;
@@ -456,9 +485,13 @@ const sendPaymentConfirmationEmails = async (prisma, reservation, paymentType, a
       // N'inclure les PJ que s'il ne s'agit pas d'un simple dépôt de caution
       const attachments = !isCaution ? getClientAttachments() : undefined;
 
+      const emailSubject = isAcompte 
+        ? `✅ Confirmation d'acompte (30%) - Gîte de la Maladrerie` 
+        : `✅ Confirmation de paiement : ${typeLabel} - Gîte de la Maladrerie`;
+
       await sendMail({
         to: reservation.client.email,
-        subject: `✅ Confirmation de paiement : ${typeLabel} - Gîte de la Maladrerie`,
+        subject: emailSubject,
         html: emailHtml,
         attachments
       });

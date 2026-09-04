@@ -18,6 +18,7 @@ const MentionsLegales = () => {
             <p>Le présent site internet est édité par l'association MUC Omnisports.</p>
             <ul className="mt-4 space-y-2 list-disc list-inside">
               <li><strong>Siège social :</strong> 150 rue François Joseph Gossec - Complexe Sportif Albert Batteux, 34070 Montpellier.</li>
+              <li><strong>Adresse du Gîte :</strong> Av. Louis Balsan, 12100 Millau.</li>
               <li><strong>Téléphone :</strong> 04 99 58 35 35.</li>
               <li><strong>Email :</strong> administration@mucomnisports.fr.</li>
               <li><strong>SIRET :</strong> 38820857100025.</li>

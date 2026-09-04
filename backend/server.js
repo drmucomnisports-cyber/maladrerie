@@ -1014,9 +1014,13 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
       const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
       const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
+      const emailSubject = isAcompte 
+        ? `Confirmation d'acompte (30%) - Gîte de la Maladrerie` 
+        : `Confirmation de paiement - ${typeLabel} - Gîte de la Maladrerie`;
+
       await sendMail({
         to: reservation.client.email,
-        subject: `Confirmation de paiement - ${typeLabel} - Gîte de la Maladrerie`,
+        subject: emailSubject,
         attachments: !isCaution ? getClientAttachments() : undefined,
         html: `
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
@@ -1416,7 +1420,8 @@ async function getAdminSignatureHTML(validePar) {
       <p style="margin: 0 0 5px 0; color: #666666; font-size: 12px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">Votre conseiller pour ce séjour :</p>
       <p style="margin: 0 0 3px 0; font-weight: bold; color: #004B93; font-size: 16px;">${details.nom}</p>
       <p style="margin: 0 0 3px 0;">✉ Email : <a href="mailto:${details.email}" style="color: #004B93; text-decoration: none;">${details.email}</a></p>
-      <p style="margin: 0;">📞 Tél : <a href="tel:${details.telephone.replace(/\s+/g, '')}" style="color: #004B93; text-decoration: none;">${details.telephone}</a></p>
+      <p style="margin: 0 0 8px 0;">📞 Tél : <a href="tel:${details.telephone.replace(/\s+/g, '')}" style="color: #004B93; text-decoration: none;">${details.telephone}</a></p>
+      <p style="margin: 0; font-size: 12px; color: #888888;">📍 Gîte de la Maladrerie - Av. Louis Balsan, 12100 Millau</p>
     </div>
   `;
 }
