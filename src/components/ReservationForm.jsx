@@ -173,7 +173,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       
       const overlappingDevis = events.filter(e => {
         // Assume events mapped from backend include 'statut'
-        if (e.statut !== 'DEVIS_EN_ATTENTE') return false;
+        if (e.statut !== 'DEVIS_EN_ATTENTE' && e.statut !== 'DEVIS') return false;
         const eStart = new Date(e.start);
         const eEnd = new Date(e.end);
         return (start < eEnd && end > eStart);
@@ -219,6 +219,19 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       events.forEach(event => {
         if (existingReservation && (event.id === existingReservation.id || event.id === `res-${existingReservation.id}`)) return;
         
+        // Ignorer les statuts inactifs (annulés, expirés, refusés)
+        const inactiveStatuses = [
+          'DEVIS_ANNULE',
+          'DEVIS_EXPIRE',
+          'DEVIS_REFUSE',
+          'ANNULE',
+          'ANNULEE',
+          'REFUSE',
+          'REFUSEE',
+          'EXPIRE'
+        ];
+        if (event.statut && inactiveStatuses.includes(event.statut)) return;
+
         const evStart = new Date(event.start);
         const evEnd = new Date(event.end);
 

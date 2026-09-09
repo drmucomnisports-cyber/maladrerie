@@ -4609,7 +4609,9 @@ const Admin = () => {
             </div>
             <div className="p-6">
               <ReservationForm
-                events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres, statut: r.statut }))}
+                events={reservations
+                  .filter(r => !['DEVIS_ANNULE', 'DEVIS_EXPIRE', 'DEVIS_REFUSE', 'ANNULE', 'ANNULEE', 'REFUSE', 'REFUSEE', 'EXPIRE'].includes(r.statut))
+                  .map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres, statut: r.statut }))}
                 isAdmin={true}
                 isDevis={activeTab === 'devis'}
                 onCreated={() => { setShowAddModal(false); fetchReservations(); }}
@@ -4651,7 +4653,9 @@ const Admin = () => {
             </div>
             <div className="p-6">
               <ReservationForm
-                events={reservations.map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres, statut: r.statut }))}
+                events={reservations
+                  .filter(r => !['DEVIS_ANNULE', 'DEVIS_EXPIRE', 'DEVIS_REFUSE', 'ANNULE', 'ANNULEE', 'REFUSE', 'REFUSEE', 'EXPIRE'].includes(r.statut))
+                  .map(r => ({ id: r.id, start: r.dateDebut, end: r.dateFin, chambres: r.chambres, statut: r.statut }))}
                 isAdmin={true}
                 isDevis={editingReservation.statut?.includes('DEVIS')}
                 existingReservation={editingReservation}
