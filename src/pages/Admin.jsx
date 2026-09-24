@@ -243,6 +243,7 @@ const Admin = () => {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showFinanceModal, setShowFinanceModal] = useState(false);
   const [financeModalData, setFinanceModalData] = useState({ title: '', code: '', total: 0, items: [] });
+  const [isValidatingVirement, setIsValidatingVirement] = useState(null);
   const [showTaxReportModal, setShowTaxReportModal] = useState(false);
   const [taxReportSelectedMonth, setTaxReportSelectedMonth] = useState('ALL');
   const [taxReportSelectedYear, setTaxReportSelectedYear] = useState(new Date().getFullYear().toString());
@@ -1613,6 +1614,30 @@ const Admin = () => {
       alert("❌ Une erreur réseau est survenue.");
     } finally {
       setIsSendingTaxReport(false);
+    }
+  };
+
+  const handleValidatePendingVirement = async (virement) => {
+    if (!window.confirm(`Confirmez-vous avoir reçu le virement de ${virement.montant.toFixed(2)} € (Réf: ${virement.reference}) pour la réservation #${virement.id} (${virement.clientNom}) ?\n\nCela confirmera la réservation et notifiera le client ainsi que la comptabilité.`)) {
+      return;
+    }
+
+    setIsValidatingVirement(virement.id);
+    try {
+      const res = await fetch(`${API_URL}/api/payment/virement/validate-by-link?token=${encodeURIComponent(virement.tokenModification)}&type=${encodeURIComponent(virement.typeAttendu)}&confirm=1`);
+      if (res.ok) {
+        alert(`✅ Virement de ${virement.montant.toFixed(2)} € validé avec succès pour ${virement.clientNom} !`);
+        await fetchFinances();
+        if (typeof fetchReservations === 'function') await fetchReservations();
+        setShowFinanceModal(false);
+      } else {
+        alert("Une erreur est survenue lors de la validation du virement.");
+      }
+    } catch (err) {
+      console.error("Erreur validation virement:", err);
+      alert("Erreur de connexion au serveur.");
+    } finally {
+      setIsValidatingVirement(null);
     }
   };
 
@@ -3567,6 +3592,7 @@ const Admin = () => {
         let rInterne = 0;
         let rListInterne = [];
         let rVirement = 0;
+        let rListVirement = [];
         let rStripe = 0;
         let rAutres = 0;
 
@@ -3591,6 +3617,18 @@ const Admin = () => {
                 });
             } else if (m === 'VIREMENT') {
                 rVirement += paye;
+                rListVirement.push({
+                    id: r.id,
+                    date: r.date || r.createdAt,
+                    label: `Résa #${r.id} - ${clientLabel}`,
+                    montant: paye,
+                    statut: r.typePaiement,
+                    modePaiement: r.modePaiement,
+                    hebergement: r.partHebergement || 0,
+                    restauration: r.partRestauration || 0,
+                    salles: r.partSalles || 0,
+                    taxeSejour: r.partTaxeSejour || 0
+                });
             } else if (m.includes('STRIPE') || m.includes('CB') || m.includes('CARTE')) {
                 rStripe += paye;
             } else {
@@ -3851,14 +3889,28 @@ const Admin = () => {
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 flex flex-col justify-between">
+                        <div 
+                            onClick={() => openModal("VIREMENT", "Règlements par Virement Bancaire (Crédit Mutuel)", rVirement, rListVirement)}
+                            className="p-4 rounded-xl bg-blue-50/80 hover:bg-blue-100/90 border-2 border-blue-300 flex flex-col justify-between cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md group"
+                        >
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-black uppercase tracking-wider text-blue-900">🏦 Virements</span>
-                                <span className="text-lg">🏦</span>
+                                <span className="text-xs font-black uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                                    🏦 Virements
+                                </span>
+                                {(finances?.virementsEnAttente || []).length > 0 ? (
+                                    <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1 animate-pulse">
+                                        ⏳ {(finances?.virementsEnAttente || []).length} en attente
+                                    </span>
+                                ) : (
+                                    <span className="text-lg">🏦</span>
+                                )}
                             </div>
                             <div className="mt-3">
                                 <span className="text-2xl font-black text-blue-800">{rVirement.toFixed(2)} €</span>
-                                <p className="text-[11px] text-blue-600 font-semibold mt-0.5">Comptes bancaires</p>
+                                <p className="text-[11px] text-blue-700 font-bold mt-0.5 flex items-center justify-between">
+                                    <span>Comptes bancaires ({rListVirement.length} reçu{rListVirement.length > 1 ? 's' : ''})</span>
+                                    <span className="text-blue-600 group-hover:translate-x-0.5 transition-transform text-xs">Gérer ➔</span>
+                                </p>
                             </div>
                         </div>
 
@@ -6537,15 +6589,25 @@ const Admin = () => {
                 <X size={24} />
               </button>
               <div className="mb-6">
-                  <span className={`px-3 py-1 rounded-md text-xs font-black tracking-widest uppercase mr-3 ${financeModalData.code === "7088" ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-600"}`}>
-                    {financeModalData.code === "7088" ? "Refacturation Interne" : `Compte ${financeModalData.code}`}
+                  <span className={`px-3 py-1 rounded-md text-xs font-black tracking-widest uppercase mr-3 ${
+                    financeModalData.code === "7088" ? "bg-purple-100 text-purple-800" :
+                    financeModalData.code === "VIREMENT" ? "bg-blue-100 text-blue-800" :
+                    "bg-slate-100 text-slate-600"
+                  }`}>
+                    {financeModalData.code === "7088" ? "Refacturation Interne" :
+                     financeModalData.code === "VIREMENT" ? "Virements Bancaires (Crédit Mutuel)" :
+                     `Compte ${financeModalData.code}`}
                   </span>
                   <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter inline-block">{financeModalData.title}</h3>
                   <div className="flex flex-wrap items-center gap-3 mt-2">
-                    <p className={`text-xl font-bold ${financeModalData.code === "7088" ? "text-purple-900" : "text-muc-blue"}`}>
-                      Total : {financeModalData.total.toFixed(2)} €
+                    <p className={`text-xl font-bold ${
+                      financeModalData.code === "7088" ? "text-purple-900" :
+                      financeModalData.code === "VIREMENT" ? "text-blue-900" :
+                      "text-muc-blue"
+                    }`}>
+                      {financeModalData.code === "VIREMENT" ? "Total Encaissé : " : "Total : "}{financeModalData.total.toFixed(2)} €
                     </p>
-                    {financeModalData.code !== "7088" && (() => {
+                    {financeModalData.code !== "7088" && financeModalData.code !== "VIREMENT" && (() => {
                       const totalInterne = (financeModalData.items || [])
                         .filter(i => (i.modePaiement || '').toUpperCase() === 'INTERNE')
                         .reduce((sum, i) => sum + (i.montant || 0), 0);
@@ -6560,6 +6622,108 @@ const Admin = () => {
                     })()}
                   </div>
               </div>
+
+              {financeModalData.code === "VIREMENT" && (
+                <div className="space-y-4 mb-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-blue-900">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-black text-sm uppercase tracking-wide flex items-center gap-2">
+                        🏦 Rapprochement & Validation des Virements Bancaires
+                      </span>
+                      <span className="bg-blue-200/80 text-blue-900 text-xs font-black px-2.5 py-0.5 rounded-md uppercase">
+                        Crédit Mutuel
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed font-medium">
+                      Ce tableau permet à l'équipe comptable (Valérie & Johanna) et aux administrateurs de rapprocher les virements bancaires avec les réservations du gîte. Dès qu'un virement apparaît sur le relevé bancaire avec sa référence, cliquez sur « Valider la réception du virement » pour enregistrer l'encaissement et notifier le client.
+                    </p>
+                  </div>
+
+                  {(() => {
+                    const enAttente = finances?.virementsEnAttente || [];
+                    const totalAttendu = enAttente.reduce((s, v) => s + (v.montant || 0), 0);
+                    return (
+                      <div className="bg-amber-50/70 border border-amber-300 rounded-2xl p-4">
+                        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">⏳</span>
+                            <div>
+                              <h4 className="font-black text-amber-950 text-xs uppercase tracking-wider">
+                                Intentions de virement en attente de réception sur le compte ({enAttente.length})
+                              </h4>
+                              <p className="text-[11px] text-amber-800 font-medium">
+                                Références à identifier sur le relevé Crédit Mutuel du gîte
+                              </p>
+                            </div>
+                          </div>
+                          <span className="font-black text-amber-900 text-sm bg-amber-100 px-3 py-1 rounded-xl border border-amber-300">
+                            Total à recevoir : {totalAttendu.toFixed(2)} €
+                          </span>
+                        </div>
+
+                        {enAttente.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
+                            {enAttente.map((v) => (
+                              <div key={v.id} className="bg-white border-2 border-amber-200 hover:border-amber-400 rounded-xl p-3.5 shadow-sm flex flex-col justify-between gap-3 transition-colors">
+                                <div>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <div className="font-black text-slate-800 text-sm">
+                                        {v.clientNom} {v.structure && <span className="text-slate-500 font-normal">({v.structure})</span>}
+                                      </div>
+                                      <div className="text-xs text-slate-500">
+                                        Résa <strong>#{v.id}</strong> • Du {new Date(v.dateDebut).toLocaleDateString('fr-FR')} au {new Date(v.dateFin).toLocaleDateString('fr-FR')}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-base font-black text-muc-blue">
+                                        {v.montant.toFixed(2)} €
+                                      </div>
+                                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                        {v.labelType}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                    <span className="text-slate-500 font-semibold text-[11px]">Réf. sur relevé :</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <code className="bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                                        {v.reference}
+                                      </code>
+                                      <button
+                                        type="button"
+                                        onClick={() => { navigator.clipboard.writeText(v.reference); alert(`Référence ${v.reference} copiée !`); }}
+                                        className="text-[10px] text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded font-bold"
+                                        title="Copier la référence"
+                                      >
+                                        Copier
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={isValidatingVirement === v.id}
+                                  onClick={() => handleValidatePendingVirement(v)}
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider py-2 px-3 rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5"
+                                >
+                                  {isValidatingVirement === v.id ? 'Validation en cours...' : '✅ Valider la réception du virement'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="bg-white border border-amber-200 rounded-xl p-3 text-center text-xs text-amber-800 italic">
+                            Aucun virement en attente d'encaissement actuellement. Tous les règlements par virement déclarés sont validés.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
               {financeModalData.code === "7088" && (
                 <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 mb-6 text-purple-900">
@@ -6691,6 +6855,14 @@ const Admin = () => {
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Statut</th>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Total Réglé</th>
                                 </>
+                              ) : financeModalData.code === "VIREMENT" ? (
+                                <>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Héberg.</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Repas</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Salles</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Statut</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Virement Encaissé</th>
+                                </>
                               ) : financeModalData.code === "447" ? (
                                 <>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Nuits</th>
@@ -6732,6 +6904,20 @@ const Admin = () => {
                                         </span>
                                       </td>
                                       <td className="p-3 font-black text-right text-purple-900">
+                                        {(item.montant || 0).toFixed(2)} €
+                                      </td>
+                                    </>
+                                  ) : financeModalData.code === "VIREMENT" ? (
+                                    <>
+                                      <td className="p-3 text-right text-slate-700 font-semibold">{item.hebergement ? `${item.hebergement.toFixed(2)} €` : '-'}</td>
+                                      <td className="p-3 text-right text-slate-700 font-semibold">{item.restauration ? `${item.restauration.toFixed(2)} €` : '-'}</td>
+                                      <td className="p-3 text-right text-slate-700 font-semibold">{item.salles ? `${item.salles.toFixed(2)} €` : '-'}</td>
+                                      <td className="p-3 text-center text-xs">
+                                        <span className="bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full text-[11px]">
+                                          {item.statut || 'PAYÉ'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 font-black text-right text-blue-900">
                                         {(item.montant || 0).toFixed(2)} €
                                       </td>
                                     </>
@@ -6790,7 +6976,7 @@ const Admin = () => {
                             );
                           }) : (
                               <tr>
-                                  <td colSpan={financeModalData.code === "7088" ? 7 : financeModalData.code === "447" ? 7 : 4} className="p-8 text-center text-slate-400 italic">Aucune transaction trouvée.</td>
+                                  <td colSpan={(financeModalData.code === "7088" || financeModalData.code === "VIREMENT") ? 7 : financeModalData.code === "447" ? 7 : 4} className="p-8 text-center text-slate-400 italic">Aucune transaction trouvée.</td>
                               </tr>
                           )}
                       </tbody>

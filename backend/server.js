@@ -540,7 +540,12 @@ const sendMail = async (options) => {
 
   if (useApi) {
     try {
-      const toEmails = options.to.split(',').map(email => ({ email: email.trim() }));
+      const uniqueTo = Array.from(new Set(
+        options.to.split(',')
+          .map(e => e.trim().toLowerCase())
+          .filter(e => e && e.includes('@'))
+      ));
+      const toEmails = uniqueTo.map(email => ({ email }));
       
       const emailPayload = {
         subject: options.subject,
@@ -561,11 +566,18 @@ const sendMail = async (options) => {
       };
 
       if (options.cc) {
-        emailPayload.cc = options.cc.split(',').map(email => ({ email: email.trim() }));
+        const uniqueCc = Array.from(new Set(
+          options.cc.split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(e => e && e.includes('@') && !uniqueTo.includes(e))
+        ));
+        if (uniqueCc.length > 0) {
+          emailPayload.cc = uniqueCc.map(email => ({ email }));
+        }
       }
 
       await brevo.transactionalEmails.sendTransacEmail(emailPayload);
-      console.log(`Email envoyé via API Brevo avec succès à : ${options.to}${options.cc ? ' (CC: ' + options.cc + ')' : ''}`);
+      console.log(`Email envoyé via API Brevo avec succès à : ${uniqueTo.join(', ')}${emailPayload.cc ? ' (CC: ' + emailPayload.cc.map(c => c.email).join(', ') + ')' : ''}`);
       return;
     } catch (error) {
       console.error("Erreur lors de l'envoi de l'email via API Brevo:", error.message || error);
@@ -4332,18 +4344,21 @@ app.post('/api/devis/validate/:token', async (req, res) => {
         `
       });
 
-      // Envoyer un mail de notification à l'admin pour le virement
+      // Envoyer un mail de notification à l'admin et aux comptables pour l'intention de virement
       const targetAdminEmail = await getAdminEmailsForPreference('notifDevisValidation', ['david.roujet@mucomnisports.fr']);
-      const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr`;
+      const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr`;
+      const virementType = (montantSolde === 0 || devis.prixTotal <= montantAcompte) ? 'totalite' : 'acompte';
+      const labelType = virementType === 'totalite' ? 'Règlement total' : 'Acompte (30% Hébergement + Repas)';
+
       await sendMail({
         to: recipientEmails,
-        subject: `🏦 [VIREMENT DEVIS] ${devis.structure ? devis.structure + ' / ' : ''}${devis.client.nom} - Devis ${devis.numeroDevis} - ${montantAcompte.toFixed(2)} €`,
+        subject: `🏦 [INTENTION DE VIREMENT] Devis ${devis.numeroDevis} - ${devis.structure ? devis.structure + ' / ' : ''}${devis.client.nom} - ${montantAcompte.toFixed(2)} €`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
             <!-- Header banner with logo text / colors -->
             <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
-              <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
-              <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">🏦 Devis validé par virement</h2>
+              <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie - Comptabilité</span>
+              <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">🏦 Intention de Virement Déclarée (Devis)</h2>
             </div>
             
             <div style="padding: 24px;">
@@ -4351,15 +4366,15 @@ app.post('/api/devis/validate/:token', async (req, res) => {
                 Bonjour,
               </p>
               <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-                Le devis <strong>${devis.numeroDevis}</strong> du client <strong>${devis.client.nom}</strong>${devis.structure ? ` (Structure: <strong>${devis.structure}</strong>)` : ''} a été validé avec succès par virement bancaire.
+                Le client <strong>${devis.client.nom}</strong>${devis.structure ? ` (Structure: <strong>${devis.structure}</strong>)` : ''} a signé et validé son devis <strong>${devis.numeroDevis}</strong> avec choix de <strong>règlement par virement bancaire</strong>.
               </p>
 
-              <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
-                <h4 style="margin: 0 0 15px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Informations du Virement :</h4>
+              <div style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
+                <h4 style="margin: 0 0 12px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails à rapprocher sur le compte bancaire :</h4>
                 <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
                   <tr>
-                    <td width="40%" style="padding: 6px 0; color: #64748b; font-weight: bold;">Client :</td>
-                    <td style="padding: 6px 0; font-weight: bold;">${devis.client.nom}</td>
+                    <td width="42%" style="padding: 6px 0; color: #64748b; font-weight: bold;">Client :</td>
+                    <td style="padding: 6px 0; font-weight: bold;">${devis.client.nom} (${devis.client.email || 'N/A'})</td>
                   </tr>
                   ${devis.structure ? `
                   <tr>
@@ -4368,32 +4383,37 @@ app.post('/api/devis/validate/:token', async (req, res) => {
                   </tr>
                   ` : ''}
                   <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">N° Devis :</td>
-                    <td style="padding: 6px 0; font-weight: bold; font-family: monospace;">${devis.numeroDevis}</td>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">N° Devis / Résa :</td>
+                    <td style="padding: 6px 0; font-weight: bold; font-family: monospace;">Devis ${devis.numeroDevis} (Résa #${devis.id})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Acompte attendu :</td>
-                    <td style="padding: 6px 0; font-weight: 800; color: #004B93; font-size: 15px;">${montantAcompte.toFixed(2)} €</td>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Montant attendu :</td>
+                    <td style="padding: 6px 0; font-weight: 800; color: #004B93; font-size: 16px;">${montantAcompte.toFixed(2)} € <span style="font-size: 12px; font-weight: normal; color: #64748b;">(${labelType})</span></td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Référence obligatoire :</td>
-                    <td style="padding: 6px 0;"><span style="font-weight: bold; color: #b45309; background-color: #fef3c7; padding: 3px 8px; border-radius: 4px; border: 1px solid #fde68a; font-family: monospace;">${uniqueRef}</span></td>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Référence sur le relevé :</td>
+                    <td style="padding: 6px 0;"><span style="font-weight: bold; color: #b45309; background-color: #fef3c7; padding: 3px 8px; border-radius: 4px; border: 1px solid #fde68a; font-family: monospace; font-size: 13px;">${uniqueRef}</span></td>
                   </tr>
                 </table>
               </div>
 
-              <p style="font-size: 14px; line-height: 1.6; color: #475569; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
-                💡 <strong>Action attendue :</strong> Veuillez surveiller votre compte bancaire pour réceptionner ce virement. Une fois reçu, cliquez sur le bouton ci-dessous pour valider le virement directement dans le système, ou accédez au Tableau de Bord.
-              </p>
+              <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 14px; margin-bottom: 24px;">
+                <p style="font-size: 13px; line-height: 1.5; color: #065f46; margin: 0;">
+                  📢 <strong>Pour la comptabilité (Valérie & Johanna) :</strong><br/>
+                  Dès que vous constatez la réception de ce virement de <strong>${montantAcompte.toFixed(2)} €</strong> sur le compte bancaire du gîte (Crédit Mutuel), cliquez sur le bouton vert ci-dessous pour valider l'encaissement. Le système confirmera automatiquement la réservation au client et mettra à jour la comptabilité.
+                </p>
+              </div>
               
-              <p style="text-align: center; margin-top: 25px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-                <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${tokenModification}&type=acompte" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">✅ Valider le paiement (Marquer comme payé)</a>
-                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2); margin-top: 10px;">Accéder au Tableau de Bord Admin</a>
+              <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
+                <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${tokenModification}&type=${virementType}" style="background-color: #059669; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 800; display: inline-block; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(5, 150, 105, 0.25);">✅ Valider la réception du virement</a>
+              </p>
+              <p style="text-align: center; margin-top: 10px;">
+                <a href="${FRONTEND_URL}/admin" style="color: #004B93; font-size: 12px; font-weight: bold; text-decoration: underline;">Accéder au Tableau de Bord Admin</a>
               </p>
             </div>
             
-            <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
-              Cet e-mail automatique est envoyé par le système de réservation du Gîte de la Maladrerie.
+            <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+              Notification comptable automatique - Gîte de la Maladrerie (MUC Omnisports)
             </div>
           </div>
         `
@@ -6139,6 +6159,61 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
     caStripe = Math.round(caStripe * 100) / 100;
     caAutres = Math.round(caAutres * 100) / 100;
 
+    // 8. Intentions de virement en attente d'encaissement / validation
+    const virementsEnAttenteRaw = await prisma.reservation.findMany({
+      where: {
+        modePaiement: 'VIREMENT',
+        statutPaiement: { not: 'PAYE' },
+        statut: { not: 'ANNULE' }
+      },
+      include: { client: true },
+      orderBy: { dateDebut: 'asc' }
+    });
+
+    const virementsEnAttente = virementsEnAttenteRaw.map(r => {
+      let typeAttendu = 'acompte';
+      let montantAttendu = 0;
+      let labelType = '';
+
+      if (r.statutPaiement === 'ACOMPTE_PAYE') {
+        typeAttendu = 'solde';
+        montantAttendu = r.montantSolde ? r.montantSolde : (r.prixTotal - (r.montantAcompte || 0));
+        labelType = 'Solde (70%)';
+      } else {
+        const repasTotal = calculerTotalRepasServeur(r.repas);
+        const montantHebergement = Math.max(0, r.prixTotal - repasTotal);
+        const acompteTheorique = Math.round((montantHebergement * 0.3 + repasTotal) * 100) / 100;
+
+        if (r.montantSolde === 0 || (r.montantAcompte && r.montantAcompte >= r.prixTotal)) {
+          typeAttendu = 'totalite';
+          montantAttendu = r.prixTotal;
+          labelType = 'Totalité (100%)';
+        } else {
+          typeAttendu = 'acompte';
+          montantAttendu = r.montantAcompte || acompteTheorique;
+          labelType = 'Acompte (30% Héberg. + Repas)';
+        }
+      }
+
+      return {
+        id: r.id,
+        clientNom: r.client?.nom || 'Inconnu',
+        clientEmail: r.client?.email || '',
+        clientTelephone: r.client?.telephone || '',
+        structure: r.structure || '',
+        dateDebut: r.dateDebut,
+        dateFin: r.dateFin,
+        statutPaiement: r.statutPaiement,
+        statut: r.statut,
+        typeAttendu,
+        labelType,
+        montant: Math.round(montantAttendu * 100) / 100,
+        prixTotal: r.prixTotal,
+        reference: `MUC-${r.id}-${typeAttendu.toUpperCase()}`,
+        tokenModification: r.tokenModification
+      };
+    });
+
     res.json({
       caEnquaisse,
       caHebergementEncaisse,
@@ -6155,7 +6230,8 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
       repasCoutsDetailles,
       totalCoutRepasCalcules,
       recettesDetaillees,
-      missionsDetails
+      missionsDetails,
+      virementsEnAttente
     });
 
   } catch (error) {
@@ -6887,18 +6963,18 @@ app.post('/api/payment/virement/:token', async (req, res) => {
       `
     });
 
-    // Send email to admin
+    // Send email to admin & accounting team (Valérie Hostein, Johanna Journet, David Roujet)
     const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['david.roujet@mucomnisports.fr']);
-    const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr`;
+    const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr`;
     await sendMail({
       to: recipientEmails,
-      subject: `🏦 [VIREMENT INTENTION] ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client.nom} - ${amount.toFixed(2)} €`,
+      subject: `🏦 [INTENTION DE VIREMENT] ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client.nom} - ${amount.toFixed(2)} € (Résa #${reservation.id})`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); background-color: #ffffff;">
           <!-- Header banner with logo text / colors -->
           <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
             <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
-            <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">🏦 Intention de virement</h2>
+            <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">🏦 Intention de règlement par virement</h2>
           </div>
           
           <div style="padding: 24px;">
@@ -6906,14 +6982,14 @@ app.post('/api/payment/virement/:token', async (req, res) => {
               Bonjour,
             </p>
             <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-              Le client <strong>${reservation.client.nom}</strong> (${reservation.client.email})${reservation.structure ? ` (Structure: <strong>${reservation.structure}</strong>)` : ''} a indiqué son intention de régler par virement bancaire pour la réservation <strong>#${reservation.id}</strong> (séjour du ${dateStr}).
+              Le client <strong>${reservation.client.nom}</strong> (${reservation.client.email})${reservation.structure ? ` (Structure: <strong>${reservation.structure}</strong>)` : ''} a validé son intention de régler par <strong>virement bancaire</strong> pour la réservation <strong>#${reservation.id}</strong> (séjour du ${dateStr}).
             </p>
 
-            <div style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
-              <h4 style="margin: 0 0 15px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails de la réservation :</h4>
+            <div style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
+              <h4 style="margin: 0 0 12px 0; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Détails à rapprocher sur le relevé bancaire :</h4>
               <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #334155;">
                 <tr>
-                  <td width="40%" style="padding: 6px 0; color: #64748b; font-weight: bold;">Client :</td>
+                  <td width="42%" style="padding: 6px 0; color: #64748b; font-weight: bold;">Client :</td>
                   <td style="padding: 6px 0; font-weight: bold;">${reservation.client.nom}</td>
                 </tr>
                 ${reservation.structure ? `
@@ -6924,7 +7000,7 @@ app.post('/api/payment/virement/:token', async (req, res) => {
                 ` : ''}
                 <tr>
                   <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Réf. Réservation :</td>
-                  <td style="padding: 6px 0; font-weight: bold;">#${reservation.id}</td>
+                  <td style="padding: 6px 0; font-weight: bold; font-family: monospace;">#${reservation.id}</td>
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Type de règlement :</td>
@@ -6932,27 +7008,32 @@ app.post('/api/payment/virement/:token', async (req, res) => {
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Montant attendu :</td>
-                  <td style="padding: 6px 0; font-weight: 800; color: #004B93; font-size: 15px;">${amount.toFixed(2)} €</td>
+                  <td style="padding: 6px 0; font-weight: 800; color: #004B93; font-size: 16px;">${amount.toFixed(2)} €</td>
                 </tr>
                 <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Référence de virement :</td>
-                  <td style="padding: 6px 0;"><span style="font-weight: bold; color: #b45309; background-color: #fef3c7; padding: 3px 8px; border-radius: 4px; border: 1px solid #fde68a; font-family: monospace;">${reference}</span></td>
+                  <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Référence sur le relevé :</td>
+                  <td style="padding: 6px 0;"><span style="font-weight: bold; color: #b45309; background-color: #fef3c7; padding: 3px 8px; border-radius: 4px; border: 1px solid #fde68a; font-family: monospace; font-size: 13px;">${reference}</span></td>
                 </tr>
               </table>
             </div>
 
-            <p style="font-size: 14px; line-height: 1.6; color: #475569; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
-              💡 <strong>Action attendue :</strong> Cette réservation est marquée comme "Virement attendu". Une fois le virement reçu sur votre compte bancaire, cliquez sur le bouton ci-dessous pour valider le virement directement dans le système, ou accédez au Tableau de Bord.
-            </p>
+            <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 14px; margin-bottom: 24px;">
+              <p style="font-size: 13px; line-height: 1.5; color: #065f46; margin: 0;">
+                📢 <strong>Pour la comptabilité (Valérie & Johanna) :</strong><br/>
+                Dès que vous constatez la réception de ce virement de <strong>${amount.toFixed(2)} €</strong> sur le compte bancaire du gîte (Crédit Mutuel), cliquez sur le bouton vert ci-dessous pour valider l'encaissement. Le système confirmera automatiquement la réservation au client et mettra à jour la comptabilité.
+              </p>
+            </div>
             
-            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-              <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${reservation.tokenModification}&type=${type}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">✅ Valider le paiement (Marquer comme payé)</a>
-              <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2); margin-top: 10px;">Accéder au Tableau de Bord Admin</a>
+            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
+              <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${reservation.tokenModification}&type=${type}" style="background-color: #059669; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 800; display: inline-block; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(5, 150, 105, 0.25);">✅ Valider la réception du virement</a>
+            </p>
+            <p style="text-align: center; margin-top: 10px;">
+              <a href="${FRONTEND_URL}/admin" style="color: #004B93; font-size: 12px; font-weight: bold; text-decoration: underline;">Accéder au Tableau de Bord Admin</a>
             </p>
           </div>
           
-          <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
-            Cet e-mail automatique est envoyé par le système de réservation du Gîte de la Maladrerie.
+          <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+            Notification comptable automatique - Gîte de la Maladrerie (MUC Omnisports)
           </div>
         </div>
       `
@@ -7043,7 +7124,7 @@ app.get('/api/payment/pay-on-arrival/:token', async (req, res) => {
 });
 
 app.get('/api/payment/virement/validate-by-link', async (req, res) => {
-  const { token, type } = req.query; // type: 'acompte', 'solde', 'totalite'
+  const { token, type, confirm } = req.query; // type: 'acompte', 'solde', 'totalite', confirm: '1'
   
   if (!token || !type) {
     return res.status(400).send(`
@@ -7052,16 +7133,17 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
       <head>
         <title>Erreur de validation</title>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
-          .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
-          h1 { color: #ef4444; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
-          p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px 15px; background-color: #f8fafc; color: #1e293b; margin: 0; }
+          .card { background: white; padding: 36px 24px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+          h1 { color: #ef4444; font-size: 22px; font-weight: 800; margin: 12px 0 8px 0; }
+          p { font-size: 14px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
         </style>
       </head>
       <body>
         <div class="card">
-          <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+          <div style="font-size: 48px;">❌</div>
           <h1>Paramètres manquants</h1>
           <p>Le jeton de validation ou le type de paiement est manquant.</p>
         </div>
@@ -7083,16 +7165,17 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
         <head>
           <title>Réservation introuvable</title>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
-            .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
-            h1 { color: #ef4444; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
-            p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px 15px; background-color: #f8fafc; color: #1e293b; margin: 0; }
+            .card { background: white; padding: 36px 24px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+            h1 { color: #ef4444; font-size: 22px; font-weight: 800; margin: 12px 0 8px 0; }
+            p { font-size: 14px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
           </style>
         </head>
         <body>
           <div class="card">
-            <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+            <div style="font-size: 48px;">❌</div>
             <h1>Réservation introuvable</h1>
             <p>La réservation associée à ce lien de validation n'a pas pu être trouvée.</p>
           </div>
@@ -7125,32 +7208,112 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
       nextPaymentType = 'totalite';
     }
 
-    if (reservation.statutPaiement === 'PAYE' || 
+    const reference = `MUC-${reservation.id}-${type.toUpperCase()}`;
+    const isAlreadyPaid = (reservation.statutPaiement === 'PAYE' || 
        (type === 'acompte' && reservation.statutPaiement === 'ACOMPTE_PAYE') || 
-       (type === 'solde' && reservation.statutPaiement === 'SOLDE_PAYE')) {
+       (type === 'solde' && reservation.statutPaiement === 'SOLDE_PAYE'));
+
+    if (isAlreadyPaid) {
+      const datePayeStr = reservation.payeLe ? new Date(reservation.payeLe).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Date non enregistrée';
       return res.send(`
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Paiement Déjà Validé</title>
+          <title>Virement Déjà Validé</title>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
-            .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
-            h1 { color: #0f172a; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
-            p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
-            .badge { background-color: #fef3c7; color: #b45309; font-weight: bold; padding: 6px 12px; border-radius: 9999px; display: inline-block; font-size: 14px; margin-bottom: 20px; border: 1px solid #fde68a; }
-            .btn { background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 40px 15px; margin: 0; text-align: center; }
+            .card { background: white; padding: 36px 28px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0; }
+            .icon { font-size: 48px; margin-bottom: 12px; }
+            h1 { color: #0f172a; font-size: 22px; font-weight: 800; margin: 0 0 10px 0; }
+            p { font-size: 14px; color: #64748b; line-height: 1.6; margin: 0 0 20px 0; }
+            .badge { background-color: #ecfdf5; color: #065f46; font-weight: 700; padding: 6px 14px; border-radius: 9999px; display: inline-block; font-size: 13px; border: 1px solid #a7f3d0; margin-bottom: 20px; }
+            .details { background-color: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: left; margin-bottom: 24px; font-size: 13px; }
+            .details table { width: 100%; border-collapse: collapse; }
+            .details td { padding: 6px 0; }
+            .btn { background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; font-size: 14px; }
           </style>
         </head>
         <body>
           <div class="card">
-            <div style="font-size: 48px; margin-bottom: 15px;">ℹ️</div>
-            <h1>Paiement Déjà Validé</h1>
-            <p>Ce paiement par virement pour la réservation #${reservation.id} (${label}) a déjà été enregistré.</p>
+            <div class="icon">ℹ️</div>
+            <h1>Virement Déjà Validé</h1>
+            <p>Ce virement pour la réservation #${reservation.id} (${label}) a déjà été validé et enregistré.</p>
             <div class="badge">Statut actuel : ${reservation.statutPaiement}</div>
-            <br/>
-            <a href="${FRONTEND_URL}/admin" class="btn">Aller au Tableau de Bord</a>
+            <div class="details">
+              <table>
+                <tr><td style="color: #64748b;">Client :</td><td style="font-weight: bold; text-align: right;">${reservation.client.nom}</td></tr>
+                <tr><td style="color: #64748b;">Montant :</td><td style="font-weight: bold; text-align: right;">${amount.toFixed(2)} €</td></tr>
+                <tr><td style="color: #64748b;">Enregistré le :</td><td style="font-weight: bold; text-align: right;">${datePayeStr}</td></tr>
+              </table>
+            </div>
+            <a href="${FRONTEND_URL}/admin" class="btn">Accéder au Tableau de Bord Admin</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Protection SafeLinks : si confirm !== '1', afficher l'écran de confirmation interactif
+    if (confirm !== '1') {
+      const datesStr = `${new Date(reservation.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(reservation.dateFin).toLocaleDateString('fr-FR')}`;
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Validation Encaissement Virement - Maladrerie</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f1f5f9; color: #1e293b; padding: 30px 15px; margin: 0; }
+            .card { background: white; padding: 36px 28px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); max-width: 540px; margin: 0 auto; border: 1px solid #e2e8f0; }
+            .header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 20px; }
+            .badge-compta { background-color: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 8px; border: 1px solid #bfdbfe; }
+            h1 { color: #0f172a; font-size: 22px; font-weight: 800; margin: 0 0 6px 0; }
+            .sub { font-size: 13px; color: #64748b; margin: 0; }
+            .details { background-color: #f8fafc; padding: 18px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 22px; font-size: 13px; }
+            .details table { width: 100%; border-collapse: collapse; }
+            .details td { padding: 7px 0; }
+            .alert-box { background-color: #fefce8; border: 1px solid #fef08a; border-radius: 10px; padding: 14px; margin-bottom: 24px; font-size: 13px; line-height: 1.5; color: #854d0e; }
+            .btn-confirm { background-color: #059669; color: white; padding: 15px 28px; text-decoration: none; border-radius: 10px; font-weight: 800; display: block; text-align: center; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25); transition: background-color 0.2s; }
+            .btn-confirm:hover { background-color: #047857; }
+            .btn-cancel { display: block; text-align: center; margin-top: 14px; font-size: 12px; color: #64748b; text-decoration: underline; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="header">
+              <span class="badge-compta">Comptabilité MUC Omnisports</span>
+              <h1>Validation de Virement</h1>
+              <p class="sub">Gîte de la Maladrerie - Rapprochement bancaire</p>
+            </div>
+
+            <div class="details">
+              <table>
+                <tr><td width="42%" style="color: #64748b; font-weight: 600;">Réservation :</td><td style="font-weight: 800; font-family: monospace;">#${reservation.id}</td></tr>
+                <tr><td style="color: #64748b; font-weight: 600;">Client :</td><td style="font-weight: 800;">${reservation.client.nom}</td></tr>
+                ${reservation.structure ? `<tr><td style="color: #64748b; font-weight: 600;">Structure :</td><td style="font-weight: 700;">${reservation.structure}</td></tr>` : ''}
+                <tr><td style="color: #64748b; font-weight: 600;">Séjour :</td><td>Du ${datesStr}</td></tr>
+                <tr><td style="color: #64748b; font-weight: 600;">Type de paiement :</td><td style="font-weight: 700; color: #004B93;">${label}</td></tr>
+                <tr><td style="color: #64748b; font-weight: 600;">Montant à valider :</td><td style="font-weight: 900; font-size: 17px; color: #059669;">${amount.toFixed(2)} €</td></tr>
+                <tr>
+                  <td style="color: #64748b; font-weight: 600;">Réf. sur relevé :</td>
+                  <td><span style="font-family: monospace; font-weight: 800; color: #b45309; background-color: #fef3c7; padding: 2px 7px; border-radius: 4px; border: 1px solid #fde68a;">${reference}</span></td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="alert-box">
+              📢 <strong>Vérification préalable :</strong><br/>
+              Valérie / Johanna : confirmez uniquement si la somme de <strong>${amount.toFixed(2)} €</strong> portant la référence <strong>${reference}</strong> est bien créditée sur le compte bancaire du gîte.
+            </div>
+
+            <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}&confirm=1" class="btn-confirm">
+              ✅ Confirmer la bonne réception du virement
+            </a>
+
+            <a href="${FRONTEND_URL}/admin" class="btn-cancel">Annuler et retourner au Tableau de Bord</a>
           </div>
         </body>
         </html>
@@ -7182,9 +7345,44 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
     });
 
     console.log(`Validation Virement par lien : Réservation #${reservation.id} mise à jour à ${targetStatus}`);
-    // Désactivé : remplacé par l'envoi hebdomadaire groupé (cron cuisine du jeudi)
-    // await sendCuisineEmailIfNeeded(reservation.id);
     await sendPaymentConfirmationEmails(updatedReservation, nextPaymentType, amount, balancePaymentLink);
+
+    // Envoyer une notification par e-mail à l'équipe comptable et admin pour confirmation de l'encaissement
+    try {
+      const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['david.roujet@mucomnisports.fr']);
+      const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr`;
+      await sendMail({
+        to: recipientEmails,
+        subject: `✅ [VIREMENT ENCAISSÉ ET VALIDÉ] Résa #${updatedReservation.id} - ${updatedReservation.structure ? updatedReservation.structure + ' / ' : ''}${updatedReservation.client.nom} - ${amount.toFixed(2)} €`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #059669; padding: 22px; text-align: center; color: white;">
+              <span style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie</span>
+              <h2 style="margin: 0; font-size: 18px; font-weight: 800;">✅ Virement Bancaire Validé</h2>
+            </div>
+            <div style="padding: 24px; color: #334155; font-size: 14px; line-height: 1.6;">
+              <p>Bonjour,</p>
+              <p>Le virement de <strong>${amount.toFixed(2)} €</strong> (${label}) pour la réservation <strong>#${updatedReservation.id}</strong> (${updatedReservation.client.nom}${updatedReservation.structure ? ` - Structure: ${updatedReservation.structure}` : ''}) a bien été validé et encaissé.</p>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin: 18px 0; font-size: 13px;">
+                <p style="margin: 3px 0;"><strong>Client :</strong> ${updatedReservation.client.nom} (${updatedReservation.client.email})</p>
+                <p style="margin: 3px 0;"><strong>Réservation :</strong> #${updatedReservation.id}</p>
+                <p style="margin: 3px 0;"><strong>Montant encaissé :</strong> ${amount.toFixed(2)} €</p>
+                <p style="margin: 3px 0;"><strong>Nouveau statut :</strong> Payé (${targetStatus})</p>
+                <p style="margin: 3px 0;"><strong>Mode de paiement :</strong> Virement bancaire</p>
+              </div>
+              <p style="color: #065f46; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 10px; font-size: 13px;">
+                ✉️ L'e-mail de confirmation avec reçu de paiement a été envoyé automatiquement au client.
+              </p>
+              <p style="text-align: center; margin-top: 20px;">
+                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block;">Consulter le Tableau de Bord</a>
+              </p>
+            </div>
+          </div>
+        `
+      });
+    } catch (teamMailErr) {
+      console.error("Erreur envoi email confirmation virement à l'équipe:", teamMailErr);
+    }
 
     if (updatedReservation.codePromo) {
       try {
@@ -7203,32 +7401,38 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
       <head>
         <title>Paiement Validé avec Succès</title>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
-          .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
-          h1 { color: #10b981; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px 15px; background-color: #f8fafc; color: #1e293b; margin: 0; }
+          .card { background: white; padding: 36px 28px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0; }
+          h1 { color: #10b981; font-size: 24px; font-weight: 800; margin: 10px 0; }
           p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
-          .details { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; margin-bottom: 25px; }
+          .details { background-color: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: left; margin-bottom: 24px; }
           .details table { width: 100%; border-collapse: collapse; font-size: 14px; }
-          .details td { padding: 8px 0; }
+          .details td { padding: 7px 0; }
           .btn { background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; }
         </style>
       </head>
       <body>
         <div class="card">
-          <div style="font-size: 48px; margin-bottom: 15px;">✅</div>
-          <h1>Paiement Enregistré</h1>
-          <p>Le virement de <strong>${amount.toFixed(2)} €</strong> (${label}) pour la réservation de <strong>${reservation.client.nom}</strong> (#${reservation.id}) a bien été validé.</p>
+          <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+          <h1>Virement Validé avec Succès !</h1>
+          <p>Le virement de <strong>${amount.toFixed(2)} €</strong> (${label}) pour la réservation de <strong>${reservation.client.nom}</strong> (#${reservation.id}) a bien été validé et enregistré.</p>
           
           <div class="details">
             <table>
               <tr><td style="color: #64748b;">Réservation :</td><td style="font-weight: bold; text-align: right;">#${reservation.id}</td></tr>
               <tr><td style="color: #64748b;">Client :</td><td style="font-weight: bold; text-align: right;">${reservation.client.nom}</td></tr>
+              <tr><td style="color: #64748b;">Montant validé :</td><td style="font-weight: 800; color: #059669; text-align: right;">${amount.toFixed(2)} €</td></tr>
               <tr><td style="color: #64748b;">Nouveau Statut :</td><td style="font-weight: bold; text-align: right; color: #10b981;">Payé (${targetStatus})</td></tr>
             </table>
           </div>
+
+          <p style="font-size: 13px; color: #059669; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px; margin-bottom: 24px;">
+            ✉️ L'e-mail de confirmation avec reçu a été envoyé au client, et l'équipe a été prévenue.
+          </p>
           
-          <a href="${FRONTEND_URL}/admin" class="btn">Accéder au Tableau de Bord</a>
+          <a href="${FRONTEND_URL}/admin" class="btn">Accéder au Tableau de Bord Admin</a>
         </div>
       </body>
       </html>
@@ -7241,16 +7445,17 @@ app.get('/api/payment/virement/validate-by-link', async (req, res) => {
       <head>
         <title>Erreur serveur</title>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8fafc; color: #1e293b; }
-          .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
-          h1 { color: #ef4444; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
-          p { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px 15px; background-color: #f8fafc; color: #1e293b; margin: 0; }
+          .card { background: white; padding: 36px 24px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; }
+          h1 { color: #ef4444; font-size: 22px; font-weight: 800; margin: 12px 0 8px 0; }
+          p { font-size: 14px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
         </style>
       </head>
       <body>
         <div class="card">
-          <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+          <div style="font-size: 48px;">❌</div>
           <h1>Erreur interne</h1>
           <p>Une erreur est survenue lors de la validation du virement.</p>
         </div>
