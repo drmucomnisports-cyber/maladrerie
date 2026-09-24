@@ -43,6 +43,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       salle12: false,
       cuisine: false,
       sejour: false,
+      prixCuisine: 0,
+      prixSejour: 0,
       dateDebut: '',
       dateFin: ''
     },
@@ -151,9 +153,11 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
           salle12: !!existingReservation.salles.salle12,
           cuisine: !!existingReservation.salles.cuisine,
           sejour: !!existingReservation.salles.sejour,
+          prixCuisine: existingReservation.salles.prixCuisine !== undefined ? existingReservation.salles.prixCuisine : 0,
+          prixSejour: existingReservation.salles.prixSejour !== undefined ? existingReservation.salles.prixSejour : 0,
           dateDebut: existingReservation.salles.dateDebut || '',
           dateFin: existingReservation.salles.dateFin || ''
-        } : { salle15: false, salle12: false, cuisine: false, sejour: false, dateDebut: '', dateFin: '' },
+        } : { salle15: false, salle12: false, cuisine: false, sejour: false, prixCuisine: 0, prixSejour: 0, dateDebut: '', dateFin: '' },
         occupants: existingReservation.occupants || [],
         repas: existingReservation.repas || {},
         modeRestauration: deducedMode,
@@ -395,21 +399,37 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     return list;
   };
 
-  const calculerTotalSalles = () => {
-    if (!formData.salles?.salle15 && !formData.salles?.salle12) return 0;
+  const getNuitsSalles = () => {
     const startStr = formData.salles?.dateDebut || formData.dateDebut;
     const endStr = formData.salles?.dateFin || formData.dateFin;
-    if (!startStr || !endStr) return 0;
+    if (!startStr || !endStr) return 1;
     const start = new Date(startStr);
     const end = new Date(endStr);
-    const nuitsSalles = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-    
-    const aDesChambres = formData.chambres.length > 0;
-    const tarifSalleParJour = aDesChambres ? 100 : 150;
+    return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+  };
+
+  const calculerTotalSallesReunion = () => {
+    if (!formData.salles?.salle15 && !formData.salles?.salle12) return 0;
+    const nuitsSalles = getNuitsSalles();
+    const tarifSalleParJour = formData.chambres.length > 0 ? 100 : 150;
     let total = 0;
     if (formData.salles?.salle15) total += tarifSalleParJour * nuitsSalles;
     if (formData.salles?.salle12) total += tarifSalleParJour * nuitsSalles;
     return total;
+  };
+
+  const calculerTotalCuisine = () => {
+    if (!formData.salles?.cuisine) return 0;
+    return (parseFloat(formData.salles?.prixCuisine) || 0) * getNuitsSalles();
+  };
+
+  const calculerTotalSejour = () => {
+    if (!formData.salles?.sejour) return 0;
+    return (parseFloat(formData.salles?.prixSejour) || 0) * getNuitsSalles();
+  };
+
+  const calculerTotalSalles = () => {
+    return calculerTotalSallesReunion() + calculerTotalCuisine() + calculerTotalSejour();
   };
 
   const calculerPrix = () => {
@@ -1011,7 +1031,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', remarques: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, cuisine: false, sejour: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
+        setFormData({ nom: '', prenom: '', structure: '', remarques: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, cuisine: false, sejour: false, prixCuisine: 0, prixSejour: 0, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
         setStep(1);
         
         if (!isAdmin) {
@@ -1237,10 +1257,43 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
                           <span className="text-[10px] bg-blue-100 text-[#004B93] font-bold px-1.5 py-0.5 rounded uppercase">Admin</span>
                         </div>
                         <span className="text-xs font-medium text-slate-500 block">
-                          Grande cuisine équipée • Inclus (0 €)
+                          Grande cuisine équipée {formData.salles?.cuisine ? (parseFloat(formData.salles?.prixCuisine) > 0 ? `• ${formData.salles.prixCuisine} € / jour` : '• Inclus (0 €)') : ''}
                         </span>
                       </div>
                     </div>
+
+                    {formData.salles?.cuisine && (
+                      <div className="mt-3 pt-3 border-t border-slate-200/70" onClick={(e) => e.stopPropagation()}>
+                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
+                          Tarif Cuisine (€ / jour)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={formData.salles?.prixCuisine ?? 0}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0);
+                              setFormData(prev => ({
+                                ...prev,
+                                salles: { ...prev.salles, prixCuisine: val }
+                              }));
+                            }}
+                            className="w-24 px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-bold text-slate-800"
+                            placeholder="0"
+                          />
+                          <div className="text-xs text-slate-600 font-medium leading-tight">
+                            <span>€ / jour</span>
+                            {getNuitsSalles() > 1 && parseFloat(formData.salles?.prixCuisine || 0) > 0 && (
+                              <span className="text-slate-500 text-[11px] block">
+                                (soit {(parseFloat(formData.salles?.prixCuisine || 0) * getNuitsSalles()).toFixed(2)} € pour {getNuitsSalles()} j)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Séjour */}
@@ -1256,10 +1309,43 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
                           <span className="text-[10px] bg-blue-100 text-[#004B93] font-bold px-1.5 py-0.5 rounded uppercase">Admin</span>
                         </div>
                         <span className="text-xs font-medium text-slate-500 block">
-                          Salle commune / Séjour • Inclus (0 €)
+                          Salle commune / Séjour {formData.salles?.sejour ? (parseFloat(formData.salles?.prixSejour) > 0 ? `• ${formData.salles.prixSejour} € / jour` : '• Inclus (0 €)') : ''}
                         </span>
                       </div>
                     </div>
+
+                    {formData.salles?.sejour && (
+                      <div className="mt-3 pt-3 border-t border-slate-200/70" onClick={(e) => e.stopPropagation()}>
+                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
+                          Tarif Séjour (€ / jour)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={formData.salles?.prixSejour ?? 0}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0);
+                              setFormData(prev => ({
+                                ...prev,
+                                salles: { ...prev.salles, prixSejour: val }
+                              }));
+                            }}
+                            className="w-24 px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-bold text-slate-800"
+                            placeholder="0"
+                          />
+                          <div className="text-xs text-slate-600 font-medium leading-tight">
+                            <span>€ / jour</span>
+                            {getNuitsSalles() > 1 && parseFloat(formData.salles?.prixSejour || 0) > 0 && (
+                              <span className="text-slate-500 text-[11px] block">
+                                (soit {(parseFloat(formData.salles?.prixSejour || 0) * getNuitsSalles()).toFixed(2)} € pour {getNuitsSalles()} j)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -1560,18 +1646,30 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
                 </div>
                 <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
-              {calculerTotalSalles() > 0 && (
+              {calculerTotalSallesReunion() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
-                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                  <span className="font-bold">{calculerTotalSallesReunion().toFixed(2)} €</span>
                 </div>
               )}
-              {isAdmin && (formData.salles?.cuisine || formData.salles?.sejour) && (
+              {isAdmin && formData.salles?.cuisine && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">
-                    Espaces ({[formData.salles?.cuisine && 'Cuisine', formData.salles?.sejour && 'Séjour'].filter(Boolean).join(', ')})
+                    Cuisine {parseFloat(formData.salles?.prixCuisine) > 0 ? `(${formData.salles.prixCuisine} €/j)` : ''}
                   </span>
-                  <span className="font-bold text-green-700">Inclus (0 €)</span>
+                  <span className={calculerTotalCuisine() > 0 ? "font-bold text-slate-900" : "font-bold text-green-700"}>
+                    {calculerTotalCuisine() > 0 ? `${calculerTotalCuisine().toFixed(2)} €` : 'Inclus (0 €)'}
+                  </span>
+                </div>
+              )}
+              {isAdmin && formData.salles?.sejour && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">
+                    Séjour {parseFloat(formData.salles?.prixSejour) > 0 ? `(${formData.salles.prixSejour} €/j)` : ''}
+                  </span>
+                  <span className={calculerTotalSejour() > 0 ? "font-bold text-slate-900" : "font-bold text-green-700"}>
+                    {calculerTotalSejour() > 0 ? `${calculerTotalSejour().toFixed(2)} €` : 'Inclus (0 €)'}
+                  </span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (
@@ -1771,18 +1869,30 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
                 </div>
                 <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
               </div>
-              {calculerTotalSalles() > 0 && (
+              {calculerTotalSallesReunion() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
-                  <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                  <span className="font-bold">{calculerTotalSallesReunion().toFixed(2)} €</span>
                 </div>
               )}
-              {isAdmin && (formData.salles?.cuisine || formData.salles?.sejour) && (
+              {isAdmin && formData.salles?.cuisine && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">
-                    Espaces ({[formData.salles?.cuisine && 'Cuisine', formData.salles?.sejour && 'Séjour'].filter(Boolean).join(', ')})
+                    Cuisine {parseFloat(formData.salles?.prixCuisine) > 0 ? `(${formData.salles.prixCuisine} €/j)` : ''}
                   </span>
-                  <span className="font-bold text-green-700">Inclus (0 €)</span>
+                  <span className={calculerTotalCuisine() > 0 ? "font-bold text-slate-900" : "font-bold text-green-700"}>
+                    {calculerTotalCuisine() > 0 ? `${calculerTotalCuisine().toFixed(2)} €` : 'Inclus (0 €)'}
+                  </span>
+                </div>
+              )}
+              {isAdmin && formData.salles?.sejour && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">
+                    Séjour {parseFloat(formData.salles?.prixSejour) > 0 ? `(${formData.salles.prixSejour} €/j)` : ''}
+                  </span>
+                  <span className={calculerTotalSejour() > 0 ? "font-bold text-slate-900" : "font-bold text-green-700"}>
+                    {calculerTotalSejour() > 0 ? `${calculerTotalSejour().toFixed(2)} €` : 'Inclus (0 €)'}
+                  </span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (

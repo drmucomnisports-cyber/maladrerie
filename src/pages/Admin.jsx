@@ -2314,8 +2314,8 @@ const Admin = () => {
                           <div className="text-xs font-bold text-indigo-600 mt-1 flex flex-col leading-tight">
                             {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
                             {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
-                            {res.salles.cuisine && <span>🍳 Cuisine</span>}
-                            {res.salles.sejour && <span>🛋️ Séjour</span>}
+                            {res.salles.cuisine && <span>🍳 Cuisine{parseFloat(res.salles.prixCuisine) > 0 ? ` (${res.salles.prixCuisine}€/j)` : ''}</span>}
+                            {res.salles.sejour && <span>🛋️ Séjour{parseFloat(res.salles.prixSejour) > 0 ? ` (${res.salles.prixSejour}€/j)` : ''}</span>}
                           </div>
                         )}
                         {(() => {
@@ -2727,8 +2727,8 @@ const Admin = () => {
                           <div className="text-sm font-bold text-indigo-600 mt-1 flex flex-col">
                             {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
                             {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
-                            {res.salles.cuisine && <span>🍳 Cuisine</span>}
-                            {res.salles.sejour && <span>🛋️ Séjour</span>}
+                            {res.salles.cuisine && <span>🍳 Cuisine{parseFloat(res.salles.prixCuisine) > 0 ? ` (${res.salles.prixCuisine}€/j)` : ''}</span>}
+                            {res.salles.sejour && <span>🛋️ Séjour{parseFloat(res.salles.prixSejour) > 0 ? ` (${res.salles.prixSejour}€/j)` : ''}</span>}
                           </div>
                         )}
                         {(() => {
@@ -5536,8 +5536,14 @@ const Admin = () => {
           const list = [];
           if (sl.salle15) list.push("Salle 15 pers.");
           if (sl.salle12) list.push("Salle 12 pers.");
-          if (sl.cuisine) list.push("Cuisine");
-          if (sl.sejour) list.push("Séjour");
+          if (sl.cuisine) {
+            const p = parseFloat(sl.prixCuisine) || 0;
+            list.push(`Cuisine${p > 0 ? ` (${p} €/j)` : ''}`);
+          }
+          if (sl.sejour) {
+            const p = parseFloat(sl.prixSejour) || 0;
+            list.push(`Séjour${p > 0 ? ` (${p} €/j)` : ''}`);
+          }
           return list.join(', ') || "Aucune";
         };
 

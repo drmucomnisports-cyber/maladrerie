@@ -433,7 +433,7 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
     total += nbAdultes * (tarifPers * 0.044) * nuits;
   });
 
-  // Salles de réunion
+  // Salles & Espaces
   if (salles) {
     let nuitsSalles = nuits;
     if (salles.dateDebut && salles.dateFin) {
@@ -444,6 +444,8 @@ const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, opt
     const prixSalle = chambres.length > 0 ? 100 : 150;
     if (salles.salle15) total += prixSalle * nuitsSalles;
     if (salles.salle12) total += prixSalle * nuitsSalles;
+    if (salles.cuisine) total += (parseFloat(salles.prixCuisine) || 0) * nuitsSalles;
+    if (salles.sejour) total += (parseFloat(salles.prixSejour) || 0) * nuitsSalles;
   }
 
   // Repas
@@ -1557,8 +1559,14 @@ function generateOptionsHTML(options, repas, salles) {
     let sallesSelected = [];
     if (salles.salle15) sallesSelected.push("Salle de réunion 15 places");
     if (salles.salle12) sallesSelected.push("Salle de réunion 12 places");
-    if (salles.cuisine) sallesSelected.push("Cuisine du gîte");
-    if (salles.sejour) sallesSelected.push("Séjour / Salle commune");
+    if (salles.cuisine) {
+      const p = parseFloat(salles.prixCuisine) || 0;
+      sallesSelected.push(`Cuisine du gîte${p > 0 ? ` (${p} € / jour)` : ' (Inclus)'}`);
+    }
+    if (salles.sejour) {
+      const p = parseFloat(salles.prixSejour) || 0;
+      sallesSelected.push(`Séjour / Salle commune${p > 0 ? ` (${p} € / jour)` : ' (Inclus)'}`);
+    }
     if (sallesSelected.length > 0) {
       hasOptions = true;
       let dateString = "";
@@ -2402,21 +2410,23 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
             });
           }
           if (salles.cuisine) {
+            const pCuisine = parseFloat(salles.prixCuisine) || 0;
             lignes.push({
               designation: `Mise à disposition Cuisine${datesSuffix}`,
               nbPersonnes: 1,
-              tarifParPersonne: 0,
+              tarifParPersonne: pCuisine,
               nuits: nuitsSalles,
-              total: 0
+              total: pCuisine * nuitsSalles
             });
           }
           if (salles.sejour) {
+            const pSejour = parseFloat(salles.prixSejour) || 0;
             lignes.push({
               designation: `Mise à disposition Séjour${datesSuffix}`,
               nbPersonnes: 1,
-              tarifParPersonne: 0,
+              tarifParPersonne: pSejour,
               nuits: nuitsSalles,
-              total: 0
+              total: pSejour * nuitsSalles
             });
           }
         }
@@ -2814,8 +2824,14 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
           const prixSalle = devisFinal.chambres.length > 0 ? 100 : 150;
           if (devisFinal.salles.salle15) detailsLignes.push({ designation: `Location Salle 15 personnes${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: prixSalle, nuits: nuitsSalles, total: prixSalle * nuitsSalles });
           if (devisFinal.salles.salle12) detailsLignes.push({ designation: `Location Salle 12 personnes${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: prixSalle, nuits: nuitsSalles, total: prixSalle * nuitsSalles });
-          if (devisFinal.salles.cuisine) detailsLignes.push({ designation: `Mise à disposition Cuisine${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
-          if (devisFinal.salles.sejour) detailsLignes.push({ designation: `Mise à disposition Séjour${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
+          if (devisFinal.salles.cuisine) {
+            const pCuisine = parseFloat(devisFinal.salles.prixCuisine) || 0;
+            detailsLignes.push({ designation: `Mise à disposition Cuisine${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: pCuisine, nuits: nuitsSalles, total: pCuisine * nuitsSalles });
+          }
+          if (devisFinal.salles.sejour) {
+            const pSejour = parseFloat(devisFinal.salles.prixSejour) || 0;
+            detailsLignes.push({ designation: `Mise à disposition Séjour${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: pSejour, nuits: nuitsSalles, total: pSejour * nuitsSalles });
+          }
         }
 
         if (devisFinal.repas) {
@@ -3084,21 +3100,23 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
         });
       }
       if (devis.salles.cuisine) {
+        const pCuisine = parseFloat(devis.salles.prixCuisine) || 0;
         detailsLignes.push({
           designation: `Mise à disposition Cuisine${datesSuffix}`,
           nbPersonnes: 1,
-          tarifParPersonne: 0,
+          tarifParPersonne: pCuisine,
           nuits: nuitsSalles,
-          total: 0
+          total: pCuisine * nuitsSalles
         });
       }
       if (devis.salles.sejour) {
+        const pSejour = parseFloat(devis.salles.prixSejour) || 0;
         detailsLignes.push({
           designation: `Mise à disposition Séjour${datesSuffix}`,
           nbPersonnes: 1,
-          tarifParPersonne: 0,
+          tarifParPersonne: pSejour,
           nuits: nuitsSalles,
-          total: 0
+          total: pSejour * nuitsSalles
         });
       }
     }
@@ -3313,10 +3331,12 @@ app.post('/api/admin/devis/:id/send', checkAuth, async (req, res) => {
         detailsLignes.push({ designation: `Location Salle 12 personnes${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: prixSalle, nuits: nuitsSalles, total: prixSalle * nuitsSalles });
       }
       if (devis.salles.cuisine) {
-        detailsLignes.push({ designation: `Mise à disposition Cuisine${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
+        const pCuisine = parseFloat(devis.salles.prixCuisine) || 0;
+        detailsLignes.push({ designation: `Mise à disposition Cuisine${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: pCuisine, nuits: nuitsSalles, total: pCuisine * nuitsSalles });
       }
       if (devis.salles.sejour) {
-        detailsLignes.push({ designation: `Mise à disposition Séjour${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
+        const pSejour = parseFloat(devis.salles.prixSejour) || 0;
+        detailsLignes.push({ designation: `Mise à disposition Séjour${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: pSejour, nuits: nuitsSalles, total: pSejour * nuitsSalles });
       }
     }
 
@@ -3606,21 +3626,23 @@ app.get('/api/devis/pdf/:token', async (req, res) => {
         });
       }
       if (devis.salles.cuisine) {
+        const pCuisine = parseFloat(devis.salles.prixCuisine) || 0;
         detailsLignes.push({
           designation: `Mise à disposition Cuisine${datesSuffix}`,
           nbPersonnes: 1,
-          tarifParPersonne: 0,
+          tarifParPersonne: pCuisine,
           nuits: nuitsSalles,
-          total: 0
+          total: pCuisine * nuitsSalles
         });
       }
       if (devis.salles.sejour) {
+        const pSejour = parseFloat(devis.salles.prixSejour) || 0;
         detailsLignes.push({
           designation: `Mise à disposition Séjour${datesSuffix}`,
           nbPersonnes: 1,
-          tarifParPersonne: 0,
+          tarifParPersonne: pSejour,
           nuits: nuitsSalles,
-          total: 0
+          total: pSejour * nuitsSalles
         });
       }
     }
@@ -3855,21 +3877,23 @@ async function getInvoicePdfBuffer(reservationId, includeOccupants = false) {
       });
     }
     if (reservation.salles.cuisine) {
+      const pCuisine = parseFloat(reservation.salles.prixCuisine) || 0;
       detailsLignes.push({
         designation: `Mise à disposition Cuisine${datesSuffix}`,
         nbPersonnes: 1,
-        tarifParPersonne: 0,
+        tarifParPersonne: pCuisine,
         nuits: nuitsSalles,
-        total: 0
+        total: pCuisine * nuitsSalles
       });
     }
     if (reservation.salles.sejour) {
+      const pSejour = parseFloat(reservation.salles.prixSejour) || 0;
       detailsLignes.push({
         designation: `Mise à disposition Séjour${datesSuffix}`,
         nbPersonnes: 1,
-        tarifParPersonne: 0,
+        tarifParPersonne: pSejour,
         nuits: nuitsSalles,
-        total: 0
+        total: pSejour * nuitsSalles
       });
     }
   }
@@ -8327,8 +8351,14 @@ app.post('/api/reservation/modify/:token', async (req, res) => {
       const list = [];
       if (sl.salle15) list.push("Salle 15 pers.");
       if (sl.salle12) list.push("Salle 12 pers.");
-      if (sl.cuisine) list.push("Cuisine");
-      if (sl.sejour) list.push("Séjour");
+      if (sl.cuisine) {
+        const p = parseFloat(sl.prixCuisine) || 0;
+        list.push(`Cuisine${p > 0 ? ` (${p} €/j)` : ''}`);
+      }
+      if (sl.sejour) {
+        const p = parseFloat(sl.prixSejour) || 0;
+        list.push(`Séjour${p > 0 ? ` (${p} €/j)` : ''}`);
+      }
       return list.join(', ') || "Aucune";
     };
     const sallesOld = formatSallesList(reservation.salles);
