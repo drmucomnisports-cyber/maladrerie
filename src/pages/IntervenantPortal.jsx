@@ -919,6 +919,8 @@ function IntervenantPortal() {
                             <div className="text-xs font-bold text-indigo-600 mt-1 flex flex-col leading-tight">
                               {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
                               {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
+                              {res.salles.cuisine && <span>🍳 Cuisine</span>}
+                              {res.salles.sejour && <span>🛋️ Séjour</span>}
                             </div>
                           )}
                           {(() => {
@@ -2304,15 +2306,17 @@ function IntervenantPortal() {
 
                   {/* Salles */}
                   <div className="bg-white p-4 rounded-xl border border-slate-200">
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Salles de réunion</div>
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Salles & Espaces</div>
                     <div className="text-base font-black text-slate-800">
-                      {selectedDetailRes.salles?.salle15 || selectedDetailRes.salles?.salle12 ? (
+                      {selectedDetailRes.salles?.salle15 || selectedDetailRes.salles?.salle12 || selectedDetailRes.salles?.cuisine || selectedDetailRes.salles?.sejour ? (
                         <div className="space-y-1">
                           {selectedDetailRes.salles?.salle15 && <div>💼 Salle 15 places</div>}
                           {selectedDetailRes.salles?.salle12 && <div>💼 Salle 12 places</div>}
+                          {selectedDetailRes.salles?.cuisine && <div>🍳 Cuisine du gîte</div>}
+                          {selectedDetailRes.salles?.sejour && <div>🛋️ Salle de séjour</div>}
                         </div>
                       ) : (
-                        <span className="text-slate-400 text-sm font-normal italic">Aucune salle réservée</span>
+                        <span className="text-slate-400 text-sm font-normal italic">Aucune salle ni espace réservé</span>
                       )}
                     </div>
                   </div>

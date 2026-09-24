@@ -477,6 +477,8 @@ const OccupantsCollect = () => {
                       if (reservation.salles) {
                         if (reservation.salles.salle15) opts.push("Location Grande Salle (15 personnes)");
                         if (reservation.salles.salle12) opts.push("Location Petite Salle (12 personnes)");
+                        if (reservation.salles.cuisine) opts.push("Mise à disposition Cuisine");
+                        if (reservation.salles.sejour) opts.push("Mise à disposition Séjour");
                       }
                       if (opts.length === 0) return null;
 

@@ -201,7 +201,7 @@ async function generateDevisPDF(data) {
                      const designation = ligne.designation || '';
                      if (/repas|déjeuner|dîner|diner|goûter|gouter|petit/i.test(designation)) {
                          totalRepas += (ligne.total || 0);
-                     } else if (/salle/i.test(designation)) {
+                     } else if (/salle|cuisine|séjour|sejour/i.test(designation)) {
                          totalSalles += (ligne.total || 0);
                      } else {
                          totalHeb += (ligne.total || 0);

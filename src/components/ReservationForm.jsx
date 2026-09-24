@@ -41,6 +41,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     salles: {
       salle15: false,
       salle12: false,
+      cuisine: false,
+      sejour: false,
       dateDebut: '',
       dateFin: ''
     },
@@ -144,7 +146,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
           return acc;
         }, {}),
         options: existingReservation.options || { litsFaits: false, lingeFourni: false, menage: false },
-        salles: existingReservation.salles || { salle15: false, salle12: false, dateDebut: '', dateFin: '' },
+        salles: existingReservation.salles ? {
+          salle15: !!existingReservation.salles.salle15,
+          salle12: !!existingReservation.salles.salle12,
+          cuisine: !!existingReservation.salles.cuisine,
+          sejour: !!existingReservation.salles.sejour,
+          dateDebut: existingReservation.salles.dateDebut || '',
+          dateFin: existingReservation.salles.dateFin || ''
+        } : { salle15: false, salle12: false, cuisine: false, sejour: false, dateDebut: '', dateFin: '' },
         occupants: existingReservation.occupants || [],
         repas: existingReservation.repas || {},
         modeRestauration: deducedMode,
@@ -336,7 +345,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
           if (prev.salles?.salle15 || prev.salles?.salle12) {
             return {
               ...prev,
-              salles: { salle15: false, salle12: false }
+              salles: { ...prev.salles, salle15: false, salle12: false }
             };
           }
           return prev;
@@ -347,7 +356,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         if (prev.salles?.salle15 || prev.salles?.salle12) {
           return {
             ...prev,
-            salles: { salle15: false, salle12: false }
+            salles: { ...prev.salles, salle15: false, salle12: false }
           };
         }
         return prev;
@@ -689,8 +698,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       return;
     }
     
-    if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12) {
-      triggerError("Veuillez sélectionner au moins une chambre ou une salle de réunion.");
+    if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12 && !formData.salles?.cuisine && !formData.salles?.sejour) {
+      triggerError("Veuillez sélectionner au moins une chambre, une salle ou un espace.");
       return;
     }
     
@@ -813,8 +822,8 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         triggerError("La date de départ doit être après la date d'arrivée.");
         return;
       }
-      if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12) {
-        triggerError("Veuillez sélectionner au moins une chambre ou une salle de réunion.");
+      if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12 && !formData.salles?.cuisine && !formData.salles?.sejour) {
+        triggerError("Veuillez sélectionner au moins une chambre, une salle ou un espace.");
         return;
       }
       if ((formData.salles?.salle15 || formData.salles?.salle12) && !areDatesValidForSalles(true)) {
@@ -1002,7 +1011,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', remarques: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
+        setFormData({ nom: '', prenom: '', structure: '', remarques: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, cuisine: false, sejour: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
         setStep(1);
         
         if (!isAdmin) {
@@ -1167,68 +1176,119 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       </div>
 
       <div className="pt-4 border-t border-slate-100">
-        <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-4 block">Salles de réunion (optionnel)</label>
+        <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-4 block">
+          {isAdmin ? "Salles & Espaces du gîte" : "Salles de réunion (optionnel)"}
+        </label>
         
         {!formData.dateDebut || !formData.dateFin ? (
           <p className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-slate-200">
-            Veuillez d'abord sélectionner vos dates de séjour pour réserver une salle de réunion.
+            {isAdmin 
+              ? "Veuillez d'abord sélectionner vos dates de séjour pour réserver une salle ou un espace."
+              : "Veuillez d'abord sélectionner vos dates de séjour pour réserver une salle de réunion."}
           </p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4">
-            {/* Salle 15 personnes */}
-            <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.salle15 ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
-                 onClick={() => handleSalleToggle('salle15')}>
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.salle15 ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
-                  {formData.salles?.salle15 && <div className="w-2 h-2 bg-white rounded-full"></div>}
-                </div>
-                <div>
-                  <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 15 personnes</span>
-                  <span className="text-xs font-medium text-slate-500">
-                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
-                  </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Salle 15 personnes */}
+              <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.salle15 ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
+                   onClick={() => handleSalleToggle('salle15')}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.salle15 ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
+                    {formData.salles?.salle15 && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 15 personnes</span>
+                    <span className="text-xs font-medium text-slate-500">
+                      {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Salle 12 personnes */}
-            <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.salle12 ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
-                 onClick={() => handleSalleToggle('salle12')}>
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.salle12 ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
-                  {formData.salles?.salle12 && <div className="w-2 h-2 bg-white rounded-full"></div>}
-                </div>
-                <div>
-                  <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 12 personnes</span>
-                  <span className="text-xs font-medium text-slate-500">
-                    {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {(formData.salles?.salle15 || formData.salles?.salle12) && (
-            <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-1 block">Dates de réservation pour la salle</label>
-              <p className="text-[11px] text-slate-500 mb-3 italic ml-1">Note : La location prend effet de 9h à 9h le lendemain (sauf le vendredi hors vacances : dès 17h).</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col justify-end gap-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée Salle</label>
-                  <input type="date" name="salleDateDebut" value={formData.salles?.dateDebut || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateDebut: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
-                </div>
-                <div className="flex flex-col justify-end gap-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Départ Salle (jusqu'à 9h le lendemain)</label>
-                  <input type="date" name="salleDateFin" value={formData.salles?.dateFin || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateFin: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
+              {/* Salle 12 personnes */}
+              <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.salle12 ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
+                   onClick={() => handleSalleToggle('salle12')}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.salle12 ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
+                    {formData.salles?.salle12 && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-700 uppercase tracking-tight block">Salle 12 personnes</span>
+                    <span className="text-xs font-medium text-slate-500">
+                      {formData.chambres.length > 0 ? '100 €' : '150 €'} / jour
+                    </span>
+                  </div>
                 </div>
               </div>
-              {!areDatesValidForSalles(true) && (
-                 <p className="text-xs text-red-500 font-bold mt-2">Les dates sélectionnées pour la salle ne sont pas valides (week-ends et vacances de la zone C uniquement).</p>
+
+              {/* Choix supplémentaires réservés aux administrateurs */}
+              {isAdmin && (
+                <>
+                  {/* Cuisine */}
+                  <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.cuisine ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
+                       onClick={() => handleSalleToggle('cuisine')}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.cuisine ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
+                        {formData.salles?.cuisine && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-black text-slate-700 uppercase tracking-tight">Cuisine</span>
+                          <span className="text-[10px] bg-blue-100 text-[#004B93] font-bold px-1.5 py-0.5 rounded uppercase">Admin</span>
+                        </div>
+                        <span className="text-xs font-medium text-slate-500 block">
+                          Grande cuisine équipée • Inclus (0 €)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Séjour */}
+                  <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.salles?.sejour ? 'border-muc-yellow bg-muc-yellow/5' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
+                       onClick={() => handleSalleToggle('sejour')}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${formData.salles?.sejour ? 'bg-muc-yellow border-muc-yellow' : 'bg-white border-slate-300'}`}>
+                        {formData.salles?.sejour && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-black text-slate-700 uppercase tracking-tight">Séjour</span>
+                          <span className="text-[10px] bg-blue-100 text-[#004B93] font-bold px-1.5 py-0.5 rounded uppercase">Admin</span>
+                        </div>
+                        <span className="text-xs font-medium text-slate-500 block">
+                          Salle commune / Séjour • Inclus (0 €)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
-          )}
-        </>
+            
+            {(formData.salles?.salle15 || formData.salles?.salle12 || formData.salles?.cuisine || formData.salles?.sejour) && (
+              <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-1 block">
+                  {isAdmin ? "Dates de réservation pour les salles & espaces" : "Dates de réservation pour la salle"}
+                </label>
+                <p className="text-[11px] text-slate-500 mb-3 italic ml-1">
+                  {isAdmin ? "Note : Dates de mise à disposition des salles et espaces sélectionnés." : "Note : La location prend effet de 9h à 9h le lendemain (sauf le vendredi hors vacances : dès 17h)."}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col justify-end gap-1">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Arrivée Salle / Espace</label>
+                    <input type="date" name="salleDateDebut" value={formData.salles?.dateDebut || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateDebut: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
+                  </div>
+                  <div className="flex flex-col justify-end gap-1">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Départ Salle / Espace</label>
+                    <input type="date" name="salleDateFin" value={formData.salles?.dateFin || ''} onChange={(e) => setFormData(prev => ({ ...prev, salles: { ...prev.salles, dateFin: e.target.value } }))} className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-muc-yellow outline-none text-sm font-medium" />
+                  </div>
+                </div>
+                {!areDatesValidForSalles(true) && (
+                   <p className="text-xs text-red-500 font-bold mt-2">Les dates sélectionnées pour la salle ne sont pas valides (week-ends et vacances de la zone C uniquement).</p>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -1280,7 +1340,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       </div>
 
       {/* ── BLOC RESTAURATION ── */}
-      {formData.dateDebut && formData.dateFin && (formData.chambres.length > 0 || formData.salles?.salle15 || formData.salles?.salle12) && (
+      {formData.dateDebut && formData.dateFin && (formData.chambres.length > 0 || formData.salles?.salle15 || formData.salles?.salle12 || formData.salles?.cuisine || formData.salles?.sejour) && (
         <div className="pt-4 border-t border-slate-100">
           <div className="flex items-center gap-2 mb-4">
             <UtensilsCrossed size={18} className="text-muc-blue" />
@@ -1454,7 +1514,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         </div>
       )}
 
-      {formData.dateDebut && formData.dateFin && (formData.chambres.length > 0 || formData.salles?.salle15 || formData.salles?.salle12) && (
+      {formData.dateDebut && formData.dateFin && (formData.chambres.length > 0 || formData.salles?.salle15 || formData.salles?.salle12 || formData.salles?.cuisine || formData.salles?.sejour) && (
         <div className="space-y-4">
           <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
             <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1 mb-2 block">Code Promo</label>
@@ -1504,6 +1564,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
                   <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                </div>
+              )}
+              {isAdmin && (formData.salles?.cuisine || formData.salles?.sejour) && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">
+                    Espaces ({[formData.salles?.cuisine && 'Cuisine', formData.salles?.sejour && 'Séjour'].filter(Boolean).join(', ')})
+                  </span>
+                  <span className="font-bold text-green-700">Inclus (0 €)</span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (
@@ -1707,6 +1775,14 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
                   <span className="font-bold">{calculerTotalSalles().toFixed(2)} €</span>
+                </div>
+              )}
+              {isAdmin && (formData.salles?.cuisine || formData.salles?.sejour) && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <span className="font-medium">
+                    Espaces ({[formData.salles?.cuisine && 'Cuisine', formData.salles?.sejour && 'Séjour'].filter(Boolean).join(', ')})
+                  </span>
+                  <span className="font-bold text-green-700">Inclus (0 €)</span>
                 </div>
               )}
               {calculerTotalRepas() > 0 && (

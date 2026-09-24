@@ -1552,11 +1552,13 @@ function generateOptionsHTML(options, repas, salles) {
     }
   }
 
-  // Salles
+  // Salles & Espaces
   if (salles) {
     let sallesSelected = [];
     if (salles.salle15) sallesSelected.push("Salle de réunion 15 places");
     if (salles.salle12) sallesSelected.push("Salle de réunion 12 places");
+    if (salles.cuisine) sallesSelected.push("Cuisine du gîte");
+    if (salles.sejour) sallesSelected.push("Séjour / Salle commune");
     if (sallesSelected.length > 0) {
       hasOptions = true;
       let dateString = "";
@@ -1564,12 +1566,12 @@ function generateOptionsHTML(options, repas, salles) {
          dateString = ` (du ${new Date(salles.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} au ${new Date(salles.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })})`;
       }
       html += `
-        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">💼 Salles de réunion${dateString}</h4>
+        <h4 style="color: #333; margin-top: 15px; margin-bottom: 10px; font-size: 14px;">💼 Salles & Espaces réservés${dateString}</h4>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           ${sallesSelected.map(s => `<li style="margin-bottom: 5px;">${s}</li>`).join('')}
         </ul>
         <p style="margin: 5px 0 0 20px; font-size: 12px; font-style: italic; color: #777;">
-          Note : La salle est disponible à  partir de 17h le jour d'arrivée, jusqu'à  minuit le jour du départ.
+          Note : Les espaces et salles sont mis à disposition selon les dates indiquées.
         </p>
       `;
     }
@@ -2399,6 +2401,24 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
               total: prixSalle * nuitsSalles
             });
           }
+          if (salles.cuisine) {
+            lignes.push({
+              designation: `Mise à disposition Cuisine${datesSuffix}`,
+              nbPersonnes: 1,
+              tarifParPersonne: 0,
+              nuits: nuitsSalles,
+              total: 0
+            });
+          }
+          if (salles.sejour) {
+            lignes.push({
+              designation: `Mise à disposition Séjour${datesSuffix}`,
+              nbPersonnes: 1,
+              tarifParPersonne: 0,
+              nuits: nuitsSalles,
+              total: 0
+            });
+          }
         }
 
         // Ajouter les repas
@@ -2794,6 +2814,8 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
           const prixSalle = devisFinal.chambres.length > 0 ? 100 : 150;
           if (devisFinal.salles.salle15) detailsLignes.push({ designation: `Location Salle 15 personnes${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: prixSalle, nuits: nuitsSalles, total: prixSalle * nuitsSalles });
           if (devisFinal.salles.salle12) detailsLignes.push({ designation: `Location Salle 12 personnes${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: prixSalle, nuits: nuitsSalles, total: prixSalle * nuitsSalles });
+          if (devisFinal.salles.cuisine) detailsLignes.push({ designation: `Mise à disposition Cuisine${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
+          if (devisFinal.salles.sejour) detailsLignes.push({ designation: `Mise à disposition Séjour${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
         }
 
         if (devisFinal.repas) {
@@ -3061,6 +3083,24 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
           total: prixSalle * nuitsSalles
         });
       }
+      if (devis.salles.cuisine) {
+        detailsLignes.push({
+          designation: `Mise à disposition Cuisine${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: 0,
+          nuits: nuitsSalles,
+          total: 0
+        });
+      }
+      if (devis.salles.sejour) {
+        detailsLignes.push({
+          designation: `Mise à disposition Séjour${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: 0,
+          nuits: nuitsSalles,
+          total: 0
+        });
+      }
     }
 
     // Repas
@@ -3271,6 +3311,12 @@ app.post('/api/admin/devis/:id/send', checkAuth, async (req, res) => {
       }
       if (devis.salles.salle12) {
         detailsLignes.push({ designation: `Location Salle 12 personnes${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: prixSalle, nuits: nuitsSalles, total: prixSalle * nuitsSalles });
+      }
+      if (devis.salles.cuisine) {
+        detailsLignes.push({ designation: `Mise à disposition Cuisine${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
+      }
+      if (devis.salles.sejour) {
+        detailsLignes.push({ designation: `Mise à disposition Séjour${datesSuffix}`, nbPersonnes: 1, tarifParPersonne: 0, nuits: nuitsSalles, total: 0 });
       }
     }
 
@@ -3559,6 +3605,24 @@ app.get('/api/devis/pdf/:token', async (req, res) => {
           total: prixSalle * nuitsSalles
         });
       }
+      if (devis.salles.cuisine) {
+        detailsLignes.push({
+          designation: `Mise à disposition Cuisine${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: 0,
+          nuits: nuitsSalles,
+          total: 0
+        });
+      }
+      if (devis.salles.sejour) {
+        detailsLignes.push({
+          designation: `Mise à disposition Séjour${datesSuffix}`,
+          nbPersonnes: 1,
+          tarifParPersonne: 0,
+          nuits: nuitsSalles,
+          total: 0
+        });
+      }
     }
 
     // Repas
@@ -3788,6 +3852,24 @@ async function getInvoicePdfBuffer(reservationId, includeOccupants = false) {
         tarifParPersonne: prixSalle,
         nuits: nuitsSalles,
         total: prixSalle * nuitsSalles
+      });
+    }
+    if (reservation.salles.cuisine) {
+      detailsLignes.push({
+        designation: `Mise à disposition Cuisine${datesSuffix}`,
+        nbPersonnes: 1,
+        tarifParPersonne: 0,
+        nuits: nuitsSalles,
+        total: 0
+      });
+    }
+    if (reservation.salles.sejour) {
+      detailsLignes.push({
+        designation: `Mise à disposition Séjour${datesSuffix}`,
+        nbPersonnes: 1,
+        tarifParPersonne: 0,
+        nuits: nuitsSalles,
+        total: 0
       });
     }
   }
@@ -8245,6 +8327,8 @@ app.post('/api/reservation/modify/:token', async (req, res) => {
       const list = [];
       if (sl.salle15) list.push("Salle 15 pers.");
       if (sl.salle12) list.push("Salle 12 pers.");
+      if (sl.cuisine) list.push("Cuisine");
+      if (sl.sejour) list.push("Séjour");
       return list.join(', ') || "Aucune";
     };
     const sallesOld = formatSallesList(reservation.salles);

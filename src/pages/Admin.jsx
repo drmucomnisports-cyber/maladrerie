@@ -2249,6 +2249,8 @@ const Admin = () => {
                           if (res.salles) {
                             if (res.salles.salle15) s += ' Salle 15 pl.';
                             if (res.salles.salle12) s += ' Salle 12 pl.';
+                            if (res.salles.cuisine) s += ' Cuisine';
+                            if (res.salles.sejour) s += ' Séjour';
                           }
                           return `${ch} ${s}`;
                         };
@@ -2312,6 +2314,8 @@ const Admin = () => {
                           <div className="text-xs font-bold text-indigo-600 mt-1 flex flex-col leading-tight">
                             {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
                             {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
+                            {res.salles.cuisine && <span>🍳 Cuisine</span>}
+                            {res.salles.sejour && <span>🛋️ Séjour</span>}
                           </div>
                         )}
                         {(() => {
@@ -2723,6 +2727,8 @@ const Admin = () => {
                           <div className="text-sm font-bold text-indigo-600 mt-1 flex flex-col">
                             {res.salles.salle15 && <span>💼 Salle 15 pl.</span>}
                             {res.salles.salle12 && <span>💼 Salle 12 pl.</span>}
+                            {res.salles.cuisine && <span>🍳 Cuisine</span>}
+                            {res.salles.sejour && <span>🛋️ Séjour</span>}
                           </div>
                         )}
                         {(() => {
@@ -5530,6 +5536,8 @@ const Admin = () => {
           const list = [];
           if (sl.salle15) list.push("Salle 15 pers.");
           if (sl.salle12) list.push("Salle 12 pers.");
+          if (sl.cuisine) list.push("Cuisine");
+          if (sl.sejour) list.push("Séjour");
           return list.join(', ') || "Aucune";
         };
 
