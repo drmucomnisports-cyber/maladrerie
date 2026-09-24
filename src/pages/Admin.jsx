@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText, Users, Mail, History } from 'lucide-react';
+import { Search, PlusCircle, Trash, Calendar, AlertTriangle, CheckCircle, CheckCircle2, Loader2, Clock, Check, X, Trash2, Banknote, CreditCard, Shield, ShieldAlert, Coins, Edit3, FileText, Users, Mail, History } from 'lucide-react';
 import { API_URL } from '../config';
 import ReservationForm from '../components/ReservationForm';
 import SignaturePad from '../components/SignaturePad';
@@ -1614,6 +1614,123 @@ const Admin = () => {
       alert("❌ Une erreur réseau est survenue.");
     } finally {
       setIsSendingTaxReport(false);
+    }
+  };
+
+  const [isSendingTaxOnlyReport, setIsSendingTaxOnlyReport] = useState(false);
+  const [isMarkingTaxDeclared, setIsMarkingTaxDeclared] = useState(false);
+
+  const handleSendTaxOnlyReport = async (customMonth, customYear, customLabel) => {
+    const today = new Date();
+    let monthToUse = customMonth;
+    let yearToUse = customYear;
+    
+    if (monthToUse === undefined || monthToUse === null) {
+      let prevM = today.getMonth() - 1;
+      let prevY = today.getFullYear();
+      if (prevM < 0) {
+        prevM = 11;
+        prevY -= 1;
+      }
+      monthToUse = prevM;
+      yearToUse = prevY;
+    }
+
+    const monthNames = [
+      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+    ];
+    const monthLabel = customLabel || `${monthNames[monthToUse] || `Mois ${monthToUse + 1}`} ${yearToUse}`;
+
+    if (!window.confirm(`Confirmer l'envoi de la déclaration de taxe de séjour (${monthLabel}) par e-mail à Valérie, Johanna et David ?\n\nCe mail contient uniquement les repères chiffrés pour 3D Ouest ainsi que le bouton permettant de marquer la taxe comme déclarée et l'enregistrer directement en dépense (Compte 447).`)) {
+      return;
+    }
+
+    setIsSendingTaxOnlyReport(monthLabel);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/finances/send-tax-declaration-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ month: monthToUse, year: yearToUse })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`✨ Déclaration de taxe de séjour envoyée avec succès !\n\n• Période : ${data.month}\n• Montant collecté à déclarer : ${data.totalTaxeSejour.toFixed(2)} €\n• Unités louées : ${data.totalUnitesLouees}\n• Nuitées assujetties : ${data.totalNuiteesAssujetties}\n• Nuitées exonérées : ${data.totalNuiteesExonerees}\n• Destinataires : ${data.to.join(', ')}`);
+      } else {
+        let errorMsg = "Une erreur est survenue lors de l'envoi.";
+        try {
+          const err = await res.json();
+          if (err && err.error) errorMsg = err.error;
+        } catch (_) {
+          const text = await res.text();
+          if (text) errorMsg = text.substring(0, 200);
+        }
+        alert(`❌ Erreur (${res.status}) : ${errorMsg}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("❌ Une erreur réseau est survenue lors de l'envoi.");
+    } finally {
+      setIsSendingTaxOnlyReport(false);
+    }
+  };
+
+  const handleMarkTaxDeclared = async (customMonth, customYear, customLabel) => {
+    const today = new Date();
+    let monthToUse = customMonth;
+    let yearToUse = customYear;
+    
+    if (monthToUse === undefined || monthToUse === null) {
+      let prevM = today.getMonth() - 1;
+      let prevY = today.getFullYear();
+      if (prevM < 0) {
+        prevM = 11;
+        prevY -= 1;
+      }
+      monthToUse = prevM;
+      yearToUse = prevY;
+    }
+
+    const monthNames = [
+      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+    ];
+    const monthLabel = customLabel || `${monthNames[monthToUse] || `Mois ${monthToUse + 1}`} ${yearToUse}`;
+
+    if (!window.confirm(`Confirmez-vous que la taxe de séjour pour ${monthLabel} a bien été déclarée sur le portail 3D Ouest ?\n\nCette action va immédiatement enregistrer une dépense au débit du Compte 447 (Reversement Taxe de Séjour) pour déduire ce montant et solder les taxes perçues.`)) {
+      return;
+    }
+
+    setIsMarkingTaxDeclared(monthLabel);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/finances/tax-report/mark-declared`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ month: monthToUse, year: yearToUse })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`✅ La taxe de séjour de ${data.periodLabel} (${data.montant.toFixed(2)} €) a bien été marquée comme déclarée !\n\nUne dépense a été créée dans le Compte 447 et est désormais prise en compte dans les dépenses de l'onglet Finances.`);
+        await fetchFinances();
+      } else {
+        let errorMsg = "Impossible d'enregistrer la déclaration.";
+        try {
+          const err = await res.json();
+          if (err && err.error) errorMsg = err.error;
+        } catch (_) {}
+        alert(`❌ Erreur : ${errorMsg}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("❌ Une erreur réseau est survenue lors de l'enregistrement.");
+    } finally {
+      setIsMarkingTaxDeclared(false);
     }
   };
 
@@ -3811,8 +3928,15 @@ const Admin = () => {
         }));
 
 
-        const openModal = (code, title, total, items) => {
-            setFinanceModalData({ code, title, total, items: items.sort((a,b) => new Date(b.date) - new Date(a.date)) });
+        const openModal = (code, title, total, items, monthIndex = null, yearNum = null) => {
+            setFinanceModalData({ 
+                code, 
+                title, 
+                total, 
+                items: items.sort((a,b) => new Date(b.date) - new Date(a.date)),
+                monthIndex,
+                yearNum
+            });
             setShowFinanceModal(true);
         };
 
@@ -4040,30 +4164,53 @@ const Admin = () => {
                     </div>
                     <div className="p-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {taxesMensuellesArray.length > 0 ? taxesMensuellesArray.map((t, idx) => (
+                        {taxesMensuellesArray.length > 0 ? taxesMensuellesArray.map((t, idx) => {
+                            const isDeclared = (finances?.expenses || []).some(e => 
+                              e.comptePcg && e.comptePcg.startsWith('447') && 
+                              e.label.toLowerCase().includes(t.label.toLowerCase())
+                            );
+                            const isSendingThis = isSendingTaxOnlyReport === t.label;
+
+                            return (
                             <div 
                                 key={idx} 
-                                onClick={() => openModal("447", `Taxe de Séjour - ${t.label}`, t.total, t.items)}
+                                onClick={() => openModal("447", `Taxe de Séjour - ${t.label}`, t.total, t.items, t.monthIndex, t.yearNum)}
                                 className="flex justify-between items-center p-4 border border-amber-200 rounded-xl bg-white shadow-sm cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md hover:bg-amber-50 group gap-2"
                             >
                                 <div>
-                                  <span className="text-xs font-bold text-amber-900 capitalize block">{t.label}</span>
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="text-xs font-bold text-amber-900 capitalize block">{t.label}</span>
+                                    {isDeclared ? (
+                                      <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5" title="Taxe déclarée et enregistrée en dépense">
+                                        ✅ Déclarée
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5" title="À déclarer sur le portail 3D Ouest">
+                                        ⏳ À déclarer
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-base font-black text-amber-600">{t.total.toFixed(2)} €</span>
                                 </div>
                                 <button
                                   type="button"
-                                  disabled={isSendingTaxReport}
+                                  disabled={isSendingThis}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleSendMonthlyTaxReport(t.monthIndex, t.yearNum);
+                                    handleSendTaxOnlyReport(t.monthIndex, t.yearNum, t.label);
                                   }}
-                                  className="px-2.5 py-1.5 bg-amber-100 text-amber-900 hover:bg-amber-600 hover:text-white rounded-lg transition-colors text-[11px] font-bold flex items-center gap-1 shrink-0"
-                                  title={`Envoyer le rapport de ${t.label} par e-mail`}
+                                  className="px-2.5 py-1.5 bg-amber-100 text-amber-900 hover:bg-amber-600 hover:text-white rounded-lg transition-colors text-[11px] font-bold flex items-center gap-1 shrink-0 disabled:opacity-50"
+                                  title={`Envoyer la déclaration de taxe de ${t.label} par e-mail (3D Ouest)`}
                                 >
-                                  <Mail size={13} /> Envoyer
+                                  {isSendingThis ? (
+                                    <Loader2 className="animate-spin" size={13} />
+                                  ) : (
+                                    <Mail size={13} />
+                                  )}
+                                  Envoyer
                                 </button>
                             </div>
-                        )) : <p className="text-sm text-amber-700 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
+                        );}) : <p className="text-sm text-amber-700 italic p-4 col-span-full text-center">Aucune taxe de séjour collectée pour le moment.</p>}
                         </div>
                     </div>
                 </div>
@@ -6742,7 +6889,20 @@ const Admin = () => {
                 </div>
               )}
 
-              {financeModalData.code === "447" && (
+              {financeModalData.code === "447" && financeModalData.title?.startsWith('Taxe de Séjour - ') && (() => {
+                const modalMonthLabel = financeModalData.title.replace('Taxe de Séjour - ', '').trim();
+                const isModalMonthDeclared = (finances?.expenses || []).some(e => 
+                  e.comptePcg && e.comptePcg.startsWith('447') && 
+                  e.label.toLowerCase().includes(modalMonthLabel.toLowerCase())
+                );
+                const currentMonthIdx = (financeModalData.monthIndex !== undefined && financeModalData.monthIndex !== null)
+                  ? financeModalData.monthIndex 
+                  : (financeModalData.items?.[0] ? new Date(financeModalData.items[0].date).getMonth() : new Date().getMonth());
+                const currentYearNum = (financeModalData.yearNum !== undefined && financeModalData.yearNum !== null)
+                  ? financeModalData.yearNum 
+                  : (financeModalData.items?.[0] ? new Date(financeModalData.items[0].date).getFullYear() : new Date().getFullYear());
+
+                return (
                 <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-5 mb-6">
                     <div className="flex justify-between items-center mb-4 border-b border-amber-200 pb-3 flex-wrap gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -6750,17 +6910,28 @@ const Admin = () => {
                                 🏛️ Informations pour la Déclaration 3D Ouest
                             </span>
                             <span className="bg-amber-200/80 text-amber-900 text-xs font-black px-2.5 py-0.5 rounded-md uppercase">
-                                (1) Mois : {financeModalData.title.replace('Taxe de Séjour - ', '')}
+                                (1) Mois : {modalMonthLabel}
                             </span>
+                            {isModalMonthDeclared ? (
+                              <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                                ✅ Déclarée & reversée (Compte 447)
+                              </span>
+                            ) : (
+                              <span className="bg-amber-200 text-amber-900 border border-amber-300 text-xs font-black px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                                ⏳ Déclaration en attente
+                              </span>
+                            )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <button
                                 type="button"
-                                disabled={isSendingTaxReport}
-                                onClick={() => handleSendMonthlyTaxReport(financeModalData.monthIndex, financeModalData.yearNum)}
+                                disabled={isSendingTaxOnlyReport === modalMonthLabel}
+                                onClick={() => handleSendTaxOnlyReport(currentMonthIdx, currentYearNum, modalMonthLabel)}
                                 className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                                title="Envoyer uniquement le relevé de taxe de séjour par e-mail (3D Ouest)"
                             >
-                                <Mail size={13} /> Envoyer le rapport par e-mail
+                                {isSendingTaxOnlyReport === modalMonthLabel ? <Loader2 className="animate-spin" size={13} /> : <Mail size={13} />}
+                                Envoyer le rapport par e-mail
                             </button>
                             <a 
                                 href="https://taxe.3douest.com/extranet/accueil.php" 
@@ -6770,6 +6941,18 @@ const Admin = () => {
                             >
                                 Accéder au site de déclaration
                             </a>
+                            {!isModalMonthDeclared ? (
+                              <button
+                                type="button"
+                                disabled={isMarkingTaxDeclared === modalMonthLabel}
+                                onClick={() => handleMarkTaxDeclared(currentMonthIdx, currentYearNum, modalMonthLabel)}
+                                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                                title="Enregistrer la déclaration et créer la dépense correspondante dans le Compte 447"
+                              >
+                                {isMarkingTaxDeclared === modalMonthLabel ? <Loader2 className="animate-spin" size={13} /> : <CheckCircle size={13} />}
+                                Marquer comme Déclarée & Reversée
+                              </button>
+                            ) : null}
                         </div>
                     </div>
 
@@ -6839,7 +7022,8 @@ const Admin = () => {
                         </div>
                     </div>
                 </div>
-              )}
+                );
+              })()}
               
               <div className="flex-1 overflow-auto">
                   <table className="w-full text-left border-collapse text-sm min-w-[600px]">
@@ -6863,7 +7047,7 @@ const Admin = () => {
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Statut</th>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Virement Encaissé</th>
                                 </>
-                              ) : financeModalData.code === "447" ? (
+                              ) : (financeModalData.code === "447" && financeModalData.title?.startsWith('Taxe de Séjour - ')) ? (
                                 <>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Nuits</th>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Adultes (3)</th>
@@ -6921,7 +7105,7 @@ const Admin = () => {
                                         {(item.montant || 0).toFixed(2)} €
                                       </td>
                                     </>
-                                  ) : financeModalData.code === "447" ? (
+                                  ) : (financeModalData.code === "447" && financeModalData.title?.startsWith('Taxe de Séjour - ')) ? (
                                     <>
                                       <td className="p-3 text-center text-slate-700 font-bold">{item.nuits}</td>
                                       <td className="p-3 text-center text-slate-700 font-bold">{item.nbAdultes}</td>

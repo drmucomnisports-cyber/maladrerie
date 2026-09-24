@@ -5454,10 +5454,11 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
     periodLabel = `${monthNames[targetMonth]} ${targetYear}`;
   }
 
-  // 1. REQUÊTE TAXE DE SÉJOUR (Séjours actifs débutant sur la période)
+  // 1. REQUÊTE TAXE DE SÉJOUR (Séjours actifs payés débutant sur la période)
   const reservations = await withDbRetry(() => prisma.reservation.findMany({
     where: {
-      statut: { in: ['RESERVE', 'TERMINE'] },
+      statutPaiement: { in: ['ACOMPTE_PAYE', 'PAYE', 'SOLDE_PAYE'] },
+      statut: { not: 'ANNULE' },
       dateDebut: {
         gte: periodStart,
         lte: periodEnd
@@ -5921,6 +5922,643 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
     res.status(500).json({ error: error.message || "Erreur lors de l'envoi du rapport de taxe et comptabilité." });
   }
 });
+
+// ===== CALCUL DÉDIÉ TAXE DE SÉJOUR (3D OUEST) =====
+async function calculerTaxeSejourMois(month, year) {
+  const today = new Date();
+  let targetYear = (year !== undefined && year !== null && year !== '') ? parseInt(year) : today.getFullYear();
+  let targetMonth = (month !== undefined && month !== null && month !== '') ? parseInt(month) : today.getMonth() - 1;
+  if (targetMonth < 0) {
+    targetMonth = 11;
+    targetYear -= 1;
+  }
+
+  const periodStart = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
+  const periodEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
+
+  const monthNames = [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+  ];
+  const monthName = monthNames[targetMonth] || `Mois ${targetMonth + 1}`;
+  const periodLabel = `${monthName} ${targetYear}`;
+
+  // Récupérer les réservations payées (encaissement effectif de la taxe) débutant sur la période
+  const reservations = await withDbRetry(() => prisma.reservation.findMany({
+    where: {
+      statutPaiement: { in: ['ACOMPTE_PAYE', 'PAYE', 'SOLDE_PAYE'] },
+      statut: { not: 'ANNULE' },
+      dateDebut: {
+        gte: periodStart,
+        lte: periodEnd
+      }
+    },
+    include: { occupants: true, client: true },
+    orderBy: { dateDebut: 'asc' }
+  }));
+
+  let totalTaxeSejour = 0;
+  let totalNuiteesAssujetties = 0;
+  let totalNuiteesExonerees = 0;
+  let totalRefacturationTaxe = 0;
+  const sejoursDetails = [];
+
+  reservations.forEach(r => {
+    const { taxeSejour, nbAdultes, nbMineurs, nuits, nuiteesAssujetties, nuiteesExonerees } = calculerDetailsFinanciersReservation(r);
+    if (taxeSejour > 0) {
+      totalTaxeSejour += taxeSejour;
+      totalNuiteesAssujetties += nuiteesAssujetties;
+      totalNuiteesExonerees += nuiteesExonerees;
+
+      const isInterne = (r.modePaiement || '').toUpperCase() === 'INTERNE';
+      if (isInterne) {
+        totalRefacturationTaxe += taxeSejour;
+      }
+
+      sejoursDetails.push({
+        id: r.id,
+        dateDebut: r.dateDebut,
+        dateFin: r.dateFin,
+        clientNom: r.client?.nom || 'Client',
+        structure: r.structure || '',
+        nuits,
+        adultes: nbAdultes,
+        mineurs: nbMineurs,
+        montantTaxe: taxeSejour,
+        statutPaiement: r.statutPaiement,
+        modePaiement: r.modePaiement || (r.stripeSessionId ? 'STRIPE' : 'VIREMENT'),
+        isInterne
+      });
+    }
+  });
+
+  totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
+  totalRefacturationTaxe = Math.round(totalRefacturationTaxe * 100) / 100;
+  const totalUnitesLouees = sejoursDetails.length;
+
+  // Vérifier si la déclaration a déjà été enregistrée en dépense (Compte 447)
+  const existingExpense = await withDbRetry(() => prisma.expense.findFirst({
+    where: {
+      comptePcg: { startsWith: '447' },
+      OR: [
+        { label: { contains: periodLabel, mode: 'insensitive' } },
+        { label: { contains: `${monthName.toLowerCase()} ${targetYear}`, mode: 'insensitive' } },
+        { description: { contains: periodLabel, mode: 'insensitive' } }
+      ]
+    }
+  }));
+
+  return {
+    targetMonth,
+    targetYear,
+    monthName,
+    periodLabel,
+    periodStart,
+    periodEnd,
+    totalTaxeSejour,
+    totalUnitesLouees,
+    totalNuiteesAssujetties,
+    totalNuiteesExonerees,
+    totalRefacturationTaxe,
+    sejoursDetails,
+    existingExpense,
+    isDeclared: !!existingExpense
+  };
+}
+
+// ===== ENVOI DU RAPPORT DÉDIÉ TAXE DE SÉJOUR (3D OUEST SEULEMENT) =====
+async function executeTaxOnlyReport({ month, year, triggeredBy = 'Automatique' } = {}) {
+  const data = await calculerTaxeSejourMois(month, year);
+  const { targetMonth, targetYear, periodLabel, totalTaxeSejour, totalUnitesLouees, totalNuiteesAssujetties, totalNuiteesExonerees, totalRefacturationTaxe, sejoursDetails } = data;
+
+  const toEmails = [
+    'valerie.hostein@mucomnisports.fr',
+    'johanna.journet@mucomnisports.fr',
+    'david.roujet@mucomnisports.fr'
+  ];
+
+  const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
+  const BACKEND_URL = process.env.BACKEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5000');
+
+  const secret = process.env.JWT_SECRET || 'secret-gite-maladrerie-2024';
+  const token = require('crypto').createHmac('sha256', secret).update(`tax-declaration-${targetMonth}-${targetYear}`).digest('hex').slice(0, 32);
+  const declarationActionUrl = `${BACKEND_URL}/api/admin/finances/tax-report/mark-declared-by-link?month=${targetMonth}&year=${targetYear}&token=${token}`;
+
+  const rowsHtml = sejoursDetails.map(s => {
+    return `
+      <tr style="border-bottom: 1px solid #f1f5f9; font-size: 12px;">
+        <td style="padding: 10px 8px; color: #475569;">${new Date(s.dateDebut).toLocaleDateString('fr-FR')}</td>
+        <td style="padding: 10px 8px; font-weight: bold; color: #1e293b;">
+          Résa #${s.id} (${s.clientNom}${s.structure ? ' - ' + s.structure : ''})
+          ${s.isInterne ? '<span style="display:inline-block; font-size:10px; background:#f3e8ff; color:#7e22ce; padding:1px 5px; border-radius:4px; margin-left:4px; font-weight:bold;">🔄 Refacturation MUC</span>' : ''}
+        </td>
+        <td style="padding: 10px 8px; text-align: center; color: #475569;">${s.nuits}</td>
+        <td style="padding: 10px 8px; text-align: center; font-weight: bold; color: #1e293b;">${s.adultes}</td>
+        <td style="padding: 10px 8px; text-align: center; font-weight: bold; color: #1e293b;">${s.mineurs}</td>
+        <td style="padding: 10px 8px; text-align: center;">
+          <span style="background-color: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">
+            ${s.statutPaiement} (${s.modePaiement})
+          </span>
+        </td>
+        <td style="padding: 10px 8px; text-align: right; font-weight: 900; color: #b45309; font-size: 13px;">${s.montantTaxe.toFixed(2)} €</td>
+      </tr>
+    `;
+  }).join('');
+
+  await sendMail({
+    to: toEmails.join(','),
+    subject: `🏛️ Déclaration Taxe de Séjour - ${periodLabel} [Repères 3D Ouest - Gîte Maladrerie]`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+        <div style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%); padding: 28px 24px; text-align: center; color: white;">
+          <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; display: inline-block; background-color: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; margin-bottom: 8px;">
+            Compte 447 • Taxe de Séjour
+          </span>
+          <h1 style="margin: 0; font-size: 24px; font-weight: 900;">Déclaration Taxe de Séjour</h1>
+          <p style="margin: 6px 0 0 0; font-size: 16px; font-weight: 700; opacity: 0.95;">Période : ${periodLabel}</p>
+        </div>
+
+        <div style="padding: 24px; color: #334155; font-size: 13px; line-height: 1.6;">
+          <p style="margin-top: 0; font-size: 14px;">Bonjour Valérie, Bonjour Johanna,</p>
+          <p style="color: #475569;">
+            Voici les repères chiffrés pour effectuer la déclaration de la taxe de séjour pour <strong>${periodLabel}</strong> sur le portail <strong>3D Ouest</strong> de la Communauté de Communes.<br/>
+            Les 4 cases ci-dessous correspondent exactement aux informations à recopier sur l'extranet :
+          </p>
+
+          <!-- 4 BLOCS 3D OUEST -->
+          <div style="background-color: #fffbeb; border: 1.5px solid #fde68a; border-radius: 14px; padding: 18px; margin: 20px 0;">
+            <div style="font-size: 11px; font-weight: 900; color: #92400e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; text-align: center;">
+              🏛️ Informations pour la Déclaration 3D Ouest • (1) Mois : ${periodLabel.toUpperCase()}
+            </div>
+
+            <table width="100%" cellpadding="4" cellspacing="0" style="table-layout: fixed;">
+              <tr>
+                <td width="25%" align="center" style="vertical-align: top;">
+                  <div style="background-color: #ffffff; border: 1.5px solid #fed7aa; border-radius: 10px; padding: 12px 6px; text-align: center; height: 100%;">
+                    <div style="font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; line-height: 1.2;">(2) Unités d'accueil louées</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #1e293b; margin: 6px 0;">${totalUnitesLouees}</div>
+                    <div style="font-size: 10px; color: #94a3b8; font-style: italic;">Nbr réservations</div>
+                  </div>
+                </td>
+                <td width="25%" align="center" style="vertical-align: top;">
+                  <div style="background-color: #ffffff; border: 1.5px solid #fed7aa; border-radius: 10px; padding: 12px 6px; text-align: center; height: 100%;">
+                    <div style="font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; line-height: 1.2;">(3) Nuitées Assujetties</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #1e293b; margin: 6px 0;">${totalNuiteesAssujetties}</div>
+                    <div style="font-size: 10px; color: #94a3b8; font-style: italic;">Adultes x nuits</div>
+                  </div>
+                </td>
+                <td width="25%" align="center" style="vertical-align: top;">
+                  <div style="background-color: #ffffff; border: 1.5px solid #fed7aa; border-radius: 10px; padding: 12px 6px; text-align: center; height: 100%;">
+                    <div style="font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; line-height: 1.2;">(4) Nuitées Exonérées</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #1e293b; margin: 6px 0;">${totalNuiteesExonerees}</div>
+                    <div style="font-size: 10px; color: #94a3b8; font-style: italic;">Mineurs x nuits</div>
+                  </div>
+                </td>
+                <td width="25%" align="center" style="vertical-align: top;">
+                  <div style="background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 10px; padding: 12px 6px; text-align: center; height: 100%;">
+                    <div style="font-size: 10px; font-weight: 900; color: #78350f; text-transform: uppercase; line-height: 1.2;">(5) Montant Collecté</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #b45309; margin: 6px 0;">${totalTaxeSejour.toFixed(2)} €</div>
+                    <div style="font-size: 10px; color: #92400e; font-weight: 700;">Total à déclarer</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            ${totalRefacturationTaxe > 0 ? `
+              <div style="margin-top: 12px; background-color: #f3e8ff; border: 1px solid #d8b4fe; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #6b21a8; font-weight: bold; text-align: center;">
+                🔄 Dont Refacturation Interne MUC : ${totalRefacturationTaxe.toFixed(2)} € (Séjours Pôle Animation MUC)
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- LIEN 3D OUEST -->
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; display: inline-block; box-shadow: 0 4px 6px rgba(5,150,105,0.2);">
+              🌐 Accéder au portail de télédéclaration 3D Ouest
+            </a>
+          </div>
+
+          <!-- BOUTON DÉCLARATION EFFECTUÉE & ENREGISTREMENT DÉPENSE -->
+          <div style="background-color: #ecfdf5; border: 2px solid #6ee7b7; border-radius: 14px; padding: 20px; text-align: center; margin: 25px 0;">
+            <div style="font-size: 15px; font-weight: 900; color: #065f46; margin-bottom: 6px;">
+              Une fois la déclaration saisie sur 3D Ouest :
+            </div>
+            <p style="font-size: 12px; color: #047857; margin: 0 0 16px 0; line-height: 1.5;">
+              Cliquez sur le bouton ci-dessous pour indiquer que la taxe a été déclarée.<br/>
+              Cela créera automatiquement la <strong>dépense de reversement (${totalTaxeSejour.toFixed(2)} €)</strong> dans l'onglet Finances (Compte PCG 447).
+            </p>
+            <a href="${declarationActionUrl}" style="background-color: #059669; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 900; font-size: 14px; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 10px rgba(5,150,105,0.3);">
+              ✅ Marquer la taxe de ${periodLabel} comme Déclarée & Reversée (${totalTaxeSejour.toFixed(2)} €)
+            </a>
+          </div>
+
+          <!-- TABLEAU DÉTAILLÉ DES SÉJOURS -->
+          <div style="margin-top: 30px;">
+            <h3 style="font-size: 14px; font-weight: 900; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+              Détail des séjours assujettis (${sejoursDetails.length})
+            </h3>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+              <thead>
+                <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; color: #64748b;">
+                  <th style="padding: 10px 8px; text-align: left;">Date</th>
+                  <th style="padding: 10px 8px; text-align: left;">Réservation & Client</th>
+                  <th style="padding: 10px 8px; text-align: center;">Nuits</th>
+                  <th style="padding: 10px 8px; text-align: center;">Adultes (3)</th>
+                  <th style="padding: 10px 8px; text-align: center;">Enfants (4)</th>
+                  <th style="padding: 10px 8px; text-align: center;">Paiement</th>
+                  <th style="padding: 10px 8px; text-align: right;">Taxe (5)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml.length > 0 ? rowsHtml : '<tr><td colspan="7" style="padding: 15px; text-align: center; color: #94a3b8; font-style: italic;">Aucun séjour avec taxe sur cette période.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="text-align: center; margin-top: 25px;">
+            <a href="${FRONTEND_URL}/admin" style="color: #004B93; font-size: 12px; font-weight: bold; text-decoration: underline;">
+              Accéder au Tableau de Bord Admin du Gîte
+            </a>
+          </div>
+        </div>
+
+        <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+          Rapport de Taxe de Séjour généré ${triggeredBy} le ${new Date().toLocaleDateString('fr-FR')} pour l'équipe MUC Omnisports.
+        </div>
+      </div>
+    `
+  });
+
+  return {
+    to: toEmails,
+    month: periodLabel,
+    year: targetYear,
+    totalTaxeSejour,
+    totalUnitesLouees,
+    totalNuiteesAssujetties,
+    totalNuiteesExonerees,
+    totalRefacturationTaxe
+  };
+}
+
+// Déclencher manuellement l'envoi de la déclaration dédiée de taxe de séjour (3D Ouest)
+app.post('/api/admin/finances/send-tax-declaration-email', checkAuth, async (req, res) => {
+  const { month, year } = req.body;
+  try {
+    const result = await executeTaxOnlyReport({
+      month,
+      year,
+      triggeredBy: req.user?.nom ? `manuellement par ${req.user.nom}` : 'manuellement depuis l\'espace Admin'
+    });
+
+    res.json({
+      success: true,
+      to: result.to,
+      month: result.month,
+      year: result.year,
+      totalTaxeSejour: result.totalTaxeSejour,
+      totalUnitesLouees: result.totalUnitesLouees,
+      totalNuiteesAssujetties: result.totalNuiteesAssujetties,
+      totalNuiteesExonerees: result.totalNuiteesExonerees,
+      totalRefacturationTaxe: result.totalRefacturationTaxe
+    });
+  } catch (error) {
+    console.error("Erreur envoi déclaration taxe de séjour:", error);
+    res.status(500).json({ error: error.message || "Erreur lors de l'envoi de la déclaration de taxe de séjour." });
+  }
+});
+
+// Valider la déclaration de taxe de séjour via le lien e-mail (protection SafeLinks & enregistrement en dépense 447)
+app.get('/api/admin/finances/tax-report/mark-declared-by-link', async (req, res) => {
+  const { month, year, token, confirm } = req.query;
+  const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
+  const BACKEND_URL = process.env.BACKEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5000');
+
+  try {
+    const targetMonth = parseInt(month);
+    const targetYear = parseInt(year);
+
+    if (isNaN(targetMonth) || isNaN(targetYear) || !token) {
+      return res.status(400).send(`
+        <html><body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h2 style="color: #ef4444;">Paramètres invalides</h2>
+          <p>Le lien de confirmation est incomplet ou invalide.</p>
+          <a href="${FRONTEND_URL}/admin">Retour au Tableau de Bord</a>
+        </body></html>
+      `);
+    }
+
+    const secret = process.env.JWT_SECRET || 'secret-gite-maladrerie-2024';
+    const expectedToken = require('crypto').createHmac('sha256', secret).update(`tax-declaration-${targetMonth}-${targetYear}`).digest('hex').slice(0, 32);
+
+    if (token !== expectedToken) {
+      return res.status(403).send(`
+        <html><body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h2 style="color: #ef4444;">Lien non autorisé</h2>
+          <p>Le jeton de sécurité ne correspond pas.</p>
+          <a href="${FRONTEND_URL}/admin">Retour au Tableau de Bord</a>
+        </body></html>
+      `);
+    }
+
+    const data = await calculerTaxeSejourMois(targetMonth, targetYear);
+    const { periodLabel, totalTaxeSejour, totalUnitesLouees, totalNuiteesAssujetties, totalNuiteesExonerees, totalRefacturationTaxe, existingExpense } = data;
+
+    // Si déjà déclarée :
+    if (existingExpense) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="utf-8">
+          <title>Taxe de Séjour Déjà Déclarée - Gîte Maladrerie</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 40px 15px; color: #1e293b; display: flex; justify-content: center; }
+            .card { background: white; max-width: 540px; width: 100%; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden; }
+            .header { background: #004B93; color: white; padding: 25px; text-align: center; }
+            .content { padding: 30px; text-align: center; }
+            .badge { display: inline-block; background-color: #ecfdf5; color: #047857; font-weight: 800; font-size: 13px; padding: 6px 14px; border-radius: 20px; border: 1px solid #a7f3d0; margin-bottom: 15px; }
+            .btn { display: inline-block; background-color: #004B93; color: white; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 10px; margin-top: 20px; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="header">
+              <h2 style="margin: 0; font-size: 20px;">Gîte de La Maladrerie</h2>
+              <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 13px;">Suivi de la Taxe de Séjour (3D Ouest)</p>
+            </div>
+            <div class="content">
+              <div class="badge">✅ Déjà déclarée & comptabilisée</div>
+              <h3 style="color: #0f172a; margin-top: 5px;">Taxe de Séjour - ${periodLabel}</h3>
+              <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+                La taxe de séjour pour <strong>${periodLabel}</strong> a déjà été déclarée et enregistrée en dépense au débit du <strong>Compte 447 (Reversement Taxe de Séjour)</strong> pour un montant de <strong>${existingExpense.montant.toFixed(2)} €</strong> le ${new Date(existingExpense.date).toLocaleDateString('fr-FR')}.
+              </p>
+              <a href="${FRONTEND_URL}/admin" class="btn">Consulter le Tableau de Bord Admin</a>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Protection SafeLinks : écran intermédiaire si confirm !== '1'
+    if (confirm !== '1') {
+      return res.send(`
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="utf-8">
+          <title>Confirmer la Déclaration de Taxe de Séjour - Gîte Maladrerie</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f1f5f9; margin: 0; padding: 30px 15px; color: #1e293b; display: flex; justify-content: center; }
+            .card { background: white; max-width: 580px; width: 100%; border-radius: 20px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; overflow: hidden; }
+            .header { background: #004B93; color: white; padding: 25px; text-align: center; }
+            .content { padding: 30px; }
+            .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+            .kpi-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center; }
+            .kpi-box.main { background: #fffbeb; border-color: #fde68a; grid-column: span 2; }
+            .kpi-title { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+            .kpi-val { font-size: 24px; font-weight: 900; color: #1e293b; margin: 4px 0; }
+            .kpi-val.gold { color: #b45309; font-size: 30px; }
+            .info-alert { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px; border-radius: 6px; font-size: 13px; color: #1e40af; margin-bottom: 25px; line-height: 1.5; }
+            .btn-confirm { display: block; width: 100%; box-sizing: border-box; background: #059669; color: white; text-align: center; padding: 16px; border-radius: 12px; font-weight: 900; font-size: 15px; text-decoration: none; transition: background 0.2s; box-shadow: 0 4px 10px rgba(5,150,105,0.25); text-transform: uppercase; letter-spacing: 0.5px; border: none; cursor: pointer; }
+            .btn-confirm:hover { background: #047857; }
+            .btn-cancel { display: block; text-align: center; margin-top: 15px; color: #64748b; text-decoration: underline; font-size: 13px; font-weight: 600; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="header">
+              <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; opacity: 0.85;">Gîte de La Maladrerie</div>
+              <h1 style="margin: 6px 0 0 0; font-size: 22px;">Validation Déclaration Taxe de Séjour</h1>
+              <p style="margin: 4px 0 0 0; opacity: 0.9; font-size: 13px;">Période : ${periodLabel}</p>
+            </div>
+
+            <div class="content">
+              <div class="info-alert">
+                🏛️ <strong>Action Comptable :</strong><br/>
+                Vous confirmez avoir complété la déclaration de taxe de séjour sur le portail <strong>3D Ouest</strong>. La validation ci-dessous enregistrera automatiquement une dépense de <strong>${totalTaxeSejour.toFixed(2)} €</strong> dans l'onglet Finances (Compte PCG 447 : Reversement Taxe de Séjour).
+              </div>
+
+              <div class="kpi-grid">
+                <div class="kpi-box">
+                  <div class="kpi-title">(2) Unités louées</div>
+                  <div class="kpi-val">${totalUnitesLouees}</div>
+                </div>
+                <div class="kpi-box">
+                  <div class="kpi-title">(3) Nuitées assujetties</div>
+                  <div class="kpi-val">${totalNuiteesAssujetties}</div>
+                </div>
+                <div class="kpi-box">
+                  <div class="kpi-title">(4) Nuitées exonérées</div>
+                  <div class="kpi-val">${totalNuiteesExonerees}</div>
+                </div>
+                <div class="kpi-box main">
+                  <div class="kpi-title" style="color: #92400e;">(5) Montant reversé à comptabiliser</div>
+                  <div class="kpi-val gold">${totalTaxeSejour.toFixed(2)} €</div>
+                  ${totalRefacturationTaxe > 0 ? `<div style="font-size: 11px; color: #7e22ce; font-weight: bold; margin-top: 2px;">(Dont ${totalRefacturationTaxe.toFixed(2)} € en Refacturation Interne MUC)</div>` : ''}
+                </div>
+              </div>
+
+              <a href="${BACKEND_URL}/api/admin/finances/tax-report/mark-declared-by-link?month=${targetMonth}&year=${targetYear}&token=${token}&confirm=1" class="btn-confirm">
+                ✅ Confirmer la Déclaration & Enregistrer la Dépense (${totalTaxeSejour.toFixed(2)} €)
+              </a>
+
+              <a href="${FRONTEND_URL}/admin" class="btn-cancel">Annuler et retourner au Tableau de Bord</a>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Confirmation validée : enregistrer la dépense (idempotence)
+    const alreadyCreated = await withDbRetry(() => prisma.expense.findFirst({
+      where: {
+        comptePcg: { startsWith: '447' },
+        OR: [
+          { label: { contains: periodLabel, mode: 'insensitive' } },
+          { label: { contains: `${data.monthName.toLowerCase()} ${targetYear}`, mode: 'insensitive' } },
+          { description: { contains: periodLabel, mode: 'insensitive' } }
+        ]
+      }
+    }));
+
+    let expense = alreadyCreated;
+    if (!expense) {
+      expense = await withDbRetry(() => prisma.expense.create({
+        data: {
+          date: new Date(),
+          label: `Reversement Taxe de Séjour - ${periodLabel}`,
+          montant: totalTaxeSejour,
+          categorie: 'Reversement Taxe de Séjour',
+          comptePcg: '447',
+          description: `Déclaration 3D Ouest effectuée pour ${periodLabel} (${totalUnitesLouees} unités, ${totalNuiteesAssujetties} nuitées assujetties, ${totalNuiteesExonerees} nuitées exonérées). Enregistré via validation par e-mail.`
+        }
+      }));
+
+      // Notification par email
+      try {
+        const recipientEmails = 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
+        await sendMail({
+          to: recipientEmails,
+          subject: `✅ [TAXE DE SÉJOUR DÉCLARÉE] ${periodLabel} - ${totalTaxeSejour.toFixed(2)} € enregistrés en dépense (Compte 447)`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+              <div style="background-color: #059669; padding: 22px; text-align: center; color: white;">
+                <span style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie</span>
+                <h2 style="margin: 0; font-size: 20px;">Taxe de Séjour Déclarée & Comptabilisée</h2>
+                <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Période : ${periodLabel}</p>
+              </div>
+              <div style="padding: 24px; color: #334155; font-size: 13px; line-height: 1.6;">
+                <p>Bonjour,</p>
+                <p>La taxe de séjour pour <strong>${periodLabel}</strong> a été marquée comme déclarée via le lien de validation par e-mail.</p>
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                  <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px;">
+                    <tr><td style="color: #64748b; font-weight: 600;">Période :</td><td style="font-weight: 800;">${periodLabel}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Unités louées (2) :</td><td style="font-weight: 800;">${totalUnitesLouees}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Nuitées assujetties (3) :</td><td style="font-weight: 800;">${totalNuiteesAssujetties}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Nuitées exonérées (4) :</td><td style="font-weight: 800;">${totalNuiteesExonerees}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Montant reversé (5) :</td><td style="font-weight: 900; color: #059669; font-size: 16px;">${totalTaxeSejour.toFixed(2)} €</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Compte Comptable :</td><td style="font-weight: 800; color: #dc2626;">Compte 447 (Reversement Taxe de Séjour)</td></tr>
+                  </table>
+                </div>
+                <p>Une dépense de <strong>${totalTaxeSejour.toFixed(2)} €</strong> a été enregistrée avec succès au débit du <strong>Compte 447 (Reversement Taxe de Séjour)</strong> et vient équilibrer la taxe collectée.</p>
+                <p style="text-align: center; margin-top: 20px;">
+                  <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 13px;">Accéder au Tableau de Bord Admin</a>
+                </p>
+              </div>
+            </div>
+          `
+        });
+      } catch (eMailErr) {
+        console.error("Erreur notification email taxe déclarée:", eMailErr);
+      }
+    }
+
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="utf-8">
+        <title>Taxe Déclarée avec Succès - Gîte Maladrerie</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0fdf4; margin: 0; padding: 40px 15px; color: #1e293b; display: flex; justify-content: center; }
+          .card { background: white; max-width: 540px; width: 100%; border-radius: 20px; box-shadow: 0 10px 25px rgba(5,150,105,0.1); border: 1px solid #bbf7d0; overflow: hidden; text-align: center; }
+          .header { background: #059669; color: white; padding: 25px; }
+          .content { padding: 30px; }
+          .icon { font-size: 48px; margin-bottom: 10px; }
+          .btn { display: inline-block; background-color: #004B93; color: white; text-decoration: none; font-weight: bold; padding: 14px 28px; border-radius: 10px; margin-top: 20px; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="header">
+            <h2 style="margin: 0; font-size: 22px;">Gîte de La Maladrerie</h2>
+            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 13px;">Déclaration Enregistrée</p>
+          </div>
+          <div class="content">
+            <div class="icon">✅</div>
+            <h2 style="color: #065f46; margin: 0 0 10px 0;">Déclaration Prise en Compte !</h2>
+            <p style="color: #475569; font-size: 14px; line-height: 1.6;">
+              La taxe de séjour de <strong>${periodLabel}</strong> d'un montant de <strong>${totalTaxeSejour.toFixed(2)} €</strong> a été enregistrée avec succès dans les dépenses (Compte PCG 447).
+            </p>
+            <p style="color: #64748b; font-size: 13px;">
+              Elle est désormais comptabilisée dans l'onglet Finances et vient solder les taxes perçues.
+            </p>
+            <a href="${FRONTEND_URL}/admin" class="btn">Retourner au Tableau de Bord Admin</a>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Erreur validation déclaration taxe:", error);
+    return res.status(500).send(`
+      <html><body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+        <h2 style="color: #ef4444;">Erreur serveur</h2>
+        <p>${error.message || "Une erreur est survenue lors de l'enregistrement."}</p>
+        <a href="${FRONTEND_URL}/admin">Retour au Tableau de Bord</a>
+      </body></html>
+    `);
+  }
+});
+
+// Enregistrer la déclaration de taxe de séjour directement depuis le Tableau de Bord Admin (1-click)
+app.post('/api/admin/finances/tax-report/mark-declared', checkAuth, async (req, res) => {
+  const { month, year } = req.body;
+  const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
+  try {
+    const data = await calculerTaxeSejourMois(parseInt(month), parseInt(year));
+    
+    // Vérifier si déjà déclarée
+    let expense = data.existingExpense;
+    if (!expense) {
+      expense = await withDbRetry(() => prisma.expense.create({
+        data: {
+          date: new Date(),
+          label: `Reversement Taxe de Séjour - ${data.periodLabel}`,
+          montant: data.totalTaxeSejour,
+          categorie: 'Reversement Taxe de Séjour',
+          comptePcg: '447',
+          description: `Déclaration 3D Ouest effectuée pour ${data.periodLabel} (${data.totalUnitesLouees} unités, ${data.totalNuiteesAssujetties} nuitées assujetties, ${data.totalNuiteesExonerees} nuitées exonérées). Enregistré depuis l'espace Admin par ${req.user?.nom || 'Admin'}.`
+        }
+      }));
+
+      // E-mail de notification
+      try {
+        const recipientEmails = 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
+        await sendMail({
+          to: recipientEmails,
+          subject: `✅ [TAXE DE SÉJOUR DÉCLARÉE] ${data.periodLabel} - ${data.totalTaxeSejour.toFixed(2)} € enregistrés en dépense (Compte 447)`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+              <div style="background-color: #059669; padding: 22px; text-align: center; color: white;">
+                <span style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie</span>
+                <h2 style="margin: 0; font-size: 20px;">Taxe de Séjour Déclarée & Comptabilisée</h2>
+                <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Période : ${data.periodLabel}</p>
+              </div>
+              <div style="padding: 24px; color: #334155; font-size: 13px; line-height: 1.6;">
+                <p>Bonjour,</p>
+                <p>La déclaration de taxe de séjour pour <strong>${data.periodLabel}</strong> a été enregistrée avec succès depuis l'espace d'administration du gîte.</p>
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                  <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px;">
+                    <tr><td style="color: #64748b; font-weight: 600;">Période :</td><td style="font-weight: 800;">${data.periodLabel}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Unités louées (2) :</td><td style="font-weight: 800;">${data.totalUnitesLouees}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Nuitées assujetties (3) :</td><td style="font-weight: 800;">${data.totalNuiteesAssujetties}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Nuitées exonérées (4) :</td><td style="font-weight: 800;">${data.totalNuiteesExonerees}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Montant reversé (5) :</td><td style="font-weight: 900; color: #059669; font-size: 16px;">${data.totalTaxeSejour.toFixed(2)} €</td></tr>
+                    <tr><td style="color: #64748b; font-weight: 600;">Compte Comptable :</td><td style="font-weight: 800; color: #dc2626;">Compte 447 (Reversement Taxe de Séjour)</td></tr>
+                  </table>
+                </div>
+                <p>Une dépense de <strong>${data.totalTaxeSejour.toFixed(2)} €</strong> a été ajoutée aux charges du gîte (Compte 447), équilibrant ainsi la taxe perçue.</p>
+                <p style="text-align: center; margin-top: 20px;">
+                  <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 13px;">Accéder au Tableau de Bord Admin</a>
+                </p>
+              </div>
+            </div>
+          `
+        });
+      } catch (eMailErr) {
+        console.error("Erreur notification email taxe déclarée:", eMailErr);
+      }
+    }
+
+    res.json({
+      success: true,
+      periodLabel: data.periodLabel,
+      montant: data.totalTaxeSejour,
+      expense
+    });
+  } catch (error) {
+    console.error("Erreur enregistrement déclaration taxe:", error);
+    res.status(500).json({ error: error.message || "Erreur lors de l'enregistrement de la déclaration de taxe." });
+  }
+});
+
 
 app.get('/api/admin/finances', checkAuth, async (req, res) => {
   try {
