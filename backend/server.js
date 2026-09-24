@@ -15,7 +15,39 @@ const jwt = require('jsonwebtoken');
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_dummy';
 const stripe = require('stripe')(stripeSecretKey);
 
-const prisma = new PrismaClient();
+const getDatabaseUrl = () => {
+  let url = process.env.DATABASE_URL || '';
+  if (url && !url.includes('connect_timeout')) {
+    url += (url.includes('?') ? '&' : '?') + 'connect_timeout=15';
+  }
+  return url;
+};
+
+const prisma = new PrismaClient({
+  datasources: process.env.DATABASE_URL ? {
+    db: { url: getDatabaseUrl() }
+  } : undefined
+});
+
+async function withDbRetry(fn, maxRetries = 3, delayMs = 1500) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const isConnectionError = err?.code === 'P1001' || err?.message?.includes("Can't reach database server") || err?.message?.includes("connection");
+      if (isConnectionError && attempt < maxRetries) {
+        console.warn(`[Neon DB Wakeup] Tentative ${attempt} échouée (P1001). Nouvelle tentative dans ${delayMs}ms...`);
+        await new Promise(r => setTimeout(r, delayMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
 const app = express();
 
 const generateFeedbackHTML = (title, message, isSuccess = true) => {
@@ -5403,7 +5435,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
   }
 
   // 1. REQUÊTE TAXE DE SÉJOUR (Séjours actifs débutant sur la période)
-  const reservations = await prisma.reservation.findMany({
+  const reservations = await withDbRetry(() => prisma.reservation.findMany({
     where: {
       statut: { in: ['RESERVE', 'TERMINE'] },
       dateDebut: {
@@ -5413,7 +5445,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
     },
     include: { occupants: true, client: true },
     orderBy: { dateDebut: 'asc' }
-  });
+  }));
 
   let totalTaxeSejour = 0;
   let totalUnitesLouees = reservations.length;
@@ -5445,7 +5477,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
   totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
 
   // 2. REQUÊTE VIREMENTS BANCAIRES ENCAISSÉS SUR LA PÉRIODE
-  const virementsEncaissesRes = await prisma.reservation.findMany({
+  const virementsEncaissesRes = await withDbRetry(() => prisma.reservation.findMany({
     where: {
       modePaiement: 'VIREMENT',
       statutPaiement: { in: ['ACOMPTE_PAYE', 'SOLDE_PAYE', 'PAYE'] },
@@ -5456,7 +5488,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
     },
     include: { client: true },
     orderBy: { dateDebut: 'asc' }
-  });
+  }));
 
   let totalVirementsEncaisses = 0;
   const listVirementsEncaisses = virementsEncaissesRes.map(r => {
@@ -5488,7 +5520,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
   totalVirementsEncaisses = Math.round(totalVirementsEncaisses * 100) / 100;
 
   // 3. REQUÊTE VIREMENTS ATTENDUS (En attente de réception)
-  const virementsAttendusRes = await prisma.reservation.findMany({
+  const virementsAttendusRes = await withDbRetry(() => prisma.reservation.findMany({
     where: {
       modePaiement: 'VIREMENT',
       statutPaiement: { in: ['EN_ATTENTE', 'ACOMPTE_PAYE'] },
@@ -5497,7 +5529,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
     },
     include: { client: true },
     orderBy: { dateDebut: 'asc' }
-  });
+  }));
 
   let totalVirementsAttendus = 0;
   const listVirementsAttendus = virementsAttendusRes.map(r => {
@@ -5779,7 +5811,7 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
     });
   } catch (error) {
     console.error("Erreur envoi manuel rapport comptable & taxe:", error);
-    res.status(500).json({ error: "Erreur lors de l'envoi du rapport de taxe et comptabilité." });
+    res.status(500).json({ error: error.message || "Erreur lors de l'envoi du rapport de taxe et comptabilité." });
   }
 });
 
