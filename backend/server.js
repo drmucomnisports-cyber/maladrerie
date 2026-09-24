@@ -5555,8 +5555,52 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
   });
   totalVirementsAttendus = Math.round(totalVirementsAttendus * 100) / 100;
 
-  // 4. SYNTHÈSE GLOBALE DE TOUS LES ENCAISSEMENTS SUR LA PÉRIODE (Virements + CB Stripe + Chèques/Espèces)
+  // 3b. REQUÊTE REFACTURATIONS INTERNES MUC (Pôle Animation / Interne) SUR LA PÉRIODE
+  const refacturationsInternesRes = await withDbRetry(() => prisma.reservation.findMany({
+    where: {
+      modePaiement: 'INTERNE',
+      statutPaiement: { in: ['ACOMPTE_PAYE', 'SOLDE_PAYE', 'PAYE'] },
+      OR: [
+        { payeLe: { gte: periodStart, lte: periodEnd } },
+        { payeLe: null, dateDebut: { gte: periodStart, lte: periodEnd } }
+      ]
+    },
+    include: { client: true },
+    orderBy: { dateDebut: 'asc' }
+  }));
+
+  let totalRefacturationsInternes = 0;
+  const listRefacturationsInternes = refacturationsInternesRes.map(r => {
+    let montant = 0;
+    let typeReglement = 'Totalité (100%)';
+    if (r.statutPaiement === 'ACOMPTE_PAYE') {
+      montant = r.montantAcompte || Math.round((r.prixTotal || 0) * 0.3 * 100) / 100;
+      typeReglement = 'Acompte (30%)';
+    } else if (r.statutPaiement === 'SOLDE_PAYE') {
+      montant = r.montantSolde || Math.round((r.prixTotal || 0) * 0.7 * 100) / 100;
+      typeReglement = 'Solde (70%)';
+    } else {
+      montant = r.prixTotal || 0;
+      typeReglement = 'Totalité (100%)';
+    }
+    totalRefacturationsInternes += montant;
+    const datePay = r.payeLe ? new Date(r.payeLe).toLocaleDateString('fr-FR') : (r.dateDebut ? new Date(r.dateDebut).toLocaleDateString('fr-FR') : 'N/A');
+    return {
+      id: r.id,
+      client: r.client?.nom || 'N/A',
+      structure: r.structure || 'Pôle Animation MUC',
+      dates: `${new Date(r.dateDebut).toLocaleDateString('fr-FR')} - ${new Date(r.dateFin).toLocaleDateString('fr-FR')}`,
+      type: typeReglement,
+      montant: Math.round(montant * 100) / 100,
+      datePaiement: datePay,
+      reference: `MUC-INT-${r.id}`
+    };
+  });
+  totalRefacturationsInternes = Math.round(totalRefacturationsInternes * 100) / 100;
+
+  // 4. SYNTHÈSE GLOBALE DE TOUS LES ENCAISSEMENTS SUR LA PÉRIODE (Virements + CB Stripe + Refacturations Internes + Chèques/Espèces)
   let totalStripe = 0;
+  let totalInterne = totalRefacturationsInternes;
   let totalAutres = 0;
 
   reservations.forEach(r => {
@@ -5566,7 +5610,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
         ? (r.prixTotal || 0) 
         : (r.montantAcompte || (r.prixTotal ? Math.round(r.prixTotal * 0.3 * 100) / 100 : 0));
 
-      if (mode !== 'VIREMENT') {
+      if (mode !== 'VIREMENT' && mode !== 'INTERNE') {
         if (mode.includes('STRIPE') || mode.includes('CARTE') || mode.includes('CB') || r.stripeSessionId) {
           totalStripe += encaisse;
         } else {
@@ -5577,7 +5621,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
   });
   totalStripe = Math.round(totalStripe * 100) / 100;
   totalAutres = Math.round(totalAutres * 100) / 100;
-  const totalGeneralEncaisse = Math.round((totalVirementsEncaisses + totalStripe + totalAutres) * 100) / 100;
+  const totalGeneralEncaisse = Math.round((totalVirementsEncaisses + totalStripe + totalInterne + totalAutres) * 100) / 100;
 
   // 5. DESTINATAIRES
   const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
@@ -5740,10 +5784,47 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
             ` : `<p style="font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 0;">Aucun virement en attente sur cette période.</p>`}
           </div>
 
-          <!-- ================= SECTION 3 : SYNTHÈSE GLOBALE ENCAISSEMENTS ================= -->
+          <!-- ================= SECTION 3 : REFACTURATIONS INTERNES MUC (PÔLE ANIMATION) ================= -->
+          <div style="margin: 25px 0 15px 0; background-color: #faf5ff; border: 2px solid #9333ea; border-radius: 10px; padding: 18px;">
+            <h3 style="margin: 0 0 12px 0; color: #9333ea; font-size: 14px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #e9d5ff; padding-bottom: 6px;">
+              🔄 3. Refacturations Internes MUC (Pôle Animation)
+            </h3>
+            
+            <p style="font-size: 13px; font-weight: bold; color: #7e22ce; margin: 12px 0 6px 0;">
+              Cessions internes & Réservations prises en charge en interne (${listRefacturationsInternes.length}) : Total <span style="font-size: 15px; color: #7e22ce; font-weight: 900;">${totalRefacturationsInternes.toFixed(2)} €</span>
+            </p>
+            ${listRefacturationsInternes.length > 0 ? `
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 11px; border-collapse: collapse; border: 1px solid #e9d5ff;">
+              <thead style="background-color: #f3e8ff; color: #7e22ce; font-weight: bold;">
+                <tr>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #d8b4fe;">Date règlem.</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #d8b4fe;">Résa</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #d8b4fe;">Client / Structure</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #d8b4fe;">Dates séjour</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #d8b4fe;">Règlement</th>
+                  <th align="right" style="padding: 6px; border-bottom: 1px solid #d8b4fe;">Montant refacturé</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${listRefacturationsInternes.map((item, idx) => `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#faf5ff'}; border-bottom: 1px solid #f3e8ff;">
+                  <td style="padding: 6px;">${item.datePaiement}</td>
+                  <td style="padding: 6px; font-weight: bold;">#${item.id}</td>
+                  <td style="padding: 6px;">${item.client}${item.structure ? ` <span style="color:#7e22ce; font-weight:bold;">(${item.structure})</span>` : ''}</td>
+                  <td style="padding: 6px;">${item.dates}</td>
+                  <td style="padding: 6px;"><span style="background-color: #f3e8ff; color: #7e22ce; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${item.type}</span></td>
+                  <td align="right" style="padding: 6px; font-weight: bold; color: #7e22ce; font-size: 12px;">${item.montant.toFixed(2)} €</td>
+                </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            ` : `<p style="font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 0;">Aucune refacturation interne enregistrée sur cette période.</p>`}
+          </div>
+
+          <!-- ================= SECTION 4 : SYNTHÈSE GLOBALE ENCAISSEMENTS & REFACTURATIONS ================= -->
           <div style="margin: 25px 0 15px 0; background-color: #f8fafc; border: 2px solid #475569; border-radius: 10px; padding: 18px;">
             <h3 style="margin: 0 0 12px 0; color: #334155; font-size: 14px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;">
-              💰 3. Synthèse Générale des Encaissements de la Période
+              💰 4. Synthèse Générale des Encaissements & Refacturations de la Période
             </h3>
             
             <table width="100%" cellpadding="8" cellspacing="0" style="font-size: 13px; border-collapse: collapse;">
@@ -5756,11 +5837,15 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
                 <td style="font-weight: 900; color: #6366f1; font-size: 15px; text-align: right;">${totalStripe.toFixed(2)} €</td>
               </tr>
               <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                <td style="color: #7e22ce; font-weight: bold;">🔄 Refacturations Internes MUC (Pôle Animation) :</td>
+                <td style="font-weight: 900; color: #7e22ce; font-size: 15px; text-align: right;">${totalRefacturationsInternes.toFixed(2)} €</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
                 <td style="color: #475569; font-weight: bold;">💵 Autres règlements (Chèques, Espèces) :</td>
                 <td style="font-weight: 900; color: #64748b; font-size: 15px; text-align: right;">${totalAutres.toFixed(2)} €</td>
               </tr>
               <tr style="background-color: #ecfdf5;">
-                <td style="color: #065f46; font-weight: 900; font-size: 14px;">📈 TOTAL GÉNÉRAL ENCAISSÉ :</td>
+                <td style="color: #065f46; font-weight: 900; font-size: 14px;">📈 TOTAL GÉNÉRAL ENCAISSÉ & REFACTURÉ :</td>
                 <td style="font-weight: 900; color: #047857; font-size: 20px; text-align: right;">${totalGeneralEncaisse.toFixed(2)} €</td>
               </tr>
             </table>
@@ -5785,6 +5870,7 @@ async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy =
     totalTaxeSejour,
     totalVirementsEncaisses,
     totalVirementsAttendus,
+    totalRefacturationsInternes,
     totalGeneralEncaisse
   };
 }
@@ -5807,6 +5893,7 @@ app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, r
       totalTaxeSejour: result.totalTaxeSejour,
       totalVirementsEncaisses: result.totalVirementsEncaisses,
       totalVirementsAttendus: result.totalVirementsAttendus,
+      totalRefacturationsInternes: result.totalRefacturationsInternes,
       totalGeneralEncaisse: result.totalGeneralEncaisse
     });
   } catch (error) {
@@ -6015,6 +6102,8 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
         createdAt: r.createdAt,
         clientNom: r.client?.nom || 'Inconnu',
         typePaiement: r.statutPaiement,
+        modePaiement: r.modePaiement || (r.stripeSessionId ? 'STRIPE' : 'VIREMENT'),
+        structure: r.structure || '',
         montantTotal: r.prixTotal,
         montantPaye,
         partRestauration: partRestaurationEncaissee,
@@ -6027,10 +6116,37 @@ app.get('/api/admin/finances', checkAuth, async (req, res) => {
       };
     });
 
+    let caInterne = 0;
+    let caVirement = 0;
+    let caStripe = 0;
+    let caAutres = 0;
+
+    recettesDetaillees.forEach(item => {
+      const mode = (item.modePaiement || '').toUpperCase();
+      if (mode === 'INTERNE') {
+        caInterne += item.montantPaye;
+      } else if (mode === 'VIREMENT') {
+        caVirement += item.montantPaye;
+      } else if (mode.includes('STRIPE') || mode.includes('CB') || mode.includes('CARTE')) {
+        caStripe += item.montantPaye;
+      } else {
+        caAutres += item.montantPaye;
+      }
+    });
+
+    caInterne = Math.round(caInterne * 100) / 100;
+    caVirement = Math.round(caVirement * 100) / 100;
+    caStripe = Math.round(caStripe * 100) / 100;
+    caAutres = Math.round(caAutres * 100) / 100;
+
     res.json({
       caEnquaisse,
       caHebergementEncaisse,
       caRestaurationEncaisse,
+      caInterne,
+      caVirement,
+      caStripe,
+      caAutres,
       resteAEncaisser,
       remunerationTotale,
       remunerationParIntervenant,
@@ -6501,8 +6617,9 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
 
     try {
       const isVirement = (mode && mode.toUpperCase() === 'VIREMENT');
+      const isInterne = (mode && mode.toUpperCase() === 'INTERNE');
       const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['david.roujet@mucomnisports.fr']);
-      const recipients = isVirement 
+      const recipients = (isVirement || isInterne)
         ? `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr`
         : `${targetAdminEmail}, david.roujet@mucomnisports.fr`;
         
@@ -6510,18 +6627,37 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
       const dFin = reservation.dateFin ? new Date(reservation.dateFin).toLocaleDateString('fr-FR') : 'N/A';
       const labelType = typePaiement === 'ACOMPTE' ? 'Acompte (30%)' : typePaiement === 'SOLDE' ? 'Solde (70%)' : 'Règlement Total (100%)';
 
+      const emailSubject = isInterne
+        ? `🔄 [REFACTURATION INTERNE MUC] ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client?.nom || 'Client'} - ${parsedMontant.toFixed(2)} € (Résa #${reservation.id})`
+        : isVirement 
+          ? `🏦 [VIREMENT ENREGISTRÉ - MANUEL] ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client?.nom || 'Client'} - ${parsedMontant.toFixed(2)} € (Résa #${reservation.id})`
+          : `💵 [PAIEMENT MANUEL ENREGISTRÉ] ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client?.nom || 'Client'} - ${parsedMontant.toFixed(2)} € (Résa #${reservation.id})`;
+
+      const headerTitle = isInterne
+        ? '🔄 Refacturation interne MUC enregistrée'
+        : isVirement
+          ? '🏦 Virement encaissé et enregistré'
+          : '💵 Paiement manuel enregistré';
+
+      const modeBadge = isInterne
+        ? '<span style="background-color: #f3e8ff; color: #7e22ce; padding: 2px 8px; border-radius: 4px; font-weight: bold;">INTERNE (Refacturation MUC)</span>'
+        : `<span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${mode || 'VIREMENT'}</span>`;
+
       await sendMail({
         to: recipients,
-        subject: `${isVirement ? '🏦 [VIREMENT ENREGISTRÉ - MANUEL]' : '💵 [PAIEMENT MANUEL ENREGISTRÉ]'} ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client?.nom || 'Client'} - ${parsedMontant.toFixed(2)} € (Résa #${reservation.id})`,
+        subject: emailSubject,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
             <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
               <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
-              <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase;">${isVirement ? '🏦 Virement encaissé et enregistré' : '💵 Paiement manuel enregistré'}</h2>
+              <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase;">${headerTitle}</h2>
             </div>
             <div style="padding: 24px; color: #334155; font-size: 14px; line-height: 1.6;">
               <p>Bonjour,</p>
               <p>Un règlement vient d'être enregistré manuellement dans l'espace d'administration par <strong>${req.user?.nom || req.user?.email || 'un administrateur'}</strong> :</p>
+              ${isInterne ? `<div style="background-color: #faf5ff; border: 1px solid #d8b4fe; border-radius: 8px; padding: 12px; margin-bottom: 15px; color: #6b21a8; font-size: 13px; font-weight: 500;">
+                ℹ️ <strong>Information Comptable :</strong> Ce règlement correspond à une <strong>refacturation interne</strong> pour le pôle animation / activités internes du MUC. Aucun encaissement bancaire externe n'est attendu.
+              </div>` : ''}
               <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 18px 0;">
                 <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px;">
                   <tr><td width="40%" style="color: #64748b; font-weight: bold;">Client :</td><td style="font-weight: bold;">${reservation.client?.nom || 'N/A'}</td></tr>
@@ -6529,8 +6665,8 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
                   <tr><td style="color: #64748b; font-weight: bold;">N° Réservation :</td><td style="font-weight: bold; font-family: monospace;">#${reservation.id}</td></tr>
                   <tr><td style="color: #64748b; font-weight: bold;">Dates séjour :</td><td>Du ${dDebut} au ${dFin}</td></tr>
                   <tr><td style="color: #64748b; font-weight: bold;">Type de paiement :</td><td style="font-weight: bold;">${labelType}</td></tr>
-                  <tr><td style="color: #64748b; font-weight: bold;">Mode de règlement :</td><td><span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${mode || 'VIREMENT'}</span></td></tr>
-                  <tr><td style="color: #64748b; font-weight: bold;">Montant encaissé :</td><td style="font-weight: 900; color: #15803d; font-size: 16px;">${parsedMontant.toFixed(2)} €</td></tr>
+                  <tr><td style="color: #64748b; font-weight: bold;">Mode de règlement :</td><td>${modeBadge}</td></tr>
+                  <tr><td style="color: #64748b; font-weight: bold;">Montant ${isInterne ? 'refacturé' : 'encaissé'} :</td><td style="font-weight: 900; color: ${isInterne ? '#7e22ce' : '#15803d'}; font-size: 16px;">${parsedMontant.toFixed(2)} €</td></tr>
                   <tr><td style="color: #64748b; font-weight: bold;">Nouveau statut :</td><td><strong>${targetStatus}</strong></td></tr>
                 </table>
               </div>
@@ -10571,9 +10707,10 @@ app.get('/api/admin/factures/period/pnm', checkAuth, async (req, res) => {
       const numPiece = String(r.id).padStart(7, '0');
 
       let modePaiement = 'V';
-      if (r.statutPaiement?.includes('CB') || r.statutPaiement?.includes('STRIPE')) modePaiement = 'U';
-      else if (r.statutPaiement?.includes('CHEQUE')) modePaiement = 'C';
-      else if (r.statutPaiement?.includes('ESPECES')) modePaiement = 'E';
+      if (r.statutPaiement?.includes('CB') || r.statutPaiement?.includes('STRIPE') || r.modePaiement === 'STRIPE') modePaiement = 'U';
+      else if (r.statutPaiement?.includes('CHEQUE') || r.modePaiement === 'CHEQUE') modePaiement = 'C';
+      else if (r.statutPaiement?.includes('ESPECES') || r.modePaiement === 'ESPECES') modePaiement = 'E';
+      else if (r.modePaiement === 'INTERNE') modePaiement = 'I';
 
       // Débit Tiers Client (Compte 4110000000000)
       if (prixTotal > 0) {

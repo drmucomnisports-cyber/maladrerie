@@ -99,7 +99,8 @@ async function generateFacturePDF(data) {
             doc.fontSize(9).font('Helvetica');
             let offsetReg = 20;
             if (data.modePaiement) {
-                doc.text(`Mode de paiement : ${data.modePaiement}`, rightCol, reglementsY + offsetReg);
+                const modeLabel = data.modePaiement === 'INTERNE' ? 'Interne (Refacturation MUC)' : data.modePaiement;
+                doc.text(`Mode de paiement : ${modeLabel}`, rightCol, reglementsY + offsetReg);
                 offsetReg += 15;
             }
             if (data.statutPaiement === 'PAYE') {

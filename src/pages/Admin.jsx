@@ -2277,7 +2277,9 @@ const Admin = () => {
                             {res.montantAcompte === 0 ? (
                               <span className="text-slate-400 font-bold">—</span>
                             ) : res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold">✓ Payé</span>
+                              <span className="text-green-600 font-bold">{res.modePaiement === 'INTERNE' ? '✓ Payé (Int.)' : '✓ Payé'}</span>
+                            ) : res.modePaiement === 'INTERNE' ? (
+                              <span className="text-purple-600 font-bold" title="Refacturation interne MUC attendue">🔄 Int. Att.</span>
                             ) : res.modePaiement === 'VIREMENT' ? (
                               <span className="text-cyan-600 font-bold" title="Virement attendu">🏦 Vir. Att.</span>
                             ) : res.stripeAcompteId ? (
@@ -2291,7 +2293,9 @@ const Admin = () => {
                               {res.montantAcompte === 0 ? "Total 100%" : "Solde 70%"}
                             </span>
                             {res.statutPaiement === 'SOLDE_PAYE' || res.statutPaiement === 'PAYE' ? (
-                              <span className="text-green-600 font-bold">✓ Payé</span>
+                              <span className="text-green-600 font-bold">{res.modePaiement === 'INTERNE' ? '✓ Payé (Int.)' : '✓ Payé'}</span>
+                            ) : res.modePaiement === 'INTERNE' ? (
+                              <span className="text-purple-600 font-bold" title="Refacturation interne MUC attendue">🔄 Int. Att.</span>
                             ) : res.modePaiement === 'VIREMENT' ? (
                               <span className="text-cyan-600 font-bold" title="Virement attendu">🏦 Vir. Att.</span>
                             ) : res.stripeSoldeId ? (
@@ -2433,9 +2437,14 @@ const Admin = () => {
                                 : (res.montantAcompte === 0 ? (res.prixTotal || 0) : (res.montantAcompte || Math.round((res.prixTotal || 0) * 0.3 * 100) / 100));
                               const defaultTypeFormatted = res.montantAcompte === 0 && !isAcomptePaid ? 'TOTAL' : defaultType;
                               
+                              const isMuc = (res.structure && res.structure.toLowerCase().includes('muc')) || 
+                                            (res.client?.nom && res.client.nom.toLowerCase().includes('muc')) ||
+                                            (res.client?.email && res.client.email.toLowerCase().includes('muc'));
+                              const defaultMode = res.modePaiement === 'INTERNE' ? 'INTERNE' : (isMuc ? 'INTERNE' : (res.modePaiement || 'VIREMENT'));
+                              
                               setManualPaymentForm({
                                 montant: defaultAmt.toString(),
-                                mode: 'ESPECES',
+                                mode: defaultMode,
                                 typePaiement: defaultTypeFormatted
                               });
                               setShowManualPaymentModal(true);
@@ -3237,14 +3246,14 @@ const Admin = () => {
                                 {new Date(res.payeLe).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                               </p>
                               <p className="text-xs text-slate-600 mt-0.5">
-                                Réglé par <strong className="uppercase">{res.modePaiement || 'N/A'}</strong> (Statut : <strong>{res.statutPaiement}</strong>)
+                                Réglé par {res.modePaiement === 'INTERNE' ? <strong className="text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">INTERNE (Refacturation MUC)</strong> : <strong className="uppercase">{res.modePaiement || 'N/A'}</strong>} (Statut : <strong>{res.statutPaiement}</strong>)
                               </p>
                             </>
                           ) : (res.statutPaiement === 'PAYE' || res.statutPaiement === 'ACOMPTE_PAYE' || res.statutPaiement === 'SOLDE_PAYE') ? (
                             <>
                               <p className="text-xs text-slate-500 italic">Payé (Date de transaction antérieure ou inconnue)</p>
                               <p className="text-xs text-slate-600 mt-0.5">
-                                Mode : <strong className="uppercase">{res.modePaiement || 'N/A'}</strong> (Statut : <strong>{res.statutPaiement}</strong>)
+                                Mode : {res.modePaiement === 'INTERNE' ? <strong className="text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">INTERNE (Refacturation MUC)</strong> : <strong className="uppercase">{res.modePaiement || 'N/A'}</strong>} (Statut : <strong>{res.statutPaiement}</strong>)
                               </p>
                             </>
                           ) : (
@@ -3252,7 +3261,7 @@ const Admin = () => {
                               <p className="text-xs text-slate-400 italic">En attente de règlement (Statut : {res.statutPaiement})</p>
                               {res.modePaiement && (
                                 <p className="text-xs text-slate-500 mt-0.5">
-                                  Moyen attendu : <strong className="uppercase">{res.modePaiement}</strong>
+                                  Moyen attendu : {res.modePaiement === 'INTERNE' ? <strong className="text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">INTERNE (Refacturation MUC)</strong> : <strong className="uppercase">{res.modePaiement}</strong>}
                                 </p>
                               )}
                             </div>
@@ -3439,7 +3448,7 @@ const Admin = () => {
                           {/* Moyen & Date */}
                           {(res.payeLe || res.modePaiement) && (
                             <div className="text-[10px] text-slate-400 mt-1 italic">
-                              Enregistré par <strong className="uppercase">{res.modePaiement || 'Stripe'}</strong>
+                              Enregistré par <strong className="uppercase">{res.modePaiement === 'INTERNE' ? 'Interne (Refacturation MUC)' : (res.modePaiement || 'Stripe')}</strong>
                               {res.payeLe && ` le ${new Date(res.payeLe).toLocaleDateString('fr-FR')}`}
                             </div>
                           )}
@@ -3554,26 +3563,60 @@ const Admin = () => {
         let rList7063 = [];
         let rList447 = [];
 
+        // Répartition par mode de règlement (Trésorerie & Refacturations)
+        let rInterne = 0;
+        let rListInterne = [];
+        let rVirement = 0;
+        let rStripe = 0;
+        let rAutres = 0;
+
         (finances?.recettesDetaillees || []).forEach(r => {
+            const m = (r.modePaiement || '').toUpperCase();
+            const paye = r.montantPaye || 0;
+            const clientLabel = `${r.clientNom}${r.structure ? ' (' + r.structure + ')' : ''}`;
+
+            if (m === 'INTERNE') {
+                rInterne += paye;
+                rListInterne.push({
+                    id: r.id,
+                    date: r.date || r.createdAt,
+                    label: `Résa #${r.id} - ${clientLabel}`,
+                    montant: paye,
+                    statut: r.typePaiement,
+                    modePaiement: r.modePaiement,
+                    hebergement: r.partHebergement || 0,
+                    restauration: r.partRestauration || 0,
+                    salles: r.partSalles || 0,
+                    taxeSejour: r.partTaxeSejour || 0
+                });
+            } else if (m === 'VIREMENT') {
+                rVirement += paye;
+            } else if (m.includes('STRIPE') || m.includes('CB') || m.includes('CARTE')) {
+                rStripe += paye;
+            } else {
+                rAutres += paye;
+            }
+
             if (r.partHebergement > 0) {
                 r7061 += r.partHebergement;
-                rList7061.push({ date: r.date || r.createdAt, label: `Résa #${r.id} (${r.clientNom})`, montant: r.partHebergement, statut: r.typePaiement });
+                rList7061.push({ date: r.date || r.createdAt, label: `Résa #${r.id} (${clientLabel})`, montant: r.partHebergement, statut: r.typePaiement, modePaiement: r.modePaiement });
             }
             if (r.partRestauration > 0) {
                 r7062 += r.partRestauration;
-                rList7062.push({ date: r.date || r.createdAt, label: `Repas Résa #${r.id} (${r.clientNom})`, montant: r.partRestauration, statut: r.typePaiement });
+                rList7062.push({ date: r.date || r.createdAt, label: `Repas Résa #${r.id} (${clientLabel})`, montant: r.partRestauration, statut: r.typePaiement, modePaiement: r.modePaiement });
             }
             if (r.partSalles > 0) {
                 r7063 += r.partSalles;
-                rList7063.push({ date: r.date || r.createdAt, label: `Salles Résa #${r.id} (${r.clientNom})`, montant: r.partSalles, statut: r.typePaiement });
+                rList7063.push({ date: r.date || r.createdAt, label: `Salles Résa #${r.id} (${clientLabel})`, montant: r.partSalles, statut: r.typePaiement, modePaiement: r.modePaiement });
             }
             if (r.partTaxeSejour > 0) {
                 r447 += r.partTaxeSejour;
                 rList447.push({ 
                     date: r.date || r.createdAt, 
-                    label: `Taxe Résa #${r.id} (${r.clientNom})`, 
+                    label: `Taxe Résa #${r.id} (${clientLabel})`, 
                     montant: r.partTaxeSejour, 
                     statut: r.typePaiement,
+                    modePaiement: r.modePaiement,
                     nbAdultes: r.nbAdultes || 0,
                     nbMineurs: r.nbMineurs || 0,
                     nuits: r.nuits || 0
@@ -3791,6 +3834,73 @@ const Admin = () => {
                             <PCGRow code="7062" title="Restauration (Repas facturés)" total={r7062} items={rList7062} type="recette" />
                             <PCGRow code="7063" title="Location de Salles" total={r7063} items={rList7063} type="recette" />
                             <PCGRow code="447" title="Taxe de séjour collectée" total={r447} items={rList447} type="recette" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* VENTILATION DES ENCAISSEMENTS & REFACTURATIONS */}
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-5">
+                        <div>
+                            <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                                <span>💳</span> Ventilation des Règlements Encaissés & Refacturations
+                            </h3>
+                            <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                Répartition par mode de paiement (Trésorerie bancaire externe vs Refacturation interne MUC)
+                            </p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 flex flex-col justify-between">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-wider text-blue-900">🏦 Virements</span>
+                                <span className="text-lg">🏦</span>
+                            </div>
+                            <div className="mt-3">
+                                <span className="text-2xl font-black text-blue-800">{rVirement.toFixed(2)} €</span>
+                                <p className="text-[11px] text-blue-600 font-semibold mt-0.5">Comptes bancaires</p>
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-col justify-between">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-wider text-emerald-900">💳 CB (Stripe)</span>
+                                <span className="text-lg">💳</span>
+                            </div>
+                            <div className="mt-3">
+                                <span className="text-2xl font-black text-emerald-800">{rStripe.toFixed(2)} €</span>
+                                <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Encaissé en ligne</p>
+                            </div>
+                        </div>
+
+                        <div 
+                            onClick={() => openModal("7088", "Refacturation Interne (Pôle Animation MUC)", rInterne, rListInterne)}
+                            className="p-4 rounded-xl bg-purple-50 hover:bg-purple-100/80 border-2 border-purple-300 flex flex-col justify-between cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md group"
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                                    🔄 Refacturation Interne
+                                </span>
+                                <span className="bg-purple-200 text-purple-800 text-[10px] font-black px-1.5 py-0.5 rounded">MUC</span>
+                            </div>
+                            <div className="mt-3">
+                                <span className="text-2xl font-black text-purple-900">{rInterne.toFixed(2)} €</span>
+                                <p className="text-[11px] text-purple-700 font-bold mt-0.5 flex items-center justify-between">
+                                    <span>Pôle Animation ({rListInterne.length} séjour{rListInterne.length > 1 ? 's' : ''})</span>
+                                    <span className="text-purple-600 group-hover:translate-x-0.5 transition-transform text-xs">Voir ➔</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-wider text-slate-700">💵 Chèques / Espèces</span>
+                                <span className="text-lg">💵</span>
+                            </div>
+                            <div className="mt-3">
+                                <span className="text-2xl font-black text-slate-800">{rAutres.toFixed(2)} €</span>
+                                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Règlements physiques</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4932,11 +5042,17 @@ const Admin = () => {
                     onChange={(e) => setManualPaymentForm({ ...manualPaymentForm, mode: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-slate-100 focus:border-muc-blue outline-none transition-all font-bold"
                   >
+                    <option value="INTERNE">🔄 Interne (Refacturation MUC)</option>
                     <option value="ESPECES">Espèces</option>
                     <option value="CHEQUE">Chèque</option>
                     <option value="VIREMENT">Virement</option>
                     <option value="STRIPE">Stripe (Carte Bancaire)</option>
                   </select>
+                  {manualPaymentForm.mode === 'INTERNE' && (
+                    <p className="text-[11px] text-purple-700 bg-purple-50 p-2.5 rounded-lg border border-purple-200 mt-2 font-medium">
+                      ℹ️ <strong>Refacturation Interne :</strong> Dédié aux réservations du <strong>Pôle Animation MUC</strong> ou autres pôles internes. Ce règlement sera ventilé en refacturation interne dans l'onglet Finances et notifié à l'équipe comptable.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Type de règlement</label>
@@ -5000,6 +5116,7 @@ const Admin = () => {
                         showFeedback('Paiement enregistré avec succès !');
                         setShowManualPaymentModal(false);
                         fetchReservations();
+                        fetchFinances();
                       } else {
                         const data = await res.json();
                         alert(data.error || 'Erreur');
@@ -5057,6 +5174,7 @@ const Admin = () => {
                   >
                     <option value="STRIPE">Carte Bancaire (Stripe)</option>
                     <option value="VIREMENT">Virement Bancaire</option>
+                    <option value="INTERNE">🔄 Interne (Refacturation MUC)</option>
                     <option value="ESPECES">Espèces</option>
                     <option value="CHEQUE">Chèque</option>
                   </select>
@@ -6419,10 +6537,46 @@ const Admin = () => {
                 <X size={24} />
               </button>
               <div className="mb-6">
-                  <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-xs font-black tracking-widest uppercase mr-3">Compte {financeModalData.code}</span>
+                  <span className={`px-3 py-1 rounded-md text-xs font-black tracking-widest uppercase mr-3 ${financeModalData.code === "7088" ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-600"}`}>
+                    {financeModalData.code === "7088" ? "Refacturation Interne" : `Compte ${financeModalData.code}`}
+                  </span>
                   <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter inline-block">{financeModalData.title}</h3>
-                  <p className="text-xl font-bold text-muc-blue mt-2">Total : {financeModalData.total.toFixed(2)} €</p>
+                  <div className="flex flex-wrap items-center gap-3 mt-2">
+                    <p className={`text-xl font-bold ${financeModalData.code === "7088" ? "text-purple-900" : "text-muc-blue"}`}>
+                      Total : {financeModalData.total.toFixed(2)} €
+                    </p>
+                    {financeModalData.code !== "7088" && (() => {
+                      const totalInterne = (financeModalData.items || [])
+                        .filter(i => (i.modePaiement || '').toUpperCase() === 'INTERNE')
+                        .reduce((sum, i) => sum + (i.montant || 0), 0);
+                      if (totalInterne > 0) {
+                        return (
+                          <span className="text-xs bg-purple-50 text-purple-800 border border-purple-200 rounded-lg px-2.5 py-1 font-bold inline-flex items-center gap-1.5">
+                            🔄 Dont Refacturation Interne MUC : <strong>{totalInterne.toFixed(2)} €</strong>
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
               </div>
+
+              {financeModalData.code === "7088" && (
+                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 mb-6 text-purple-900">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-black text-sm uppercase tracking-wide flex items-center gap-2">
+                      🔄 Séjours Pôle Animation MUC (Règlements Internes)
+                    </span>
+                    <span className="bg-purple-200/80 text-purple-900 text-xs font-black px-2.5 py-0.5 rounded-md uppercase">
+                      Écritures internes
+                    </span>
+                  </div>
+                  <p className="text-xs text-purple-800 leading-relaxed font-medium">
+                    Ces montants correspondent aux réservations du gîte effectuées par les pôles internes du MUC (notamment le Pôle Animation). 
+                    Aucun encaissement externe n'apparaît sur les relevés bancaires du gîte. Ces prestations sont refacturées en interne par l'équipe comptable via un virement de compte à compte MUC.
+                  </p>
+                </div>
+              )}
 
               {financeModalData.code === "447" && (
                 <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-5 mb-6">
@@ -6529,46 +6683,114 @@ const Admin = () => {
                           <tr className="border-b-2 border-slate-200">
                               <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Date</th>
                               <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Libellé</th>
-                              {financeModalData.code === "447" && (
+                              {financeModalData.code === "7088" ? (
+                                <>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Héberg.</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Repas</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Salles</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Statut</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Total Réglé</th>
+                                </>
+                              ) : financeModalData.code === "447" ? (
                                 <>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Nuits</th>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Adultes (3)</th>
                                   <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Enfants (4)</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Statut / Type</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Montant</th>
+                                </>
+                              ) : (
+                                <>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Règlement / Statut</th>
+                                  <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Montant</th>
                                 </>
                               )}
-                              <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs">Statut / Type</th>
-                              <th className="p-3 font-bold text-slate-500 uppercase tracking-widest text-xs text-right">Montant</th>
                           </tr>
                       </thead>
                       <tbody>
-                          {financeModalData.items.length > 0 ? financeModalData.items.map((item, idx) => (
+                          {financeModalData.items.length > 0 ? financeModalData.items.map((item, idx) => {
+                            const isInterne = (item.modePaiement || '').toUpperCase() === 'INTERNE';
+                            return (
                               <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                                   <td className="p-3 text-slate-600">{new Date(item.date).toLocaleDateString('fr-FR')}</td>
-                                  <td className="p-3 font-medium text-slate-800">{item.label}</td>
-                                  {financeModalData.code === "447" && (
+                                  <td className="p-3 font-medium text-slate-800">
+                                      <div>{item.label}</div>
+                                      {financeModalData.code !== "7088" && isInterne && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-purple-700 bg-purple-100 font-bold px-1.5 py-0.5 rounded mt-0.5">
+                                          🔄 Refacturation MUC
+                                        </span>
+                                      )}
+                                  </td>
+                                  {financeModalData.code === "7088" ? (
+                                    <>
+                                      <td className="p-3 text-right text-slate-700 font-semibold">{item.hebergement ? `${item.hebergement.toFixed(2)} €` : '-'}</td>
+                                      <td className="p-3 text-right text-slate-700 font-semibold">{item.restauration ? `${item.restauration.toFixed(2)} €` : '-'}</td>
+                                      <td className="p-3 text-right text-slate-700 font-semibold">{item.salles ? `${item.salles.toFixed(2)} €` : '-'}</td>
+                                      <td className="p-3 text-center text-xs">
+                                        <span className="bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-full text-[11px]">
+                                          {item.statut || 'RÉGLÉ'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 font-black text-right text-purple-900">
+                                        {(item.montant || 0).toFixed(2)} €
+                                      </td>
+                                    </>
+                                  ) : financeModalData.code === "447" ? (
                                     <>
                                       <td className="p-3 text-center text-slate-700 font-bold">{item.nuits}</td>
                                       <td className="p-3 text-center text-slate-700 font-bold">{item.nbAdultes}</td>
                                       <td className="p-3 text-center text-slate-700 font-bold">{item.nbMineurs}</td>
+                                      <td className="p-3 text-xs text-slate-500">
+                                          <span className="bg-slate-100 px-2 py-1 rounded-full">{item.statut || '-'}</span>
+                                      </td>
+                                      <td className="p-3 font-bold text-right text-slate-800">
+                                          {item.inclus ? (
+                                              <span className="text-slate-400 font-normal">
+                                                  <span className="line-through text-xs mr-1">{item.originalMontant ? item.originalMontant.toFixed(2) : '0.00'} €</span>
+                                                  <span>0.00 €</span>
+                                              </span>
+                                          ) : (
+                                              `${(item.montant || 0).toFixed(2)} €`
+                                          )}
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td className="p-3 text-xs text-slate-500">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="bg-slate-100 px-2 py-1 rounded-full font-medium">{item.statut || '-'}</span>
+                                            {isInterne ? (
+                                              <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                                🔄 Interne
+                                              </span>
+                                            ) : item.modePaiement === 'VIREMENT' ? (
+                                              <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                                🏦 Virement
+                                              </span>
+                                            ) : (item.modePaiement === 'STRIPE' || item.modePaiement === 'CB') ? (
+                                              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                                💳 Carte
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                      </td>
+                                      <td className="p-3 font-bold text-right text-slate-800">
+                                          {item.inclus ? (
+                                              <span className="text-slate-400 font-normal">
+                                                  <span className="line-through text-xs mr-1">{item.originalMontant ? item.originalMontant.toFixed(2) : '0.00'} €</span>
+                                                  <span>0.00 €</span>
+                                              </span>
+                                          ) : (
+                                              `${(item.montant || 0).toFixed(2)} €`
+                                          )}
+                                      </td>
                                     </>
                                   )}
-                                  <td className="p-3 text-xs text-slate-500">
-                                      <span className="bg-slate-100 px-2 py-1 rounded-full">{item.statut || '-'}</span>
-                                  </td>
-                                  <td className="p-3 font-bold text-right text-slate-800">
-                                      {item.inclus ? (
-                                          <span className="text-slate-400 font-normal">
-                                              <span className="line-through text-xs mr-1">{item.originalMontant ? item.originalMontant.toFixed(2) : '0.00'} €</span>
-                                              <span>0.00 €</span>
-                                          </span>
-                                      ) : (
-                                          `${(item.montant || 0).toFixed(2)} €`
-                                      )}
-                                  </td>
                               </tr>
-                          )) : (
+                            );
+                          }) : (
                               <tr>
-                                  <td colSpan={financeModalData.code === "447" ? "7" : "4"} className="p-8 text-center text-slate-400 italic">Aucune transaction trouvée.</td>
+                                  <td colSpan={financeModalData.code === "7088" ? 7 : financeModalData.code === "447" ? 7 : 4} className="p-8 text-center text-slate-400 italic">Aucune transaction trouvée.</td>
                               </tr>
                           )}
                       </tbody>
