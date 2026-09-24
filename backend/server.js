@@ -1122,11 +1122,22 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
       });
     }
 
-    // 2. Email pour l'Administrateur
-    const adminEmail = await getAdminEmailsForPreference('notifPaymentReceived');
+    // 2. Email pour l'Administrateur & l'équipe comptable
+    const isVirement = (reservation.modePaiement === 'VIREMENT');
+    const adminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['david.roujet@mucomnisports.fr']);
+    
+    // Si virement, notifier obligatoirement Valérie et Johanna en plus de David et des admins
+    const recipientEmails = isVirement 
+      ? `${adminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr`
+      : `${adminEmail}, david.roujet@mucomnisports.fr`;
+
+    const emailSubject = isVirement
+      ? `🏦 [VIREMENT ENCAISSÉ] ${typeLabel} - ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client?.nom || 'Client'} - ${amount.toFixed(2)} € (Résa #${reservation.id})`
+      : `💳 [PAIEMENT STRIPE] ${typeLabel} - ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client?.nom || 'Client'} - ${amount.toFixed(2)} €`;
+
     await sendMail({
-      to: adminEmail,
-      subject: `💰 Nouveau paiement reçu - ${typeLabel} (${reservation.client?.nom || 'Client'})`,
+      to: recipientEmails,
+      subject: emailSubject,
       html: `
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
           <tr>
@@ -1134,24 +1145,30 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
               <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #dddddd; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
                 <tr>
                   <td style="background-color: #004B93; padding: 20px; text-align: center;">
-                    <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: bold;">Paiement Gîte de La Maladrerie</h1>
+                    <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: bold;">${isVirement ? '🏦 Virement Validé - Gîte de La Maladrerie' : '💳 Paiement Enregistré - Gîte de La Maladrerie'}</h1>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 30px; color: #333333; line-height: 1.6;">
-                    <h2 style="color: #004B93; margin-top: 0;">Nouveau paiement enregistré</h2>
-                    <p>Un paiement vient d'être validé en ligne via Stripe :</p>
+                    <h2 style="color: #004B93; margin-top: 0;">${isVirement ? 'Paiement par virement bancaire validé' : 'Nouveau paiement enregistré'}</h2>
+                    <p>${isVirement ? 'Le virement bancaire ci-dessous a été validé et enregistré comme payé dans le système :' : 'Un paiement vient d\'être validé en ligne via Stripe :'}</p>
                     
                     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #004B93;">
                       <p style="margin: 0 0 10px 0;"><strong>Client :</strong> ${reservation.client?.nom || 'Non spécifié'} (${reservation.client?.email || 'N/A'})</p>
+                      ${reservation.structure ? `<p style="margin: 0 0 10px 0;"><strong>Structure :</strong> ${reservation.structure}</p>` : ''}
+                      <p style="margin: 0 0 10px 0;"><strong>N° Réservation :</strong> #${reservation.id}</p>
                       <p style="margin: 0 0 10px 0;"><strong>Type de transaction :</strong> ${typeLabel}</p>
-                      <p style="margin: 0 0 10px 0;"><strong>Montant :</strong> ${amount.toFixed(2)} €</p>
+                      <p style="margin: 0 0 10px 0;"><strong>Mode de paiement :</strong> ${isVirement ? 'Virement bancaire' : 'Carte bancaire (Stripe)'}</p>
+                      <p style="margin: 0 0 10px 0;"><strong>Montant encaissé :</strong> <strong style="color: #15803d; font-size: 16px;">${amount.toFixed(2)} €</strong></p>
                       <p style="margin: 0 0 10px 0;"><strong>Séjour :</strong> du ${dDebut} au ${dFin}</p>
-                      <p style="margin: 0;"><strong>Référence devis :</strong> ${reservation.numeroDevis || 'N/A'}</p>
+                      <p style="margin: 0;"><strong>Statut paiement :</strong> ${reservation.statutPaiement}</p>
                     </div>
 
                     <p>Vous pouvez consulter et gérer cette réservation directement dans votre espace administratif.</p>
-                    <p style="margin-top: 30px;"><strong>Notification système - Maladrerie</strong></p>
+                    <p style="text-align: center; margin-top: 25px;">
+                      <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px;">Accéder au Tableau de Bord Admin</a>
+                    </p>
+                    <p style="margin-top: 30px; font-size: 12px; color: #64748b;"><strong>Notification système comptable - Gîte de la Maladrerie (MUC Omnisports)</strong></p>
                   </td>
                 </tr>
                 <tr>
@@ -4042,40 +4059,40 @@ app.post('/api/devis/public-request', async (req, res) => {
     });
     const numeroDevis = `DEV-${todayStr}-${String(countToday + 1).padStart(3, '0')}`;
 
-    const tempRes = {
-      dateDebut: new Date(dateDebut),
-      dateFin: new Date(dateFin),
-      chambres: sanitizedChambres,
-      chambresDetails: chambresDetails || {},
-      options: options || {},
-      repas: repas || {},
-      salles: salles || {},
-      modeRestauration: modeRestauration || 'global',
-      repasGlobal: repasGlobal || {}
-    };
-    const detailsFinanciers = calculerDetailsFinanciersReservation(tempRes);
+    // Calculer le montant exact côté serveur
+    const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, sanitizedChambres, chambresDetails, options, req.body.promoCode, repas, salles);
 
     const expireLe = new Date();
     expireLe.setDate(expireLe.getDate() + 15);
+
+    const safeOptions = {
+      ...(options || {}),
+      ...(remarques ? { remarques } : {})
+    };
+    const safeRepas = {
+      ...(repas || {}),
+      ...(modeRestauration ? { modeRestauration } : {}),
+      ...(repasGlobal ? { repasGlobal } : {})
+    };
+
+    const token = require('crypto').randomBytes(24).toString('hex');
 
     const devis = await prisma.reservation.create({
       data: {
         clientId: client.id,
         numeroDevis,
+        tokenDevis: token,
         statut: 'DEVIS',
+        statutPaiement: 'EN_ATTENTE',
         structure: structure || null,
         dateDebut: new Date(dateDebut),
         dateFin: new Date(dateFin),
         chambres: sanitizedChambres,
         chambresDetails: chambresDetails || {},
-        options: options || {},
-        repas: repas || {},
+        options: safeOptions,
+        repas: safeRepas,
         salles: salles || {},
-        modeRestauration: modeRestauration || 'global',
-        repasGlobal: repasGlobal || {},
-        remarques: remarques || null,
-        prixTotal: detailsFinanciers.totalTTC,
-        acomptePaid: false,
+        prixTotal: backendPrixTotal,
         expireLe
       }
     });
@@ -4108,7 +4125,8 @@ app.post('/api/devis/public-request', async (req, res) => {
               <p style="margin: 4px 0; font-size: 13px;"><strong>Référence :</strong> ${numeroDevis}</p>
               <p style="margin: 4px 0; font-size: 13px;"><strong>Dates :</strong> Du ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}</p>
               <p style="margin: 4px 0; font-size: 13px;"><strong>Chambres :</strong> ${sanitizedChambres.length > 0 ? sanitizedChambres.join(', ') : 'Aucune'}</p>
-              <p style="margin: 4px 0; font-size: 13px;"><strong>Estimation Tarifaire :</strong> ${detailsFinanciers.totalTTC.toFixed(2)} €</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Estimation Tarifaire :</strong> ${(backendPrixTotal || 0).toFixed(2)} €</p>
+              ${remarques ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Remarques :</strong> ${remarques}</p>` : ''}
             </div>
 
             <p style="font-size: 13px; color: #475569;">Connectez-vous à l'Espace Admin pour consulter, ajuster et valider ce devis.</p>
@@ -4212,6 +4230,8 @@ app.post('/api/devis/validate/:token', async (req, res) => {
     let bankDetails = null;
     let reference = null;
 
+    const tokenModification = devis.tokenModification || require('crypto').randomBytes(32).toString('hex');
+
     if (paymentMethod === 'virement') {
       const uniqueRef = `MUC-${devis.id}-ACOMPTE`;
       reference = uniqueRef;
@@ -4227,6 +4247,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
         data: { 
           statut: 'RESERVE', 
           tokenDevis: null,
+          tokenModification: tokenModification,
           montantAcompte: montantAcompte,
           montantSolde: montantSolde,
           modePaiement: 'VIREMENT',
@@ -4280,7 +4301,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       });
 
       // Envoyer un mail de notification à l'admin pour le virement
-      const targetAdminEmail = await getAdminEmailsForPreference('notifDevisValidation');
+      const targetAdminEmail = await getAdminEmailsForPreference('notifDevisValidation', ['david.roujet@mucomnisports.fr']);
       const recipientEmails = `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr`;
       await sendMail({
         to: recipientEmails,
@@ -4334,7 +4355,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
               </p>
               
               <p style="text-align: center; margin-top: 25px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-                <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${devis.tokenModification}&type=acompte" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">✅ Valider le paiement (Marquer comme payé)</a>
+                <a href="${BACKEND_URL}/api/payment/virement/validate-by-link?token=${tokenModification}&type=acompte" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">✅ Valider le paiement (Marquer comme payé)</a>
                 <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0, 75, 147, 0.2); margin-top: 10px;">Accéder au Tableau de Bord Admin</a>
               </p>
             </div>
@@ -4379,6 +4400,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
         data: { 
           statut: 'RESERVE', 
           tokenDevis: null,
+          tokenModification: tokenModification,
           montantAcompte: montantAcompte,
           montantSolde: montantSolde,
           stripeSessionId: session.id,
@@ -5352,128 +5374,412 @@ function calculerDetailsFinanciersReservation(res) {
 }
 
 
-// Déclencher manuellement l'envoi du rapport mensuel de taxe de séjour par e-mail
-app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, res) => {
-  const { month, year } = req.body;
-  try {
-    const today = new Date();
-    let targetYear = (year !== undefined && year !== null && year !== '') ? parseInt(year) : today.getFullYear();
-    const isAll = (month === 'ALL' || month === 'all' || month === 'TOTALITY');
+// ===== RAPPORT MENSUEL UNIFIÉ : COMPTABILITÉ (VIREMENTS & ENCAISSEMENTS) + TAXE DE SÉJOUR (3D OUEST) =====
+async function executeMonthlyAccountingAndTaxReport({ month, year, triggeredBy = 'Automatique (Cron)' } = {}) {
+  const today = new Date();
+  let targetYear = (year !== undefined && year !== null && year !== '') ? parseInt(year) : today.getFullYear();
+  const isAll = (month === 'ALL' || month === 'all' || month === 'TOTALITY');
 
-    let prevMonthStart, prevMonthEnd, prevMonthLabel;
+  let periodStart, periodEnd, periodLabel;
 
-    if (isAll) {
-      prevMonthStart = new Date(targetYear, 0, 1);
-      prevMonthEnd = new Date(targetYear, 11, 31, 23, 59, 59, 999);
-      prevMonthLabel = `Toutes les périodes (Année ${targetYear})`;
-    } else {
-      let targetMonth = (month !== undefined && month !== null && month !== '') ? parseInt(month) : today.getMonth() - 1;
-      if (targetMonth < 0) {
-        targetMonth = 11;
-        targetYear -= 1;
-      }
-      prevMonthStart = new Date(targetYear, targetMonth, 1);
-      prevMonthEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
-
-      const monthNames = [
-        "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-        "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
-      ];
-      prevMonthLabel = `${monthNames[targetMonth]} ${targetYear}`;
+  if (isAll) {
+    periodStart = new Date(targetYear, 0, 1);
+    periodEnd = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+    periodLabel = `Toutes les périodes (Année ${targetYear})`;
+  } else {
+    let targetMonth = (month !== undefined && month !== null && month !== '') ? parseInt(month) : today.getMonth() - 1;
+    if (targetMonth < 0) {
+      targetMonth = 11;
+      targetYear -= 1;
     }
+    periodStart = new Date(targetYear, targetMonth, 1);
+    periodEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
 
-    const reservations = await prisma.reservation.findMany({
-      where: {
-        statut: { in: ['RESERVE', 'TERMINE'] },
-        dateDebut: {
-          gte: prevMonthStart,
-          lte: prevMonthEnd
+    const monthNames = [
+      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+    ];
+    periodLabel = `${monthNames[targetMonth]} ${targetYear}`;
+  }
+
+  // 1. REQUÊTE TAXE DE SÉJOUR (Séjours actifs débutant sur la période)
+  const reservations = await prisma.reservation.findMany({
+    where: {
+      statut: { in: ['RESERVE', 'TERMINE'] },
+      dateDebut: {
+        gte: periodStart,
+        lte: periodEnd
+      }
+    },
+    include: { occupants: true, client: true },
+    orderBy: { dateDebut: 'asc' }
+  });
+
+  let totalTaxeSejour = 0;
+  let totalUnitesLouees = reservations.length;
+  let totalChambresLouees = 0;
+  let totalNuiteesAssujetties = 0;
+  let totalNuiteesExonerees = 0;
+  const sejoursDetails = [];
+
+  reservations.forEach(r => {
+    const { taxeSejour, nbAdultes, nbMineurs, nuits } = calculerDetailsFinanciersReservation(r);
+    totalTaxeSejour += taxeSejour;
+    totalChambresLouees += (r.chambres ? r.chambres.length : 0);
+    totalNuiteesAssujetties += (nbAdultes * nuits);
+    totalNuiteesExonerees += (nbMineurs * nuits);
+
+    const datesStr = `${new Date(r.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(r.dateFin).toLocaleDateString('fr-FR')}`;
+    sejoursDetails.push({
+      id: r.id,
+      client: r.client?.nom || 'Client',
+      structure: r.structure || '',
+      dates: datesStr,
+      nuits,
+      adultes: nbAdultes,
+      mineurs: nbMineurs,
+      taxe: taxeSejour
+    });
+  });
+
+  totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
+
+  // 2. REQUÊTE VIREMENTS BANCAIRES ENCAISSÉS SUR LA PÉRIODE
+  const virementsEncaissesRes = await prisma.reservation.findMany({
+    where: {
+      modePaiement: 'VIREMENT',
+      statutPaiement: { in: ['ACOMPTE_PAYE', 'SOLDE_PAYE', 'PAYE'] },
+      OR: [
+        { payeLe: { gte: periodStart, lte: periodEnd } },
+        { payeLe: null, dateDebut: { gte: periodStart, lte: periodEnd } }
+      ]
+    },
+    include: { client: true },
+    orderBy: { dateDebut: 'asc' }
+  });
+
+  let totalVirementsEncaisses = 0;
+  const listVirementsEncaisses = virementsEncaissesRes.map(r => {
+    let montant = 0;
+    let typeReglement = 'Total';
+    if (r.statutPaiement === 'ACOMPTE_PAYE') {
+      montant = r.montantAcompte || Math.round((r.prixTotal || 0) * 0.3 * 100) / 100;
+      typeReglement = 'Acompte (30%)';
+    } else if (r.statutPaiement === 'SOLDE_PAYE') {
+      montant = r.montantSolde || Math.round((r.prixTotal || 0) * 0.7 * 100) / 100;
+      typeReglement = 'Solde (70%)';
+    } else {
+      montant = r.prixTotal || 0;
+      typeReglement = 'Totalité (100%)';
+    }
+    totalVirementsEncaisses += montant;
+    const datePay = r.payeLe ? new Date(r.payeLe).toLocaleDateString('fr-FR') : (r.dateDebut ? new Date(r.dateDebut).toLocaleDateString('fr-FR') : 'N/A');
+    return {
+      id: r.id,
+      client: r.client?.nom || 'N/A',
+      structure: r.structure || '',
+      dates: `${new Date(r.dateDebut).toLocaleDateString('fr-FR')} - ${new Date(r.dateFin).toLocaleDateString('fr-FR')}`,
+      type: typeReglement,
+      montant: Math.round(montant * 100) / 100,
+      datePaiement: datePay,
+      reference: `MUC-${r.id}`
+    };
+  });
+  totalVirementsEncaisses = Math.round(totalVirementsEncaisses * 100) / 100;
+
+  // 3. REQUÊTE VIREMENTS ATTENDUS (En attente de réception)
+  const virementsAttendusRes = await prisma.reservation.findMany({
+    where: {
+      modePaiement: 'VIREMENT',
+      statutPaiement: { in: ['EN_ATTENTE', 'ACOMPTE_PAYE'] },
+      statut: { in: ['RESERVE', 'DEVIS'] },
+      dateDebut: { gte: periodStart, lte: periodEnd }
+    },
+    include: { client: true },
+    orderBy: { dateDebut: 'asc' }
+  });
+
+  let totalVirementsAttendus = 0;
+  const listVirementsAttendus = virementsAttendusRes.map(r => {
+    let montant = 0;
+    let typeReglement = '';
+    if (r.statutPaiement === 'EN_ATTENTE') {
+      montant = r.montantAcompte || Math.round((r.prixTotal || 0) * 0.3 * 100) / 100;
+      typeReglement = 'Acompte attendu';
+    } else if (r.statutPaiement === 'ACOMPTE_PAYE') {
+      montant = r.montantSolde || Math.round((r.prixTotal || 0) * 0.7 * 100) / 100;
+      typeReglement = 'Solde attendu';
+    }
+    totalVirementsAttendus += montant;
+    return {
+      id: r.id,
+      client: r.client?.nom || 'N/A',
+      structure: r.structure || '',
+      dates: `${new Date(r.dateDebut).toLocaleDateString('fr-FR')} - ${new Date(r.dateFin).toLocaleDateString('fr-FR')}`,
+      type: typeReglement,
+      montant: Math.round(montant * 100) / 100,
+      reference: `MUC-${r.id}`
+    };
+  });
+  totalVirementsAttendus = Math.round(totalVirementsAttendus * 100) / 100;
+
+  // 4. SYNTHÈSE GLOBALE DE TOUS LES ENCAISSEMENTS SUR LA PÉRIODE (Virements + CB Stripe + Chèques/Espèces)
+  let totalStripe = 0;
+  let totalAutres = 0;
+
+  reservations.forEach(r => {
+    if (r.statutPaiement && r.statutPaiement !== 'EN_ATTENTE' && r.statutPaiement !== 'ECHOUE') {
+      const mode = (r.modePaiement || '').toUpperCase();
+      const encaisse = (r.statutPaiement === 'PAYE') 
+        ? (r.prixTotal || 0) 
+        : (r.montantAcompte || (r.prixTotal ? Math.round(r.prixTotal * 0.3 * 100) / 100 : 0));
+
+      if (mode !== 'VIREMENT') {
+        if (mode.includes('STRIPE') || mode.includes('CARTE') || mode.includes('CB') || r.stripeSessionId) {
+          totalStripe += encaisse;
+        } else {
+          totalAutres += encaisse;
         }
-      },
-      include: { occupants: true }
-    });
+      }
+    }
+  });
+  totalStripe = Math.round(totalStripe * 100) / 100;
+  totalAutres = Math.round(totalAutres * 100) / 100;
+  const totalGeneralEncaisse = Math.round((totalVirementsEncaisses + totalStripe + totalAutres) * 100) / 100;
 
-    let totalTaxeSejour = 0;
-    let totalUnitesLouees = reservations.length;
-    let totalChambresLouees = 0;
-    let totalNuiteesAssujetties = 0;
-    let totalNuiteesExonerees = 0;
+  // 5. DESTINATAIRES
+  const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
 
-    reservations.forEach(r => {
-      const { taxeSejour, nbAdultes, nbMineurs, nuits } = calculerDetailsFinanciersReservation(r);
-      totalTaxeSejour += taxeSejour;
-      totalChambresLouees += (r.chambres ? r.chambres.length : 0);
-      totalNuiteesAssujetties += (nbAdultes * nuits);
-      totalNuiteesExonerees += (nbMineurs * nuits);
-    });
+  // 6. ENVOI EMAIL
+  await sendMail({
+    to: toEmails,
+    subject: `📊 [RÉCAP COMPTABILITÉ & TAXE DE SÉJOUR] ${periodLabel} - Gîte de la Maladrerie`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto; padding: 0; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <!-- Header -->
+        <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+          <span style="color: #FFD700; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie - MUC Omnisports</span>
+          <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase;">📊 Récapitulatif Mensuel : Comptabilité & Taxe de Séjour</h2>
+          <span style="color: #e2e8f0; font-size: 13px; font-weight: bold; margin-top: 4px; display: inline-block;">Période : ${periodLabel}</span>
+        </div>
 
-    totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
+        <div style="padding: 24px; color: #334155; line-height: 1.5;">
+          <p style="font-size: 14px; margin-top: 0;">Bonjour Valérie, Johanna, David,</p>
+          <p style="font-size: 14px;">
+            Voici le <strong>point complet mensuel</strong> pour la période <strong>${periodLabel}</strong> concernant le Gîte de la Maladrerie : repères de saisie pour la déclaration de taxe de séjour (3D Ouest), détail des virements bancaires (encaissés et en attente) et synthèse globale des encaissements.
+          </p>
 
-    const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
+          <!-- ================= SECTION 1 : TAXE DE SÉJOUR 3D OUEST ================= -->
+          <div style="margin: 25px 0 15px 0; background-color: #f8fafc; border: 2px solid #004B93; border-radius: 10px; padding: 18px;">
+            <h3 style="margin: 0 0 12px 0; color: #004B93; font-size: 14px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;">
+              🏛️ 1. Déclaration Taxe de Séjour (Portail 3D Ouest)
+            </h3>
+            <p style="font-size: 12px; color: #64748b; margin: 0 0 12px 0;">Chiffres officiels pré-calculés à reporter dans le portail extranet 3D Ouest :</p>
+            
+            <table width="100%" cellpadding="8" cellspacing="0" style="font-size: 13px; border-collapse: collapse;">
+              <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                <td style="color: #475569; font-weight: bold;">(1) Mois de déclaration :</td>
+                <td style="font-weight: 900; color: #004B93; font-size: 14px; text-align: right;">${periodLabel}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="color: #475569; font-weight: bold;">(2) Nb d'unités louées (Nombre de séjours meublé) :</td>
+                <td style="font-weight: 900; color: #0f172a; font-size: 15px; text-align: right;">${totalUnitesLouees} <span style="font-size:11px; font-weight:normal; color:#64748b;">(${totalChambresLouees} chambres)</span></td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                <td style="color: #475569; font-weight: bold;">(3) Nb total de nuitées assujetties (Adultes x Nuits) :</td>
+                <td style="font-weight: 900; color: #0f172a; font-size: 15px; text-align: right;">${totalNuiteesAssujetties}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="color: #475569; font-weight: bold;">(4) Nb total de nuitées exonérées (Mineurs &lt; 18 ans x Nuits) :</td>
+                <td style="font-weight: 900; color: #0f172a; font-size: 15px; text-align: right;">${totalNuiteesExonerees}</td>
+              </tr>
+              <tr style="background-color: #f0fdf4;">
+                <td style="color: #166534; font-weight: 900; font-size: 13px;">(5) Montant total collecté à déclarer (€) :</td>
+                <td style="font-weight: 900; color: #15803d; font-size: 18px; text-align: right;">${totalTaxeSejour.toFixed(2)} €</td>
+              </tr>
+            </table>
 
-    await sendMail({
-      to: toEmails,
-      subject: `📊 [TAXE DE SÉJOUR] Rapport de Déclaration 3D Ouest - ${prevMonthLabel}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 0; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-          <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
-            <span style="color: #FFD700; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie - MUC Omnisports</span>
-            <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase;">📊 Déclaration Taxe de Séjour (3D Ouest)</h2>
-          </div>
-
-          <div style="padding: 24px;">
-            <p style="font-size: 14px; color: #334155; margin-top: 0;">Bonjour Valérie, Johanna,</p>
-            <p style="font-size: 14px; color: #334155; line-height: 1.5;">
-              Voici les <strong>chiffres exacts pré-calculés à saisir dans les cases du formulaire 3D Ouest</strong> pour la période <strong>${prevMonthLabel}</strong> :
-            </p>
-
-            <div style="margin: 20px 0; background-color: #f8fafc; border: 2px solid #004B93; border-radius: 10px; padding: 20px;">
-              <h3 style="margin: 0 0 14px 0; color: #004B93; font-size: 13px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
-                📝 REPERES DE SAISIE PORTAIL 3D OUEST (${prevMonthLabel})
-              </h3>
-
-              <table width="100%" cellpadding="10" cellspacing="0" style="font-size: 13px; border-collapse: collapse;">
-                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
-                  <td style="color: #475569; font-weight: bold;">(1) Mois de déclaration :</td>
-                  <td style="font-weight: 900; color: #004B93; font-size: 15px; text-align: right;">${prevMonthLabel}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="color: #475569; font-weight: bold;">(2) Nb d'unités louées (Nombre de séjours meublé) :</td>
-                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalUnitesLouees} <span style="font-size:11px; font-weight:normal; color:#64748b;">(${totalChambresLouees} chambres)</span></td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
-                  <td style="color: #475569; font-weight: bold;">(3) Nb total de nuitées assujetties (Adultes x Nuits) :</td>
-                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesAssujetties}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="color: #475569; font-weight: bold;">(4) Nb total de nuitées exonérées (Mineurs &lt; 18 ans x Nuits) :</td>
-                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesExonerees}</td>
-                </tr>
-                <tr style="background-color: #f0fdf4;">
-                  <td style="color: #166534; font-weight: 900; font-size: 14px;">(5) Montant total collecté à déclarer (€) :</td>
-                  <td style="font-weight: 900; color: #15803d; font-size: 22px; text-align: right;">${totalTaxeSejour.toFixed(2)} €</td>
-                </tr>
-              </table>
-            </div>
-
-            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
-              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">
+            <p style="text-align: center; margin: 15px 0 5px 0;">
+              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
                 Accéder au Portail de Déclaration (3D Ouest)
               </a>
             </p>
           </div>
 
-          <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
-            Rapport généré et transmis manuellement par un administrateur depuis l'Espace Admin.
+          <!-- Détail des séjours assujettis -->
+          ${sejoursDetails.length > 0 ? `
+          <div style="margin-bottom: 25px;">
+            <p style="font-size: 12px; font-weight: bold; color: #475569; margin: 0 0 6px 0; text-transform: uppercase;">Détail des séjours de la période (${sejoursDetails.length}) :</p>
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 11px; border-collapse: collapse; border: 1px solid #e2e8f0;">
+              <thead style="background-color: #f1f5f9; color: #334155; font-weight: bold;">
+                <tr>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Réf</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Client / Structure</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Dates séjour</th>
+                  <th align="center" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Nuits</th>
+                  <th align="center" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Adultes</th>
+                  <th align="center" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Mineurs</th>
+                  <th align="right" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Taxe séjour</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sejoursDetails.map((s, idx) => `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 6px; font-weight: bold;">#${s.id}</td>
+                  <td style="padding: 6px;">${s.client}${s.structure ? ` <span style="color:#64748b;">(${s.structure})</span>` : ''}</td>
+                  <td style="padding: 6px;">${s.dates}</td>
+                  <td align="center" style="padding: 6px;">${s.nuits}</td>
+                  <td align="center" style="padding: 6px;">${s.adultes}</td>
+                  <td align="center" style="padding: 6px;">${s.mineurs}</td>
+                  <td align="right" style="padding: 6px; font-weight: bold; color: #15803d;">${s.taxe.toFixed(2)} €</td>
+                </tr>
+                `).join('')}
+              </tbody>
+            </table>
           </div>
+          ` : ''}
+
+          <!-- ================= SECTION 2 : VIREMENTS BANCAIRES ================= -->
+          <div style="margin: 25px 0 15px 0; background-color: #f8fafc; border: 2px solid #0284c7; border-radius: 10px; padding: 18px;">
+            <h3 style="margin: 0 0 12px 0; color: #0284c7; font-size: 14px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;">
+              🏦 2. Virements Bancaires du Mois
+            </h3>
+            
+            <!-- Virements encaissés -->
+            <p style="font-size: 13px; font-weight: bold; color: #0369a1; margin: 12px 0 6px 0;">
+              ✅ Virements Encaissés & Validés (${listVirementsEncaisses.length}) : Total <span style="font-size: 15px; color: #15803d; font-weight: 900;">${totalVirementsEncaisses.toFixed(2)} €</span>
+            </p>
+            ${listVirementsEncaisses.length > 0 ? `
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 11px; border-collapse: collapse; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+              <thead style="background-color: #e0f2fe; color: #0369a1; font-weight: bold;">
+                <tr>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Date paiement</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Résa</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Client / Structure</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Règlement</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Réf virement</th>
+                  <th align="right" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Montant encaissé</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${listVirementsEncaisses.map((v, idx) => `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 6px;">${v.datePaiement}</td>
+                  <td style="padding: 6px; font-weight: bold;">#${v.id}</td>
+                  <td style="padding: 6px;">${v.client}${v.structure ? ` <span style="color:#64748b;">(${v.structure})</span>` : ''}</td>
+                  <td style="padding: 6px;">${v.type}</td>
+                  <td style="padding: 6px; font-family: monospace; color: #b45309;">${v.reference}</td>
+                  <td align="right" style="padding: 6px; font-weight: bold; color: #15803d; font-size: 12px;">${v.montant.toFixed(2)} €</td>
+                </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            ` : `<p style="font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 16px;">Aucun virement validé/encaissé sur cette période.</p>`}
+
+            <!-- Virements attendus -->
+            <p style="font-size: 13px; font-weight: bold; color: #b45309; margin: 12px 0 6px 0;">
+              ⏳ Virements Attendus / En attente de règlement (${listVirementsAttendus.length}) : Total <span style="font-size: 15px; color: #b45309; font-weight: 900;">${totalVirementsAttendus.toFixed(2)} €</span>
+            </p>
+            ${listVirementsAttendus.length > 0 ? `
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 11px; border-collapse: collapse; border: 1px solid #e2e8f0;">
+              <thead style="background-color: #fef3c7; color: #b45309; font-weight: bold;">
+                <tr>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Résa</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Client / Structure</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Dates séjour</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Statut attendu</th>
+                  <th align="left" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Réf virement</th>
+                  <th align="right" style="padding: 6px; border-bottom: 1px solid #cbd5e1;">Montant attendu</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${listVirementsAttendus.map((v, idx) => `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 6px; font-weight: bold;">#${v.id}</td>
+                  <td style="padding: 6px;">${v.client}${v.structure ? ` <span style="color:#64748b;">(${v.structure})</span>` : ''}</td>
+                  <td style="padding: 6px;">${v.dates}</td>
+                  <td style="padding: 6px;">${v.type}</td>
+                  <td style="padding: 6px; font-family: monospace; color: #b45309;">${v.reference}</td>
+                  <td align="right" style="padding: 6px; font-weight: bold; color: #b45309; font-size: 12px;">${v.montant.toFixed(2)} €</td>
+                </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            ` : `<p style="font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 0;">Aucun virement en attente sur cette période.</p>`}
+          </div>
+
+          <!-- ================= SECTION 3 : SYNTHÈSE GLOBALE ENCAISSEMENTS ================= -->
+          <div style="margin: 25px 0 15px 0; background-color: #f8fafc; border: 2px solid #475569; border-radius: 10px; padding: 18px;">
+            <h3 style="margin: 0 0 12px 0; color: #334155; font-size: 14px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;">
+              💰 3. Synthèse Générale des Encaissements de la Période
+            </h3>
+            
+            <table width="100%" cellpadding="8" cellspacing="0" style="font-size: 13px; border-collapse: collapse;">
+              <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                <td style="color: #475569; font-weight: bold;">🏦 Virements bancaires :</td>
+                <td style="font-weight: 900; color: #0284c7; font-size: 15px; text-align: right;">${totalVirementsEncaisses.toFixed(2)} €</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="color: #475569; font-weight: bold;">💳 Cartes Bancaires (Stripe) :</td>
+                <td style="font-weight: 900; color: #6366f1; font-size: 15px; text-align: right;">${totalStripe.toFixed(2)} €</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                <td style="color: #475569; font-weight: bold;">💵 Autres règlements (Chèques, Espèces) :</td>
+                <td style="font-weight: 900; color: #64748b; font-size: 15px; text-align: right;">${totalAutres.toFixed(2)} €</td>
+              </tr>
+              <tr style="background-color: #ecfdf5;">
+                <td style="color: #065f46; font-weight: 900; font-size: 14px;">📈 TOTAL GÉNÉRAL ENCAISSÉ :</td>
+                <td style="font-weight: 900; color: #047857; font-size: 20px; text-align: right;">${totalGeneralEncaisse.toFixed(2)} €</td>
+              </tr>
+            </table>
+          </div>
+
+          <p style="text-align: center; margin-top: 25px;">
+            <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 13px;">Accéder au Tableau de Bord Admin</a>
+          </p>
         </div>
-      `
+
+        <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+          Rapport généré ${triggeredBy} le ${new Date().toLocaleDateString('fr-FR')} pour l'équipe administrative et comptable du MUC Omnisports.
+        </div>
+      </div>
+    `
+  });
+
+  return {
+    to: toEmails,
+    month: periodLabel,
+    year: targetYear,
+    totalTaxeSejour,
+    totalVirementsEncaisses,
+    totalVirementsAttendus,
+    totalGeneralEncaisse
+  };
+}
+
+// Déclencher manuellement l'envoi du rapport mensuel de comptabilité & taxe de séjour par e-mail
+app.post('/api/admin/finances/send-monthly-tax-report', checkAuth, async (req, res) => {
+  const { month, year } = req.body;
+  try {
+    const result = await executeMonthlyAccountingAndTaxReport({
+      month,
+      year,
+      triggeredBy: req.user?.nom ? `manuellement par ${req.user.nom}` : 'manuellement depuis l\'espace Admin'
     });
 
-    res.json({ success: true, to: toEmails, month: prevMonthLabel, year: targetYear, totalTaxeSejour });
+    res.json({ 
+      success: true, 
+      to: result.to, 
+      month: result.month, 
+      year: result.year, 
+      totalTaxeSejour: result.totalTaxeSejour,
+      totalVirementsEncaisses: result.totalVirementsEncaisses,
+      totalVirementsAttendus: result.totalVirementsAttendus,
+      totalGeneralEncaisse: result.totalGeneralEncaisse
+    });
   } catch (error) {
-    console.error("Erreur envoi manuel rapport taxe:", error);
-    res.status(500).json({ error: "Erreur lors de l'envoi du rapport de taxe de séjour." });
+    console.error("Erreur envoi manuel rapport comptable & taxe:", error);
+    res.status(500).json({ error: "Erreur lors de l'envoi du rapport de taxe et comptabilité." });
   }
 });
 
@@ -6157,8 +6463,58 @@ app.post('/api/admin/reservations/:id/manual-payment', checkAuth, async (req, re
     
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(id) },
-      data
+      data,
+      include: { client: true }
     });
+
+    try {
+      const isVirement = (mode && mode.toUpperCase() === 'VIREMENT');
+      const targetAdminEmail = await getAdminEmailsForPreference('notifPaymentReceived', ['david.roujet@mucomnisports.fr']);
+      const recipients = isVirement 
+        ? `${targetAdminEmail}, valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr`
+        : `${targetAdminEmail}, david.roujet@mucomnisports.fr`;
+        
+      const dDebut = reservation.dateDebut ? new Date(reservation.dateDebut).toLocaleDateString('fr-FR') : 'N/A';
+      const dFin = reservation.dateFin ? new Date(reservation.dateFin).toLocaleDateString('fr-FR') : 'N/A';
+      const labelType = typePaiement === 'ACOMPTE' ? 'Acompte (30%)' : typePaiement === 'SOLDE' ? 'Solde (70%)' : 'Règlement Total (100%)';
+
+      await sendMail({
+        to: recipients,
+        subject: `${isVirement ? '🏦 [VIREMENT ENREGISTRÉ - MANUEL]' : '💵 [PAIEMENT MANUEL ENREGISTRÉ]'} ${reservation.structure ? reservation.structure + ' / ' : ''}${reservation.client?.nom || 'Client'} - ${parsedMontant.toFixed(2)} € (Résa #${reservation.id})`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
+              <span style="color: #FFD700; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 6px;">Gîte de la Maladrerie</span>
+              <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase;">${isVirement ? '🏦 Virement encaissé et enregistré' : '💵 Paiement manuel enregistré'}</h2>
+            </div>
+            <div style="padding: 24px; color: #334155; font-size: 14px; line-height: 1.6;">
+              <p>Bonjour,</p>
+              <p>Un règlement vient d'être enregistré manuellement dans l'espace d'administration par <strong>${req.user?.nom || req.user?.email || 'un administrateur'}</strong> :</p>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 18px 0;">
+                <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px;">
+                  <tr><td width="40%" style="color: #64748b; font-weight: bold;">Client :</td><td style="font-weight: bold;">${reservation.client?.nom || 'N/A'}</td></tr>
+                  ${reservation.structure ? `<tr><td style="color: #64748b; font-weight: bold;">Structure :</td><td style="font-weight: bold;">${reservation.structure}</td></tr>` : ''}
+                  <tr><td style="color: #64748b; font-weight: bold;">N° Réservation :</td><td style="font-weight: bold; font-family: monospace;">#${reservation.id}</td></tr>
+                  <tr><td style="color: #64748b; font-weight: bold;">Dates séjour :</td><td>Du ${dDebut} au ${dFin}</td></tr>
+                  <tr><td style="color: #64748b; font-weight: bold;">Type de paiement :</td><td style="font-weight: bold;">${labelType}</td></tr>
+                  <tr><td style="color: #64748b; font-weight: bold;">Mode de règlement :</td><td><span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${mode || 'VIREMENT'}</span></td></tr>
+                  <tr><td style="color: #64748b; font-weight: bold;">Montant encaissé :</td><td style="font-weight: 900; color: #15803d; font-size: 16px;">${parsedMontant.toFixed(2)} €</td></tr>
+                  <tr><td style="color: #64748b; font-weight: bold;">Nouveau statut :</td><td><strong>${targetStatus}</strong></td></tr>
+                </table>
+              </div>
+              <p style="text-align: center; margin-top: 20px;">
+                <a href="${FRONTEND_URL}/admin" style="background-color: #004B93; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 13px;">Accéder au Tableau de Bord Admin</a>
+              </p>
+            </div>
+            <div style="background-color: #f8fafc; padding: 12px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
+              Notification système envoyée à l'équipe comptable et administrative du MUC Omnisports.
+            </div>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      console.error("Erreur envoi email notif paiement manuel:", mailErr);
+    }
     
     res.json({ success: true, reservation });
   } catch (error) {
@@ -9045,116 +9401,12 @@ app.get('/api/cron/lieux-emails', async (req, res) => {
 // ===== CRON JOB : DÉCLARATION MENSUELLE DE TAXE DE SÉJOUR =====
 // S'exécute le 1er de chaque mois à 09:00
 const executeMonthlyTaxReport = async () => {
-  console.log("Exécution du Cron Job : Rapport mensuel de Taxe de Séjour...");
+  console.log("Exécution du Cron Job : Rapport mensuel Comptabilité & Taxe de Séjour...");
   try {
-    const today = new Date();
-    let prevMonth = today.getMonth() - 1;
-    let prevYear = today.getFullYear();
-    if (prevMonth < 0) {
-      prevMonth = 11;
-      prevYear -= 1;
-    }
-
-    const prevMonthStart = new Date(prevYear, prevMonth, 1);
-    const prevMonthEnd = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59, 999);
-
-    const reservations = await prisma.reservation.findMany({
-      where: {
-        statut: { in: ['RESERVE', 'TERMINE'] },
-        dateDebut: {
-          gte: prevMonthStart,
-          lte: prevMonthEnd
-        }
-      },
-      include: { occupants: true }
-    });
-
-    let totalTaxeSejour = 0;
-    let totalUnitesLouees = reservations.length;
-    let totalChambresLouees = 0;
-    let totalNuiteesAssujetties = 0;
-    let totalNuiteesExonerees = 0;
-
-    reservations.forEach(r => {
-      const { taxeSejour, nbAdultes, nbMineurs, nuits } = calculerDetailsFinanciersReservation(r);
-      totalTaxeSejour += taxeSejour;
-      totalChambresLouees += (r.chambres ? r.chambres.length : 0);
-      totalNuiteesAssujetties += (nbAdultes * nuits);
-      totalNuiteesExonerees += (nbMineurs * nuits);
-    });
-
-    totalTaxeSejour = Math.round(totalTaxeSejour * 100) / 100;
-
-    const monthNames = [
-      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
-    ];
-    const prevMonthLabel = `${monthNames[prevMonth]} ${prevYear}`;
-
-    const toEmails = process.env.TAX_REPORT_EMAILS || 'valerie.hostein@mucomnisports.fr, johanna.journet@mucomnisports.fr, david.roujet@mucomnisports.fr';
-
-    await sendMail({
-      to: toEmails,
-      subject: `📊 [TAXE DE SÉJOUR] Déclaration Mensuelle 3D Ouest - ${prevMonthLabel}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 0; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-          <div style="background-color: #004B93; padding: 24px; text-align: center; border-bottom: 4px solid #FFD700;">
-            <span style="color: #FFD700; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px;">Gîte de la Maladrerie - MUC Omnisports</span>
-            <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase;">📊 Déclaration Taxe de Séjour (3D Ouest)</h2>
-          </div>
-
-          <div style="padding: 24px;">
-            <p style="font-size: 14px; color: #334155; margin-top: 0;">Bonjour Valérie, Johanna,</p>
-            <p style="font-size: 14px; color: #334155; line-height: 1.5;">
-              Voici les <strong>chiffres exacts pré-calculés à saisir dans les cases du formulaire 3D Ouest</strong> pour la période <strong>${prevMonthLabel}</strong> :
-            </p>
-
-            <div style="margin: 20px 0; background-color: #f8fafc; border: 2px solid #004B93; border-radius: 10px; padding: 20px;">
-              <h3 style="margin: 0 0 14px 0; color: #004B93; font-size: 13px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
-                📝 REPERES DE SAISIE PORTAIL 3D OUEST (${prevMonthLabel})
-              </h3>
-
-              <table width="100%" cellpadding="10" cellspacing="0" style="font-size: 13px; border-collapse: collapse;">
-                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
-                  <td style="color: #475569; font-weight: bold;">(1) Mois de déclaration :</td>
-                  <td style="font-weight: 900; color: #004B93; font-size: 15px; text-align: right;">${prevMonthLabel}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="color: #475569; font-weight: bold;">(2) Nb d'unités louées (Nombre de séjours meublé) :</td>
-                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalUnitesLouees} <span style="font-size:11px; font-weight:normal; color:#64748b;">(${totalChambresLouees} chambres)</span></td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
-                  <td style="color: #475569; font-weight: bold;">(3) Nb total de nuitées assujetties (Adultes x Nuits) :</td>
-                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesAssujetties}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="color: #475569; font-weight: bold;">(4) Nb total de nuitées exonérées (Mineurs &lt; 18 ans x Nuits) :</td>
-                  <td style="font-weight: 900; color: #0f172a; font-size: 17px; text-align: right;">${totalNuiteesExonerees}</td>
-                </tr>
-                <tr style="background-color: #f0fdf4;">
-                  <td style="color: #166534; font-weight: 900; font-size: 14px;">(5) Montant total collecté à déclarer (€) :</td>
-                  <td style="font-weight: 900; color: #15803d; font-size: 22px; text-align: right;">${totalTaxeSejour.toFixed(2)} €</td>
-                </tr>
-              </table>
-            </div>
-
-            <p style="text-align: center; margin-top: 25px; margin-bottom: 15px;">
-              <a href="https://taxe.3douest.com/extranet/accueil.php" target="_blank" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);">
-                Accéder au Portail de Déclaration (3D Ouest)
-              </a>
-            </p>
-          </div>
-
-          <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #f1f5f9;">
-            Cet e-mail automatique est envoyé le 1er jour de chaque mois par le système.
-          </div>
-        </div>
-      `
-    });
-
-    console.log(`Cron mensuel taxe de séjour exécuté avec succès. E-mail envoyé à : ${toEmails}`);
+    await executeMonthlyAccountingAndTaxReport({ triggeredBy: 'Automatique (Cron Mensuel 1er du mois)' });
+    console.log("Cron mensuel comptabilité et taxe de séjour exécuté avec succès.");
   } catch (error) {
-    console.error("Erreur dans le cron mensuel taxe de séjour :", error);
+    console.error("Erreur dans le cron mensuel comptabilité et taxe de séjour :", error);
   }
 };
 

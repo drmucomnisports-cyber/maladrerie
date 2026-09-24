@@ -1580,7 +1580,7 @@ const Admin = () => {
     ];
     const monthLabel = monthNames[monthToUse] || `Mois ${monthToUse + 1}`;
 
-    if (!window.confirm(`Confirmer l'envoi immédiat du rapport de taxe de séjour (${monthLabel} ${yearToUse}) par e-mail à Valérie, Johanna et David ?`)) {
+    if (!window.confirm(`Confirmer l'envoi du récapitulatif comptable & taxe de séjour (${monthLabel} ${yearToUse}) par e-mail à Valérie, Johanna et David ?\n\nCe mail regroupe les repères de déclaration 3D Ouest, le point sur les virements bancaires encaissés/attendus et la synthèse générale des encaissements.`)) {
       return;
     }
 
@@ -1596,7 +1596,7 @@ const Admin = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`✨ Rapport mensuel envoyé avec succès par e-mail !\n\n• Période : ${data.month} ${data.year}\n• Montant déclaré : ${data.totalTaxeSejour.toFixed(2)} €\n• Destinataires : ${data.to}`);
+        alert(`✨ Récapitulatif comptable & taxe de séjour envoyé avec succès !\n\n• Période : ${data.month} ${data.year}\n• Taxe de séjour 3D Ouest : ${data.totalTaxeSejour.toFixed(2)} €\n• Virements encaissés : ${(data.totalVirementsEncaisses || 0).toFixed(2)} €\n• Total général encaissé : ${(data.totalGeneralEncaisse || 0).toFixed(2)} €\n• Destinataires : ${data.to}`);
       } else {
         let errorMsg = "Une erreur est survenue lors de l'envoi.";
         try {
@@ -3848,15 +3848,20 @@ const Admin = () => {
 
                 {/* TAXE DE SEJOUR MENSUELLE */}
                 <div className="bg-amber-50 rounded-2xl shadow-xl border border-amber-100 overflow-hidden mt-8">
-                    <div className="p-6 border-b border-amber-200 flex justify-between items-center bg-amber-100/50 flex-wrap gap-2">
-                        <h3 className="font-black text-amber-900 uppercase tracking-widest flex items-center gap-2">
-                            <span className="text-2xl">🏛️</span> Taxe de Séjour Mensuelle (À reverser)
-                        </h3>
+                    <div className="p-6 border-b border-amber-200 flex justify-between items-center bg-amber-100/50 flex-wrap gap-3">
+                        <div>
+                          <h3 className="font-black text-amber-900 uppercase tracking-widest flex items-center gap-2">
+                              <span className="text-2xl">🏛️</span> Taxe de Séjour & Récapitulatif Comptable
+                          </h3>
+                          <p className="text-xs text-amber-800 font-medium mt-1">
+                            Transmission mensuelle à Valérie, Johanna et David (Repères 3D Ouest + Virements encaissés/attendus + Synthèse globale)
+                          </p>
+                        </div>
                         <button
                           type="button"
                           disabled={isSendingTaxReport}
                           onClick={() => setShowTaxReportModal(true)}
-                          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
                         >
                           {isSendingTaxReport ? (
                             <>
@@ -3866,7 +3871,7 @@ const Admin = () => {
                           ) : (
                             <>
                               <Mail size={14} />
-                              Envoyer le rapport par e-mail
+                              Envoyer le récapitulatif par e-mail
                             </>
                           )}
                         </button>
@@ -6589,14 +6594,14 @@ const Admin = () => {
             <div className="flex items-center gap-3 mb-4">
               <span className="p-3 bg-amber-100 text-amber-800 rounded-2xl text-2xl font-black">🏛️</span>
               <div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Rapport Taxe de Séjour</h3>
-                <p className="text-xs text-slate-500 font-medium">Sélectionnez la période à envoyer par e-mail</p>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Récapitulatif Comptable & Taxe</h3>
+                <p className="text-xs text-slate-500 font-medium">Repères 3D Ouest + Virements bancaires + Synthèse des encaissements</p>
               </div>
             </div>
 
             <div className="space-y-4 my-6">
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1.5">Période à déclarer</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1.5">Période du récapitulatif</label>
                 <select
                   value={taxReportSelectedMonth}
                   onChange={(e) => setTaxReportSelectedMonth(e.target.value)}
@@ -6625,8 +6630,10 @@ const Admin = () => {
                   onChange={(e) => setTaxReportSelectedYear(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-muc-blue transition-all"
                 >
+                  <option value="2027">2027</option>
                   <option value="2026">2026</option>
                   <option value="2025">2025</option>
+                  <option value="2024">2024</option>
                 </select>
               </div>
 
@@ -6635,9 +6642,9 @@ const Admin = () => {
                   <span>📬 Destinataires de l'e-mail :</span>
                 </div>
                 <div className="pl-4 font-mono text-[11px] text-amber-800">
-                  • valerie.hostein@mucomnisports.fr<br/>
-                  • johanna.journet@mucomnisports.fr<br/>
-                  • david.roujet@mucomnisports.fr
+                  • valerie.hostein@mucomnisports.fr (Comptabilité)<br/>
+                  • johanna.journet@mucomnisports.fr (Comptabilité)<br/>
+                  • david.roujet@mucomnisports.fr (Direction)
                 </div>
               </div>
             </div>

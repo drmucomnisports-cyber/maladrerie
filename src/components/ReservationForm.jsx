@@ -23,6 +23,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     nom: '',
     prenom: '',
     structure: '',
+    remarques: '',
     devisAdultes: 0,
     devisMineurs: 0,
     email: '',
@@ -797,9 +798,9 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     setErrorMsg('');
     setSuccessMsg('');
     
-    if (isDevis) {
-      if (!formData.nom || !formData.prenom || !formData.email || !formData.telephone || !formData.adressePostale) {
-        triggerError("Veuillez remplir toutes les informations du demandeur.");
+    if (isDevis || isPublicDevis) {
+      if (!formData.nom || (isDevis && !formData.prenom) || !formData.email || !formData.telephone || (isDevis && !formData.adressePostale)) {
+        triggerError("Veuillez renseigner toutes les informations obligatoires (Nom, Email, Téléphone" + (isDevis ? ", Prénom, Adresse" : "") + ").");
         return;
       }
       if (!formData.dateDebut || !formData.dateFin) {
@@ -907,6 +908,16 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         adminEmail: adminUser?.email,
         adminName: adminUser?.nom,
         sendEmail: formData.sendEmail
+      } : isPublicDevis ? {
+        ...formData,
+        chambresDetails: mappedChambresDetails,
+        occupants: generateFakeOccupants(),
+        prixTotal: prixTotalGlobal,
+        prixHebergement,
+        totalRepas,
+        repas: computedRepas,
+        promoCode: promoApplied?.code,
+        remarques: formData.remarques || ''
       } : {
         ...formData,
         chambresDetails: mappedChambresDetails,
@@ -991,7 +1002,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        setFormData({ nom: '', prenom: '', structure: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
+        setFormData({ nom: '', prenom: '', structure: '', remarques: '', devisAdultes: 0, devisMineurs: 0, email: '', telephone: '', adressePostale: '', dateDebut: '', dateFin: '', chambres: [], chambresDetails: {}, options: {litsFaits: false, lingeFourni: false, menage: false}, salles: {salle15: false, salle12: false, dateDebut: '', dateFin: ''}, occupants: [], repas: {}, modeRestauration: 'global', repasGlobal: { PETIT_DEJ: false, DEJEUNER: false, DINER: false }, sendEmail: true });
         setStep(1);
         
         if (!isAdmin) {
@@ -1028,7 +1039,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
 
   return (
     <div className="w-full">
-      <form noValidate onSubmit={isDevis ? handleSubmit : (step === 1 ? goToStep2 : handleSubmit)} className="space-y-6 relative">
+      <form noValidate onSubmit={(isDevis || isPublicDevis) ? handleSubmit : (step === 1 ? goToStep2 : handleSubmit)} className="space-y-6 relative">
       <div ref={errorRef} className="scroll-mt-24">
         {errorMsg && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
@@ -1521,12 +1532,32 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         </div>
       )}
 
+          {isPublicDevis && (
+            <div className="space-y-1 mt-4">
+              <label className="text-xs font-black uppercase text-slate-500 tracking-widest ml-1">Remarques ou demandes particulières (optionnel)</label>
+              <textarea 
+                name="remarques" 
+                value={formData.remarques || ''} 
+                onChange={handleChange} 
+                rows="2" 
+                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-muc-yellow focus:bg-white transition-all outline-none font-medium text-sm" 
+                placeholder="Ex : Horaires particuliers, précisions sur votre groupe, régimes alimentaires spécifiques..." 
+              />
+            </div>
+          )}
+
           <button disabled={isSubmitting} type="submit" className="w-full bg-muc-blue text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-muc-blue/90 hover:scale-[1.02] transition-all shadow-xl mt-8 disabled:opacity-70 disabled:cursor-not-allowed">
             {isDevis ? (
               isSubmitting ? (
                 <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Traitement en cours...</>
               ) : (
                 <><Send size={20} /> Générer le devis</>
+              )
+            ) : isPublicDevis ? (
+              isSubmitting ? (
+                <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Envoi de votre demande...</>
+              ) : (
+                <><Send size={20} /> Envoyer ma demande de devis</>
               )
             ) : (
               <><Send size={20} /> Valider</>
