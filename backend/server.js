@@ -412,36 +412,37 @@ const CHAMBRES_NAMES = { 1: "Chambre 1", 2: "Chambre 2", 3: "Chambre 3", 4: "Cha
 const recalculerPrix = async (dateDebut, dateFin, chambres, chambresDetails, options, promoCode, repas, salles) => {
   const start = new Date(dateDebut);
   const end = new Date(dateFin);
-  const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-  if (nuits <= 0) return 0;
+  const nuits = Math.max(0, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
 
   let total = 0;
   let totalAdultes = 0;
 
-  // Chambres
-  chambres.forEach(chId => {
-    const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
-    const nbAdultes = parseInt(details.adultes || 0);
-    const nbMineurs = parseInt(details.enfants || 0);
-    const occupants = nbAdultes + nbMineurs;
-    const capacite = CHAMBRES_CAPACITE[chId] || 5;
-    
-    totalAdultes += nbAdultes;
-    const tarifPers = occupants >= capacite ? 22 : 25;
-    total += occupants * tarifPers * nuits;
-    // Taxe de séjour : 4% du prix de la nuitée par adulte
-    total += nbAdultes * (tarifPers * 0.044) * nuits;
-  });
+  // Chambres (uniquement si au moins 1 nuitée et des chambres sélectionnées)
+  if (nuits > 0 && Array.isArray(chambres)) {
+    chambres.forEach(chId => {
+      const details = (chambresDetails && chambresDetails[chId]) || { adultes: 0, enfants: 0 };
+      const nbAdultes = parseInt(details.adultes || 0);
+      const nbMineurs = parseInt(details.enfants || 0);
+      const occupants = nbAdultes + nbMineurs;
+      const capacite = CHAMBRES_CAPACITE[chId] || 5;
+      
+      totalAdultes += nbAdultes;
+      const tarifPers = occupants >= capacite ? 22 : 25;
+      total += occupants * tarifPers * nuits;
+      // Taxe de séjour : 4% du prix de la nuitée par adulte
+      total += nbAdultes * (tarifPers * 0.044) * nuits;
+    });
+  }
 
   // Salles & Espaces
   if (salles) {
-    let nuitsSalles = nuits;
+    let nuitsSalles = Math.max(1, nuits);
     if (salles.dateDebut && salles.dateFin) {
       const startS = new Date(salles.dateDebut);
       const endS = new Date(salles.dateFin);
       nuitsSalles = Math.max(1, Math.ceil((endS - startS) / (1000 * 60 * 60 * 24)));
     }
-    const prixSalle = chambres.length > 0 ? 100 : 150;
+    const prixSalle = (Array.isArray(chambres) && chambres.length > 0) ? 100 : 150;
     if (salles.salle15) total += prixSalle * nuitsSalles;
     if (salles.salle12) total += prixSalle * nuitsSalles;
     if (salles.cuisine) total += (parseFloat(salles.prixCuisine) || 0) * nuitsSalles;

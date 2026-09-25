@@ -432,12 +432,16 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     return calculerTotalSallesReunion() + calculerTotalCuisine() + calculerTotalSejour();
   };
 
-  const calculerPrix = () => {
+  const getNuitsHebergement = () => {
     if (!formData.dateDebut || !formData.dateFin) return 0;
     const start = new Date(formData.dateDebut);
     const end = new Date(formData.dateFin);
-    const nuits = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    if (nuits <= 0) return 0;
+    return Math.max(0, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+  };
+
+  const calculerTotalHebergement = () => {
+    const nuits = getNuitsHebergement();
+    if (nuits <= 0 || !formData.chambres || formData.chambres.length === 0) return 0;
 
     let total = 0;
     let totalAdultes = 0;
@@ -448,6 +452,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     formData.chambres.forEach(chId => {
       const details = detailsSource[chId] || { adultes: 0, mineurs: 0 };
       const info = CHAMBRES_INFO[chId];
+      if (!info) return;
       const nbAdultes = parseInt(details.adultes || 0);
       const nbMineurs = parseInt(details.mineurs || 0);
       const occupants = nbAdultes + nbMineurs;
@@ -459,8 +464,6 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       total += occupants * tarifPers * nuits;
       
       // Taxe de séjour : 4% du prix de la nuitée par adulte (+18 ans) + 10% part départementale = 4.4%
-      // Note: Adultes dans chambresDetails sont ≥13 ans pour le tarif, 
-      // mais ici on applique 4.4% sur le prix de la nuitée par adulte.
       total += nbAdultes * tarifPers * nuits * 0.044;
     });
 
@@ -469,8 +472,12 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     if (formData.options.lingeFourni) total += totalPersonnes * 5;
     if (formData.options.menage) total += formData.chambres.length * 50;
 
-    // Calcul du prix des salles de réunion
-    total += calculerTotalSalles();
+    return Math.max(0, total);
+  };
+
+  const calculerPrix = () => {
+    if (!formData.dateDebut || !formData.dateFin) return 0;
+    let total = calculerTotalHebergement() + calculerTotalSalles();
 
     // Appliquer Promo
     if (promoApplied) {
@@ -481,7 +488,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       }
     }
 
-    return total;
+    return Math.max(0, total);
   };
 
   const calculerTaxeSejour = () => {
@@ -713,8 +720,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
     }
     const start = new Date(formData.dateDebut);
     const end = new Date(formData.dateFin);
-    if (start >= end) {
-      triggerError("La date de départ doit être après la date d'arrivée.");
+    if (start > end || (start >= end && formData.chambres.length > 0)) {
+      triggerError(formData.chambres.length > 0 
+        ? "Pour une réservation avec hébergement, la date de départ doit être après la date d'arrivée." 
+        : "La date de départ doit être égale ou postérieure à la date d'arrivée.");
       return;
     }
     
@@ -838,8 +847,10 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
       }
       const start = new Date(formData.dateDebut);
       const end = new Date(formData.dateFin);
-      if (start >= end) {
-        triggerError("La date de départ doit être après la date d'arrivée.");
+      if (start > end || (start >= end && formData.chambres.length > 0)) {
+        triggerError(formData.chambres.length > 0 
+          ? "Pour une réservation avec hébergement, la date de départ doit être après la date d'arrivée." 
+          : "La date de départ doit être égale ou postérieure à la date d'arrivée.");
         return;
       }
       if (formData.chambres.length === 0 && !formData.salles?.salle15 && !formData.salles?.salle12 && !formData.salles?.cuisine && !formData.salles?.sejour) {
@@ -1639,13 +1650,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
           <div className="bg-muc-blue/5 p-6 rounded-2xl border-2 border-muc-blue/10">
             <h3 className="text-sm font-black uppercase text-muc-blue tracking-widest mb-4">Récapitulatif</h3>
             <div className="space-y-2 mb-4">
-              <div className="flex justify-between items-center text-sm text-slate-700">
-                <div className="flex flex-col">
-                  <span className="font-medium">Hébergement</span>
-                  {calculerTaxeSejour() > 0 && <span className="text-[10px] text-slate-500 italic">dont taxe de séjour : {calculerTaxeSejour().toFixed(2)} €</span>}
+              {(formData.chambres.length > 0 || calculerTotalHebergement() > 0) && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <div className="flex flex-col">
+                    <span className="font-medium">Hébergement</span>
+                    {calculerTaxeSejour() > 0 && <span className="text-[10px] text-slate-500 italic">dont taxe de séjour : {calculerTaxeSejour().toFixed(2)} €</span>}
+                  </div>
+                  <span className="font-bold">{calculerTotalHebergement().toFixed(2)} €</span>
                 </div>
-                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
-              </div>
+              )}
               {calculerTotalSallesReunion() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>
@@ -1862,13 +1875,15 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
           <div className="bg-muc-blue/5 p-6 rounded-2xl border-2 border-muc-blue/10">
             <h3 className="text-sm font-black uppercase text-muc-blue tracking-widest mb-3">Récapitulatif final</h3>
             <div className="space-y-2 mb-3">
-              <div className="flex justify-between items-center text-sm text-slate-700">
-                <div className="flex flex-col">
-                  <span className="font-medium">Hébergement</span>
-                  {calculerTaxeSejour() > 0 && <span className="text-[10px] text-slate-500 italic">dont taxe de séjour : {calculerTaxeSejour().toFixed(2)} €</span>}
+              {(formData.chambres.length > 0 || calculerTotalHebergement() > 0) && (
+                <div className="flex justify-between items-center text-sm text-slate-700">
+                  <div className="flex flex-col">
+                    <span className="font-medium">Hébergement</span>
+                    {calculerTaxeSejour() > 0 && <span className="text-[10px] text-slate-500 italic">dont taxe de séjour : {calculerTaxeSejour().toFixed(2)} €</span>}
+                  </div>
+                  <span className="font-bold">{calculerTotalHebergement().toFixed(2)} €</span>
                 </div>
-                <span className="font-bold">{(calculerPrix() - calculerTotalSalles()).toFixed(2)} €</span>
-              </div>
+              )}
               {calculerTotalSallesReunion() > 0 && (
                 <div className="flex justify-between items-center text-sm text-slate-700">
                   <span className="font-medium">Salles de réunion</span>

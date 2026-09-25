@@ -17,7 +17,7 @@ const formatPrice = (price) => {
 };
 
 const calculateBreakdown = (res) => {
-  if (!res) return { hebergement: 0, repas: 0, taxe: 0 };
+  if (!res) return { hebergement: 0, salles: 0, repas: 0, taxe: 0 };
   
   // 1. Repas
   let repasTotal = 0;
@@ -46,7 +46,7 @@ const calculateBreakdown = (res) => {
   if (res.dateDebut && res.dateFin) {
     const start = new Date(res.dateDebut);
     const end = new Date(res.dateFin);
-    const nuits = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    const nuits = Math.max(0, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
     if (nuits > 0) {
       let nbAdultes = 0;
       let nbOccupants = 0;
@@ -67,12 +67,33 @@ const calculateBreakdown = (res) => {
   }
 
   taxeSejour = Math.round(taxeSejour * 100) / 100;
+
+  // 3. Salles & Espaces
+  let sallesTotal = 0;
+  if (res.salles) {
+    let nuitsSalles = 1;
+    if (res.salles.dateDebut && res.salles.dateFin) {
+      const s = new Date(res.salles.dateDebut);
+      const e = new Date(res.salles.dateFin);
+      nuitsSalles = Math.max(1, Math.ceil((e - s) / (1000 * 60 * 60 * 24)));
+    } else if (res.dateDebut && res.dateFin) {
+      const s = new Date(res.dateDebut);
+      const e = new Date(res.dateFin);
+      nuitsSalles = Math.max(1, Math.ceil((e - s) / (1000 * 60 * 60 * 24)));
+    }
+    const prixSalle = (res.chambres && res.chambres.length > 0) ? 100 : 150;
+    if (res.salles.salle15) sallesTotal += prixSalle * nuitsSalles;
+    if (res.salles.salle12) sallesTotal += prixSalle * nuitsSalles;
+    if (res.salles.cuisine) sallesTotal += (parseFloat(res.salles.prixCuisine) || 0) * nuitsSalles;
+    if (res.salles.sejour) sallesTotal += (parseFloat(res.salles.prixSejour) || 0) * nuitsSalles;
+  }
   
-  // 3. Hébergement (prixTotal - repas - taxe)
-  const hebergement = Math.max(0, (res.prixTotal || 0) - repasTotal - taxeSejour);
+  // 4. Hébergement (prixTotal - repas - taxe - salles)
+  const hebergement = Math.max(0, (res.prixTotal || 0) - repasTotal - taxeSejour - sallesTotal);
 
   return {
     hebergement: Math.round(hebergement * 100) / 100,
+    salles: Math.round(sallesTotal * 100) / 100,
     repas: Math.round(repasTotal * 100) / 100,
     taxe: taxeSejour
   };
@@ -2811,7 +2832,8 @@ const Admin = () => {
                             const breakdown = calculateBreakdown(res);
                             return (
                               <div className="text-[10px] text-slate-400 font-bold mt-1.5 space-y-0.5 leading-tight uppercase tracking-wider">
-                                <div>Héb. : {formatPrice(breakdown.hebergement)}</div>
+                                {breakdown.hebergement > 0 && <div>Héb. : {formatPrice(breakdown.hebergement)}</div>}
+                                {breakdown.salles > 0 && <div className="text-indigo-600">Salles/Esp. : {formatPrice(breakdown.salles)}</div>}
                                 {breakdown.repas > 0 && <div className="text-orange-600">Repas : {formatPrice(breakdown.repas)}</div>}
                                 {breakdown.taxe > 0 && <div className="text-emerald-600">Taxe : {formatPrice(breakdown.taxe)}</div>}
                               </div>
@@ -4390,7 +4412,8 @@ const Admin = () => {
                               const breakdown = calculateBreakdown(res);
                               return (
                                 <div className="text-[10px] text-slate-400 font-bold mt-1.5 space-y-0.5 leading-tight uppercase tracking-wider">
-                                  <div>Héb. : {formatPrice(breakdown.hebergement)}</div>
+                                  {breakdown.hebergement > 0 && <div>Héb. : {formatPrice(breakdown.hebergement)}</div>}
+                                  {breakdown.salles > 0 && <div className="text-indigo-600">Salles/Esp. : {formatPrice(breakdown.salles)}</div>}
                                   {breakdown.repas > 0 && <div className="text-orange-600">Repas : {formatPrice(breakdown.repas)}</div>}
                                   {breakdown.taxe > 0 && <div className="text-emerald-600">Taxe : {formatPrice(breakdown.taxe)}</div>}
                                 </div>
