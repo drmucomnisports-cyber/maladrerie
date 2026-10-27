@@ -39,6 +39,10 @@ const sendMail = async (options) => {
           name: options.fromName || "Gîte de la Maladrerie - MUC", 
           email: safeSender 
         },
+        replyTo: {
+          email: options.replyTo || "philippe.morereau@mucomnisports.fr",
+          name: "Philippe Morereau - Gîte de la Maladrerie"
+        },
         to: toEmails,
         headers: {
           'X-Mailin-Track-Click': '0',
@@ -83,6 +87,7 @@ const sendMail = async (options) => {
 
     const mailOptions = {
       from: `"${options.fromName || 'Gîte de la Maladrerie - MUC'}" <${safeSender}>`,
+      replyTo: options.replyTo || 'philippe.morereau@mucomnisports.fr',
       to: cleanTo,
       subject: options.subject,
       html: options.html
@@ -305,11 +310,17 @@ const getValidatingAdminDetails = async (prisma, validePar) => {
       console.error("Erreur getValidatingAdminDetails mailer:", err);
     }
   }
-  const isGeneric = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
+  const isGeneric = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+  const formatTel = (t) => {
+    if (!t) return '07 52 62 79 62';
+    const clean = t.replace(/\s+/g, '');
+    if (clean.length === 10) return clean.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+    return t;
+  };
   return {
-    nom: isGeneric ? 'David Roujet' : admin.nom,
-    email: admin ? admin.email : 'david.roujet@mucomnisports.fr',
-    telephone: admin && admin.telephone && admin.telephone.trim() !== '' ? admin.telephone : '06 67 99 36 81'
+    nom: isGeneric ? 'Philippe Morereau' : admin.nom,
+    email: isGeneric ? 'philippe.morereau@mucomnisports.fr' : admin.email,
+    telephone: isGeneric ? '07 52 62 79 62' : formatTel(admin.telephone)
   };
 };
 

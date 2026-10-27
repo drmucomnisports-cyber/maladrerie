@@ -1009,7 +1009,7 @@ const ReservationForm = ({ events = [], isAdmin = false, isDevis = false, isPubl
         const roomNames = formData.chambres.map(id => CHAMBRES_INFO[id]?.name || `Chambre ${id}`).join(', ');
         let message = '';
         if (isPublicDevis) {
-          message = `✨ Votre demande de devis n° ${data.numeroDevis || ''} a bien été enregistrée et transmise à notre équipe !\nUn accusé de réception vous a été envoyé par e-mail à ${formData.email}. Philippe et David vous recontacteront dans les plus brefs délais.`;
+          message = `✨ Votre demande de devis n° ${data.numeroDevis || ''} a bien été enregistrée et transmise à notre équipe !\nUn accusé de réception vous a été envoyé par e-mail à ${formData.email}. Philippe vous recontactera dans les plus brefs délais.`;
         } else if (existingReservation) {
           if (isDevis) {
             if (formData.sendEmail !== false) {

@@ -73,8 +73,8 @@ async function generateFacturePDF(data) {
             doc.fontSize(10).font('Helvetica').text('Émetteur :', rightCol, startY);
             doc.fontSize(11).font('Helvetica-Bold').text(data.adminNom || 'Gîte de la Maladrerie', rightCol, startY + 15);
             doc.fontSize(10).font('Helvetica');
-            doc.text(`Email : ${data.adminEmail || 'david.roujet@mucomnisports.fr'}`, rightCol, startY + 30);
-            doc.text(`Tél : ${data.adminTel || '04 67 15 82 00'}`, rightCol, startY + 45);
+            doc.text(`Email : ${data.adminEmail || 'philippe.morereau@mucomnisports.fr'}`, rightCol, startY + 30);
+            doc.text(`Tél : ${data.adminTel || '07 52 62 79 62'}`, rightCol, startY + 45);
 
             // --- DATES DU SÉJOUR ---
             doc.fillColor('#004B93').font('Helvetica-Bold').fontSize(10).text(`Dates du séjour : du ${new Date(data.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(data.dateFin).toLocaleDateString('fr-FR')} (${data.nuits} nuits)`, leftCol, 220);

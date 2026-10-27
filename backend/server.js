@@ -681,8 +681,7 @@ const cancelOverlappingDevis = async (confirmedRes) => {
                   <p>Par conséquent, votre proposition de devis a été automatiquement annulée.</p>
                   <p>Si vous souhaitez positionner votre séjour sur d'autres dates disponibles ou ajuster votre demande, notre équipe est à votre entière disposition :</p>
                   <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
-                    <p style="margin: 4px 0; font-size: 13px;"><strong>• Philippe Morereau :</strong> 07 52 62 79 62</p>
-                    <p style="margin: 4px 0; font-size: 13px;"><strong>• David Roujet :</strong> 06 67 99 36 81</p>
+                    <p style="margin: 4px 0; font-size: 13px;"><strong>• Philippe Morereau :</strong> 07 52 62 79 62 (<a href="mailto:philippe.morereau@mucomnisports.fr" style="color: #004B93; text-decoration: none;">philippe.morereau@mucomnisports.fr</a>)</p>
                   </div>
                   <p style="margin-top: 24px;">Bien cordialement,<br/><strong>L'équipe du Gîte de la Maladrerie</strong></p>
                 </div>
@@ -1057,7 +1056,7 @@ const sendPaymentConfirmationEmails = async (reservation, paymentType, amount, b
         }
       }
 
-      const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
+      const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : 'philippe.morereau@mucomnisports.fr';
       const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
       const modificationLinkHTML = getModificationLinkHTML(tokenModification);
 
@@ -1468,11 +1467,17 @@ async function getValidatingAdminDetails(validePar) {
       console.error("Erreur getValidatingAdminDetails:", err);
     }
   }
-  const isGeneric = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
+  const isGeneric = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+  const formatTel = (t) => {
+    if (!t) return '07 52 62 79 62';
+    const clean = t.replace(/\s+/g, '');
+    if (clean.length === 10) return clean.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+    return t;
+  };
   return {
-    nom: isGeneric ? 'David Roujet' : admin.nom,
-    email: admin ? admin.email : 'david.roujet@mucomnisports.fr',
-    telephone: admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81'
+    nom: isGeneric ? 'Philippe Morereau' : admin.nom,
+    email: isGeneric ? 'philippe.morereau@mucomnisports.fr' : admin.email,
+    telephone: isGeneric ? '07 52 62 79 62' : formatTel(admin.telephone)
   };
 }
 
@@ -1713,7 +1718,7 @@ app.post('/api/reservations', async (req, res) => {
 
     const responseData = { ...reservation, isLastMinute };
     if (isLastMinute) {
-      responseData.lastMinuteWarning = "Votre réservation a bien été enregistrée. Celle-ci étant effectuée moins de 3 jours avant la date d'arrivée, nous vous invitons à  contacter directement Philippe Morereau (07 52 62 79 62) ou David Roujet (06 67 99 36 81) afin de confirmer la bonne prise en compte de votre demande.";
+      responseData.lastMinuteWarning = "Votre réservation a bien été enregistrée. Celle-ci étant effectuée moins de 3 jours avant la date d'arrivée, nous vous invitons à contacter directement Philippe Morereau (07 52 62 79 62 - philippe.morereau@mucomnisports.fr) afin de confirmer la prise en charge de votre demande.";
     }
 
     // Envoyer mail d'alerte aux administrateurs
@@ -1900,7 +1905,7 @@ app.get('/api/reservations/:id/accept', async (req, res) => {
     const tokenModification = existingReservation.tokenModification || require('crypto').randomBytes(32).toString('hex');
     paymentLink = `${FRONTEND_URL}/payment?token=${tokenModification}&type=${paymentType}`;
 
-    let adminEmail = req.query.adminEmail || existingReservation.validePar || 'david.roujet@mucomnisports.fr';
+    let adminEmail = (req.query.adminEmail && req.query.adminEmail !== 'david.roujet@mucomnisports.fr') ? req.query.adminEmail : ((existingReservation.validePar && existingReservation.validePar !== 'david.roujet@mucomnisports.fr') ? existingReservation.validePar : 'philippe.morereau@mucomnisports.fr');
     if (req.headers.authorization) {
       try {
         const token = req.headers.authorization.split(' ')[1];
@@ -2223,11 +2228,11 @@ app.post('/api/admin/devis', checkAuth, async (req, res) => {
       where: { email: req.user.email }
     });
 
-    // Fallback : si le nom admin est générique ("admin", vide, etc.), afficher "David Roujet"
-    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
-    const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
-    const resolvedAdminEmail = admin ? admin.email : 'david.roujet@mucomnisports.fr';
-    const resolvedAdminTel = admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81';
+    // Fallback : si le nom admin est générique ("admin", vide, etc.), afficher "Philippe Morereau"
+    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+    const resolvedAdminNom = isGenericAdmin ? 'Philippe Morereau' : admin.nom;
+    const resolvedAdminEmail = isGenericAdmin ? 'philippe.morereau@mucomnisports.fr' : admin.email;
+    const resolvedAdminTel = isGenericAdmin ? '07 52 62 79 62' : (admin.telephone || '07 52 62 79 62');
 
     // 2. Calculer le montant
     const backendPrixTotal = await recalculerPrix(dateDebut, dateFin, chambres, chambresDetails, options, promoCode, repas, salles);
@@ -2767,10 +2772,10 @@ app.put('/api/admin/devis/:id', checkAuth, async (req, res) => {
         
         const adminEmail = devisFinal.validePar || req.user.email;
         const admin = await prisma.adminAccount.findUnique({ where: { email: adminEmail } });
-        const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
-        const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
-        const resolvedAdminEmail = admin ? admin.email : adminEmail;
-        const resolvedAdminTel = admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81';
+        const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+        const resolvedAdminNom = isGenericAdmin ? 'Philippe Morereau' : admin.nom;
+        const resolvedAdminEmail = isGenericAdmin ? 'philippe.morereau@mucomnisports.fr' : adminEmail;
+        const resolvedAdminTel = isGenericAdmin ? '07 52 62 79 62' : (admin ? (admin.telephone || '07 52 62 79 62') : '07 52 62 79 62');
         
         let totalAdultes = 0;
         let totalMineurs = 0;
@@ -3025,10 +3030,10 @@ app.get('/api/admin/devis/:id/pdf', checkAuth, async (req, res) => {
     const admin = await prisma.adminAccount.findUnique({
       where: { email: adminEmail }
     });
-    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
-    const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
-    const resolvedAdminEmail = admin ? admin.email : adminEmail;
-    const resolvedAdminTel = admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81';
+    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+    const resolvedAdminNom = isGenericAdmin ? 'Philippe Morereau' : admin.nom;
+    const resolvedAdminEmail = isGenericAdmin ? 'philippe.morereau@mucomnisports.fr' : adminEmail;
+    const resolvedAdminTel = isGenericAdmin ? '07 52 62 79 62' : (admin ? (admin.telephone || '07 52 62 79 62') : '07 52 62 79 62');
 
     let totalAdultes = 0;
     let totalMineurs = 0;
@@ -3269,10 +3274,10 @@ app.post('/api/admin/devis/:id/send', checkAuth, async (req, res) => {
     const admin = await prisma.adminAccount.findUnique({
       where: { email: adminEmail }
     });
-    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
-    const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
-    const resolvedAdminEmail = admin ? admin.email : adminEmail;
-    const resolvedAdminTel = admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81';
+    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+    const resolvedAdminNom = isGenericAdmin ? 'Philippe Morereau' : admin.nom;
+    const resolvedAdminEmail = isGenericAdmin ? 'philippe.morereau@mucomnisports.fr' : adminEmail;
+    const resolvedAdminTel = isGenericAdmin ? '07 52 62 79 62' : (admin ? (admin.telephone || '07 52 62 79 62') : '07 52 62 79 62');
 
     let totalAdultes = 0;
     let totalMineurs = 0;
@@ -3547,14 +3552,14 @@ app.get('/api/devis/pdf/:token', async (req, res) => {
     const refClient = `C-${year}-${devis.clientId}`;
 
     // Trouver l'administrateur
-    const adminEmail = devis.validePar || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (devis.validePar && devis.validePar !== 'david.roujet@mucomnisports.fr') ? devis.validePar : 'philippe.morereau@mucomnisports.fr';
     const admin = await prisma.adminAccount.findUnique({
       where: { email: adminEmail }
     });
-    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
-    const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
-    const resolvedAdminEmail = admin ? admin.email : adminEmail;
-    const resolvedAdminTel = admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81';
+    const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+    const resolvedAdminNom = isGenericAdmin ? 'Philippe Morereau' : admin.nom;
+    const resolvedAdminEmail = isGenericAdmin ? 'philippe.morereau@mucomnisports.fr' : adminEmail;
+    const resolvedAdminTel = isGenericAdmin ? '07 52 62 79 62' : (admin ? (admin.telephone || '07 52 62 79 62') : '07 52 62 79 62');
 
     let totalAdultes = 0;
     let totalMineurs = 0;
@@ -3798,14 +3803,14 @@ async function getInvoicePdfBuffer(reservationId, includeOccupants = false) {
   }
 
   // Trouver l'administrateur
-  const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
+  const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : 'philippe.morereau@mucomnisports.fr';
   const admin = await prisma.adminAccount.findUnique({
     where: { email: adminEmail }
   });
-  const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin';
-  const resolvedAdminNom = isGenericAdmin ? 'David Roujet' : admin.nom;
-  const resolvedAdminEmail = admin ? admin.email : adminEmail;
-  const resolvedAdminTel = admin ? (admin.telephone || '06 67 99 36 81') : '06 67 99 36 81';
+  const isGenericAdmin = !admin || !admin.nom || admin.nom.trim().toLowerCase() === 'admin' || admin.email === 'david.roujet@mucomnisports.fr';
+  const resolvedAdminNom = isGenericAdmin ? 'Philippe Morereau' : admin.nom;
+  const resolvedAdminEmail = isGenericAdmin ? 'philippe.morereau@mucomnisports.fr' : adminEmail;
+  const resolvedAdminTel = isGenericAdmin ? '07 52 62 79 62' : (admin ? (admin.telephone || '07 52 62 79 62') : '07 52 62 79 62');
 
   let totalAdultes = 0;
   let totalMineurs = 0;
@@ -4411,7 +4416,7 @@ app.post('/api/devis/validate/:token', async (req, res) => {
       await cancelOverlappingDevis(devis);
 
       // Envoyer l'email d'intention de virement au client
-      const adminEmailForSignature = devis.validePar || 'david.roujet@mucomnisports.fr';
+      const adminEmailForSignature = (devis.validePar && devis.validePar !== 'david.roujet@mucomnisports.fr') ? devis.validePar : 'philippe.morereau@mucomnisports.fr';
       const adminSignatureHTML = await getAdminSignatureHTML(adminEmailForSignature);
       await sendMail({
         to: devis.client.email,
@@ -4833,7 +4838,7 @@ app.post('/api/reservations/:id/acompte', checkAuth, async (req, res) => {
       tokenModification = require('crypto').randomBytes(32).toString('hex');
     }
 
-    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : ((req.user?.email && req.user.email !== 'david.roujet@mucomnisports.fr') ? req.user.email : 'philippe.morereau@mucomnisports.fr');
 
     await prisma.reservation.update({
       where: { id: parseInt(id) },
@@ -4898,7 +4903,7 @@ app.post('/api/reservations/:id/totalite', checkAuth, async (req, res) => {
       tokenModification = require('crypto').randomBytes(32).toString('hex');
     }
 
-    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : ((req.user?.email && req.user.email !== 'david.roujet@mucomnisports.fr') ? req.user.email : 'philippe.morereau@mucomnisports.fr');
 
     await prisma.reservation.update({
       where: { id: parseInt(id) },
@@ -4969,7 +4974,7 @@ app.post('/api/reservations/:id/solde', checkAuth, async (req, res) => {
       tokenModification = require('crypto').randomBytes(32).toString('hex');
     }
 
-    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : ((req.user?.email && req.user.email !== 'david.roujet@mucomnisports.fr') ? req.user.email : 'philippe.morereau@mucomnisports.fr');
 
     await prisma.reservation.update({
       where: { id: parseInt(id) },
@@ -5087,7 +5092,7 @@ app.post('/api/reservations/:id/caution', checkAuth, async (req, res) => {
       tokenModification = require('crypto').randomBytes(32).toString('hex');
     }
 
-    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : ((req.user?.email && req.user.email !== 'david.roujet@mucomnisports.fr') ? req.user.email : 'philippe.morereau@mucomnisports.fr');
 
     await prisma.reservation.update({
       where: { id: parseInt(id) },
@@ -7667,7 +7672,7 @@ app.post('/api/payment/virement/:token', async (req, res) => {
     };
 
     // Send email to client
-    const adminEmail = reservation.validePar || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : 'philippe.morereau@mucomnisports.fr';
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     const dateStr = new Date(reservation.dateDebut).toLocaleDateString('fr-FR') + " au " + new Date(reservation.dateFin).toLocaleDateString('fr-FR');
 
@@ -8658,7 +8663,7 @@ app.post('/api/admin/reservations/:id/accept-modification', checkAuth, async (re
       });
     }
 
-    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : ((req.user?.email && req.user.email !== 'david.roujet@mucomnisports.fr') ? req.user.email : 'philippe.morereau@mucomnisports.fr');
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     const modificationLinkHTML = await getModificationLinkHTML(reservation.tokenModification || reservation.id);
 
@@ -8727,7 +8732,7 @@ app.post('/api/admin/reservations/:id/reject-modification', checkAuth, async (re
       }
     });
 
-    const adminEmail = reservation.validePar || req.user.email || 'david.roujet@mucomnisports.fr';
+    const adminEmail = (reservation.validePar && reservation.validePar !== 'david.roujet@mucomnisports.fr') ? reservation.validePar : ((req.user?.email && req.user.email !== 'david.roujet@mucomnisports.fr') ? req.user.email : 'philippe.morereau@mucomnisports.fr');
     const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     const modificationLinkHTML = getModificationLinkHTML(reservation.tokenModification);
 
@@ -10681,7 +10686,7 @@ const executeWeeklyCuisineEmail = async (targetEmail = null) => {
           <p style="color:#555;margin-bottom:20px;">Bonjour,<br><br>Veuillez trouver ci-dessous le récapitulatif des commandes de repas (déjeuners & dîners) pour la semaine du <strong>${periodeLabel}</strong>.<br>Chaque groupe dispose de son propre détail (livraison en bac inox par groupe).</p>
           ${clientBlocks.join('')}
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-          <p style="color:#888;font-size:13px;">Ce récapitulatif a été généré automatiquement. Pour toute question, contactez-nous à l'adresse <a href="mailto:david.roujet@mucomnisports.fr">david.roujet@mucomnisports.fr</a>.</p>
+          <p style="color:#888;font-size:13px;">Ce récapitulatif a été généré automatiquement. Pour toute question, contactez-nous à l'adresse <a href="mailto:philippe.morereau@mucomnisports.fr">philippe.morereau@mucomnisports.fr</a>.</p>
         </div>
       </div>
     `;
@@ -10898,7 +10903,8 @@ app.post('/api/admin/reservations/:id/send-police-email', checkAuth, async (req,
     const frontendUrl = process.env.FRONTEND_URL || (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' ? 'https://www.gite-maladrerie.fr' : 'http://localhost:5173');
     const link = `${frontendUrl}/sign-police?token=${token}`;
     
-    const adminSignatureHTML = await getAdminSignatureHTML(req.user?.email || 'david.roujet@mucomnisports.fr');
+    const adminEmail = (req.user?.email && req.user.email !== 'david.roujet@mucomnisports.fr') ? req.user.email : 'philippe.morereau@mucomnisports.fr';
+    const adminSignatureHTML = await getAdminSignatureHTML(adminEmail);
     
     await sendMail({
       to: reservation.client.email,

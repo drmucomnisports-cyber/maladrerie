@@ -153,7 +153,7 @@ async function generateLieuxPDF(reservation) {
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
         doc.fontSize(8).fillColor('#94A3B8').text(
-          `Gîte de la Maladrerie - Rue de la Maladrerie, 30120 Le Vigan | Tél : 04 67 15 82 00 | Email : david.roujet@mucomnisports.fr`,
+          `Gîte de la Maladrerie - Rue de la Maladrerie, 30120 Le Vigan | Tél : 07 52 62 79 62 | Email : philippe.morereau@mucomnisports.fr`,
           50,
           745,
           { align: 'center', width: 512 }

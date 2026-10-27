@@ -87,15 +87,27 @@ const Home = () => {
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-50 mix-blend-overlay" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }}></div>
       
       {/* Navigation Flottante Style MUC Formation */}
-      <nav className="relative mt-6 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md border-b-4 border-muc-yellow px-8 py-0 rounded-xl flex items-center shadow-lg w-11/12 max-w-6xl h-20">
+      <nav className="relative mt-6 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md border-b-4 border-muc-yellow px-6 sm:px-8 py-0 rounded-xl flex items-center shadow-lg w-11/12 max-w-6xl h-20">
         {/* Menu Gauche */}
-        <div className="hidden lg:flex gap-8 text-[13px] font-black uppercase tracking-wider text-slate-700 flex-1 justify-end">
-          <a href="#presentation" onClick={(e) => handleScroll(e, 'presentation')} className="hover:text-muc-blue transition-colors">Le Gîte</a>
-          <a href="#gite" onClick={(e) => handleScroll(e, 'gite')} className="hover:text-muc-blue transition-colors">Hébergement</a>
+        <div className="hidden lg:flex gap-6 text-[13px] font-black uppercase tracking-wider text-slate-700 flex-1 items-center justify-between">
+          <Link to="/planning?mode=devis" className="bg-slate-100 text-slate-800 border border-slate-300 px-4 py-2 rounded-lg text-xs font-black hover:bg-slate-200 transition-all shadow-sm whitespace-nowrap">
+            DEMANDER UN DEVIS
+          </Link>
+          <div className="flex gap-8 items-center">
+            <a href="#presentation" onClick={(e) => handleScroll(e, 'presentation')} className="hover:text-muc-blue transition-colors">Le Gîte</a>
+            <a href="#gite" onClick={(e) => handleScroll(e, 'gite')} className="hover:text-muc-blue transition-colors">Hébergement</a>
+          </div>
+        </div>
+
+        {/* Mobile Gauche - Bouton Devis */}
+        <div className="lg:hidden flex-1 flex justify-start">
+          <Link to="/planning?mode=devis" className="bg-slate-100 text-slate-800 border border-slate-200 px-3 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap">
+            DEVIS
+          </Link>
         </div>
 
         {/* Logo Central */}
-        <div className="mx-12 shrink-0 flex flex-col items-center">
+        <div className="mx-4 sm:mx-8 shrink-0 flex flex-col items-center">
             <div className="bg-white p-2 rounded-b-2xl shadow-md -mt-1 mb-1 flex items-center justify-center">
               <img src="/logo-muc.jpg" alt="MUC Omnisports" className="h-10 w-auto object-contain" />
             </div>
@@ -103,21 +115,19 @@ const Home = () => {
         </div>
 
         {/* Menu Droite */}
-        <div className="hidden lg:flex gap-6 text-[13px] font-black uppercase tracking-wider text-slate-700 flex-1 items-center justify-end">
-          <a href="#activites" onClick={(e) => handleScroll(e, 'activites')} className="hover:text-muc-blue transition-colors">Activités</a>
-          <a href="#infos" onClick={(e) => handleScroll(e, 'infos')} className="hover:text-muc-blue transition-colors">Infos</a>
-          <Link to="/planning?mode=devis" className="bg-slate-100 text-slate-800 border border-slate-300 px-4 py-2 rounded-lg text-xs font-black hover:bg-slate-200 transition-all shadow-sm">
-            DEMANDER UN DEVIS
-          </Link>
-          <Link to="/planning" className="bg-muc-yellow text-muc-blue px-5 py-2 rounded-lg text-xs font-black hover:bg-[#E5A600] transition-all shadow-sm">
+        <div className="hidden lg:flex gap-6 text-[13px] font-black uppercase tracking-wider text-slate-700 flex-1 items-center justify-between">
+          <div className="flex gap-8 items-center">
+            <a href="#activites" onClick={(e) => handleScroll(e, 'activites')} className="hover:text-muc-blue transition-colors">Activités</a>
+            <a href="#infos" onClick={(e) => handleScroll(e, 'infos')} className="hover:text-muc-blue transition-colors">Infos</a>
+          </div>
+          <Link to="/planning" className="bg-muc-yellow text-muc-blue px-5 py-2 rounded-lg text-xs font-black hover:bg-[#E5A600] transition-all shadow-sm whitespace-nowrap">
             RÉSERVER
           </Link>
         </div>
 
-        {/* Mobile menu toggle simplified */}
-        <div className="lg:hidden flex-1 flex justify-end gap-2">
-           <Link to="/planning?mode=devis" className="bg-slate-100 text-slate-800 px-3 py-1.5 rounded-lg text-[11px] font-black">DEVIS</Link>
-           <Link to="/planning" className="bg-muc-yellow text-muc-blue px-3 py-1.5 rounded-lg text-[11px] font-black">RÉSERVER</Link>
+        {/* Mobile Droite - Bouton Réserver */}
+        <div className="lg:hidden flex-1 flex justify-end">
+           <Link to="/planning" className="bg-muc-yellow text-muc-blue px-3 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap">RÉSERVER</Link>
         </div>
       </nav>
 
@@ -523,16 +533,19 @@ const Home = () => {
              </Link>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-16 max-w-4xl mx-auto mb-20">
-            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors" data-reveal="left">
-              <p className="font-black text-2xl mb-4 text-muc-yellow uppercase tracking-tight">David Roujet</p>
-              <p className="text-lg font-medium text-blue-100 mb-2">david.roujet@mucomnisports.fr</p>
-              <p className="text-2xl font-black text-white">06 67 99 36 81</p>
-            </div>
-            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors" data-reveal="right">
+          <div className="flex justify-center max-w-xl mx-auto mb-20" data-reveal="bottom">
+            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors w-full max-w-md text-center">
               <p className="font-black text-2xl mb-4 text-muc-yellow uppercase tracking-tight">Philippe Morereau</p>
-              <p className="text-lg font-medium text-blue-100 mb-2">philippe.morereau@mucomnisports.fr</p>
-              <p className="text-2xl font-black text-white">07 52 62 79 62</p>
+              <p className="text-lg font-medium text-blue-100 mb-2">
+                <a href="mailto:philippe.morereau@mucomnisports.fr" className="hover:underline">
+                  philippe.morereau@mucomnisports.fr
+                </a>
+              </p>
+              <p className="text-2xl font-black text-white">
+                <a href="tel:0752627962" className="hover:text-muc-yellow transition-colors">
+                  07 52 62 79 62
+                </a>
+              </p>
             </div>
           </div>
 
